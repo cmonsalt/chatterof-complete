@@ -8,6 +8,8 @@ export default function Dashboard() {
   const { modelId } = useAuth()
   const navigate = useNavigate()
   const [fans, setFans] = useState([])
+  const [filteredFans, setFilteredFans] = useState([])
+  const [searchQuery, setSearchQuery] = useState('')
   const [loading, setLoading] = useState(true)
   const [showAddFan, setShowAddFan] = useState(false)
   const [newFanId, setNewFanId] = useState('')
@@ -19,16 +21,31 @@ export default function Dashboard() {
     }
   }, [modelId])
 
+  useEffect(() => {
+    // Filtrar fans según búsqueda
+    if (searchQuery.trim() === '') {
+      setFilteredFans(fans)
+    } else {
+      const filtered = fans.filter(fan => 
+        fan.fan_id.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        fan.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        fan.tier?.toLowerCase().includes(searchQuery.toLowerCase())
+      )
+      setFilteredFans(filtered)
+    }
+  }, [searchQuery, fans])
+
   const loadFans = async () => {
     try {
-      const { data, error } = await supabase
+      const { data, error} = await supabase
         .from('fans')
         .select('*')
         .eq('model_id', modelId)
-        .order('last_update', { ascending: false, nullsFirst: false })
+        .order('last_message_date', { ascending: false, nullsFirst: false })
 
       if (error) throw error
       setFans(data || [])
+      setFilteredFans(data || [])
     } catch (error) {
       console.error('Error loading fans:', error)
     } finally {
@@ -97,6 +114,44 @@ export default function Dashboard() {
           </button>
         </div>
 
+        {/* Search Bar */}
+        <div className="card" style={{ marginBottom: '2rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <span style={{ fontSize: '1.25rem' }}>🔍</span>
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search fans by ID, name, or tier..."
+              style={{
+                flex: 1,
+                padding: '0.75rem',
+                border: '2px solid #e5e7eb',
+                borderRadius: '0.375rem',
+                fontSize: '1rem'
+              }}
+            />
+            {searchQuery && (
+              <button
+                onClick={() => setSearchQuery('')}
+                style={{
+                  padding: '0.75rem 1rem',
+                  background: '#f3f4f6',
+                  borderRadius: '0.375rem',
+                  fontWeight: 500
+                }}
+              >
+                Clear
+              </button>
+            )}
+          </div>
+          {searchQuery && (
+            <div style={{ marginTop: '0.5rem', fontSize: '0.875rem', color: '#6b7280' }}>
+              Found {filteredFans.length} result{filteredFans.length !== 1 ? 's' : ''}
+            </div>
+          )}
+        </div>
+
         {showAddFan && (
           <div className="card" style={{ marginBottom: '2rem' }}>
             <h3 style={{ fontSize: '1.125rem', fontWeight: 600, marginBottom: '1rem' }}>
@@ -154,15 +209,15 @@ export default function Dashboard() {
           </div>
         )}
 
-        {fans.length === 0 ? (
+        {filteredFans.length === 0 ? (
           <div className="card" style={{ textAlign: 'center', padding: '3rem' }}>
             <p style={{ color: '#6b7280', marginBottom: '1rem' }}>
-              No fans yet. Add your first fan to start chatting!
+              {searchQuery ? 'No fans found matching your search' : 'No fans yet. Add your first fan to start chatting!'}
             </p>
           </div>
         ) : (
           <div style={{ display: 'grid', gap: '1rem' }}>
-            {fans.map((fan) => (
+            {filteredFans.map((fan) => (
               <div
                 key={fan.fan_id}
                 onClick={() => navigate(`/chat/${fan.fan_id}`)}
