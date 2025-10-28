@@ -92,11 +92,40 @@ export default function ChatView() {
     }
   }
 
-  const handleCopyAndClear = () => {
+  const handleCopyAndClear = async () => {
     if (aiResponse) {
-      navigator.clipboard.writeText(aiResponse.texto)
-      setMessage('')
-      setAiResponse(null)
+      try {
+        // Copiar al portapapeles
+        navigator.clipboard.writeText(aiResponse.texto)
+        
+        // Guardar mensaje del fan
+        await supabase.from('chat').insert({
+          fan_id: fanId,
+          model_id: modelId,
+          sender: 'fan',
+          message: message
+        })
+        
+        // Guardar respuesta del modelo
+        await supabase.from('chat').insert({
+          fan_id: fanId,
+          model_id: modelId,
+          sender: 'chatter',
+          message: aiResponse.texto
+        })
+        
+        // Actualizar historial
+        loadChatHistory()
+        
+        // Limpiar
+        setMessage('')
+        setAiResponse(null)
+        
+        alert('✅ Chat saved and copied to clipboard!')
+      } catch (error) {
+        console.error('Error saving chat:', error)
+        alert('Error saving chat: ' + error.message)
+      }
     }
   }
 
@@ -188,7 +217,8 @@ export default function ChatView() {
   return (
     <>
       <Navbar />
-      <div className="max-w-5xl mx-auto p-4 lg:p-6">
+      <div className="max-w-6xl mx-auto p-4 lg:p-6">
+        
         {/* Header con info del fan */}
         <div className="bg-white rounded-xl shadow-lg p-6 mb-6">
           <div className="flex justify-between items-center">
@@ -201,6 +231,12 @@ export default function ChatView() {
               </p>
             </div>
             <div className="flex items-center gap-4">
+              <button
+                onClick={() => setShowTransactionModal(true)}
+                className="bg-gradient-to-r from-green-500 to-emerald-600 hover:shadow-xl text-white py-3 px-6 rounded-lg font-semibold transition-all"
+              >
+                💰 Register Transaction
+              </button>
               <div className="text-right">
                 <div className="text-2xl font-bold text-green-600">
                   ${fan.spent_total || 0}
@@ -217,153 +253,161 @@ export default function ChatView() {
           </div>
         </div>
 
-        {/* Botones de acción rápida */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
-          <button
-            onClick={handleReactivate}
-            disabled={generating}
-            className="bg-purple-600 hover:bg-purple-700 text-white py-3 px-4 rounded-lg font-semibold transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            🔄 Reactivate
-          </button>
-          <button
-            onClick={handleOfferCustom}
-            disabled={generating}
-            className="bg-amber-600 hover:bg-amber-700 text-white py-3 px-4 rounded-lg font-semibold transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            🎨 Offer Custom
-          </button>
-          <button
-            onClick={() => setShowTransactionModal(true)}
-            className="bg-gradient-to-r from-green-500 to-emerald-600 hover:shadow-lg text-white py-3 px-4 rounded-lg font-semibold transition-all col-span-2"
-          >
-            💰 Register Transaction
-          </button>
-        </div>
-
-        {/* Chat History */}
-        <div className="bg-white rounded-xl shadow-lg p-6 mb-6 max-h-80 overflow-y-auto">
-          <h3 className="text-lg font-semibold text-gray-700 mb-4">
-            Recent Conversation
-          </h3>
-          {chatHistory.length === 0 ? (
-            <p className="text-gray-400 text-center py-8">No messages yet</p>
-          ) : (
-            <div className="space-y-3">
-              {chatHistory.slice(-10).map((msg, idx) => (
-                <div
-                  key={idx}
-                  className={`p-4 rounded-lg border-l-4 ${
-                    msg.sender === 'fan' 
-                      ? 'bg-gray-50 border-gray-400' 
-                      : 'bg-blue-50 border-blue-500'
-                  }`}
-                >
-                  <div className="text-xs font-semibold text-gray-500 mb-1">
-                    {msg.sender === 'fan' ? 'Fan' : 'Model'}
-                  </div>
-                  <div className="text-sm text-gray-800">
-                    {msg.message}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* Input area */}
-        <div className="bg-white rounded-xl shadow-lg p-6 mb-6">
-          <h3 className="text-lg font-semibold text-gray-800 mb-4">
-            Fan's New Message
-          </h3>
-          <textarea
-            value={message}
-            onChange={(e) => setMessage(e.target.value)}
-            placeholder="Enter fan's message here..."
-            rows={4}
-            className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent resize-none mb-4"
-          />
-          <button
-            onClick={handleGenerate}
-            disabled={generating || !message.trim()}
-            className="w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:shadow-lg text-white py-4 rounded-lg font-semibold text-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {generating ? '🤖 Generating...' : '🤖 Generate AI Response'}
-          </button>
-        </div>
-
-        {/* AI Response */}
-        {aiResponse && (
-          <div className={`bg-white rounded-xl shadow-lg p-6 border-2 ${getAccionColor(aiResponse.accion)} border-opacity-50`}>
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-xl font-bold text-gray-800">
-                AI Response
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          
+          {/* COLUMNA IZQUIERDA - Chat History */}
+          <div className="space-y-6">
+            <div className="bg-white rounded-xl shadow-lg p-6">
+              <h3 className="text-lg font-semibold text-gray-700 mb-4 flex items-center gap-2">
+                <span>💬</span> Recent Conversation
               </h3>
-              <span className={`${getAccionColor(aiResponse.accion)} text-white px-4 py-2 rounded-lg text-sm font-semibold`}>
-                {getAccionText(aiResponse.accion)}
-              </span>
-            </div>
-
-            {/* Response text */}
-            <div className="bg-gray-50 rounded-lg p-4 mb-4 text-lg leading-relaxed">
-              {aiResponse.texto}
-            </div>
-
-            {/* Instructions */}
-            {aiResponse.instrucciones_chatter && (
-              <div className="bg-blue-50 border-l-4 border-blue-500 p-4 mb-4">
-                <div className="font-semibold text-blue-800 mb-2">📋 Instructions:</div>
-                <div className="text-blue-700">{aiResponse.instrucciones_chatter}</div>
-              </div>
-            )}
-
-            {/* Suggested content */}
-            {aiResponse.contenido_sugerido && (
-              <div className="bg-amber-50 border-l-4 border-amber-500 p-4 mb-4">
-                <div className="font-semibold text-amber-800 mb-2">
-                  📦 Suggested Content:
-                </div>
-                <div className="text-sm text-amber-700 space-y-1">
-                  <div><strong>ID:</strong> {aiResponse.contenido_sugerido.offer_id}</div>
-                  <div><strong>Title:</strong> {aiResponse.contenido_sugerido.title}</div>
-                  <div><strong>Price:</strong> ${aiResponse.contenido_sugerido.price}</div>
-                  <div><strong>Description:</strong> {aiResponse.contenido_sugerido.description}</div>
-                </div>
-              </div>
-            )}
-
-            {/* Context */}
-            {aiResponse.contexto && (
-              <div className="bg-gray-100 rounded-lg p-4 text-sm text-gray-700 mb-4 space-y-1">
-                <div className="font-semibold text-gray-800 mb-2">ℹ️ Context:</div>
-                <div>Tier: {aiResponse.contexto.fan_tier}</div>
-                <div>Total Spent: ${aiResponse.contexto.spent_total}</div>
-                <div>Messages this session: {aiResponse.contexto.mensajes_sesion}</div>
-                {aiResponse.contexto.recent_tip && (
-                  <div className="text-green-600 font-semibold">
-                    💰 Recent tip: ${aiResponse.contexto.recent_tip.amount} ({aiResponse.contexto.recent_tip.minutes_ago} min ago)
-                  </div>
+              <div className="space-y-3 max-h-[500px] overflow-y-auto">
+                {chatHistory.length === 0 ? (
+                  <p className="text-gray-400 text-center py-8">No messages yet</p>
+                ) : (
+                  chatHistory.slice(-20).map((msg, idx) => (
+                    <div
+                      key={idx}
+                      className={`p-4 rounded-lg border-l-4 ${
+                        msg.sender === 'fan' 
+                          ? 'bg-gray-50 border-gray-400' 
+                          : 'bg-blue-50 border-blue-500'
+                      }`}
+                    >
+                      <div className="text-xs font-semibold text-gray-500 mb-1">
+                        {msg.sender === 'fan' ? '👤 Fan' : '💎 Model'}
+                      </div>
+                      <div className="text-sm text-gray-800">
+                        {msg.message}
+                      </div>
+                      <div className="text-xs text-gray-400 mt-1">
+                        {new Date(msg.ts).toLocaleString()}
+                      </div>
+                    </div>
+                  ))
                 )}
               </div>
-            )}
-
-            {/* Action buttons */}
-            <div className="flex gap-3">
-              <button
-                onClick={handleCopyAndClear}
-                className="flex-1 bg-green-600 hover:bg-green-700 text-white py-3 rounded-lg font-semibold transition-all"
-              >
-                📋 Copy Text & Clear
-              </button>
-              <button
-                onClick={() => setAiResponse(null)}
-                className="px-6 bg-gray-200 hover:bg-gray-300 text-gray-800 py-3 rounded-lg font-semibold transition-all"
-              >
-                ✕ Close
-              </button>
             </div>
           </div>
-        )}
+
+          {/* COLUMNA DERECHA - AI Chat Generator */}
+          <div className="space-y-6">
+            
+            {/* Input area */}
+            <div className="bg-white rounded-xl shadow-lg p-6">
+              <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
+                <span>🤖</span> AI Chat Generator
+              </h3>
+              
+              <textarea
+                value={message}
+                onChange={(e) => setMessage(e.target.value)}
+                placeholder="Enter fan's message here..."
+                rows={4}
+                className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent resize-none mb-4"
+              />
+              
+              {/* Botones AI */}
+              <div className="grid grid-cols-3 gap-2 mb-4">
+                <button
+                  onClick={handleGenerate}
+                  disabled={generating || !message.trim()}
+                  className="col-span-3 bg-gradient-to-r from-purple-600 to-pink-600 hover:shadow-lg text-white py-4 rounded-lg font-semibold text-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {generating ? '🤖 Generating...' : '🤖 Generate Response'}
+                </button>
+                
+                <button
+                  onClick={handleReactivate}
+                  disabled={generating}
+                  className="bg-purple-600 hover:bg-purple-700 text-white py-3 rounded-lg font-semibold text-sm transition-all disabled:opacity-50"
+                >
+                  🔄 Reactivate
+                </button>
+                <button
+                  onClick={handleOfferCustom}
+                  disabled={generating}
+                  className="col-span-2 bg-amber-600 hover:bg-amber-700 text-white py-3 rounded-lg font-semibold text-sm transition-all disabled:opacity-50"
+                >
+                  🎨 Offer Custom Content
+                </button>
+              </div>
+            </div>
+
+            {/* AI Response */}
+            {aiResponse && (
+              <div className={`bg-white rounded-xl shadow-lg p-6 border-2 ${getAccionColor(aiResponse.accion)} border-opacity-50`}>
+                <div className="flex justify-between items-center mb-4">
+                  <h3 className="text-xl font-bold text-gray-800">
+                    AI Response
+                  </h3>
+                  <span className={`${getAccionColor(aiResponse.accion)} text-white px-4 py-2 rounded-lg text-sm font-semibold`}>
+                    {getAccionText(aiResponse.accion)}
+                  </span>
+                </div>
+
+                {/* Response text */}
+                <div className="bg-gray-50 rounded-lg p-4 mb-4 text-lg leading-relaxed">
+                  {aiResponse.texto}
+                </div>
+
+                {/* Instructions */}
+                {aiResponse.instrucciones_chatter && (
+                  <div className="bg-blue-50 border-l-4 border-blue-500 p-4 mb-4">
+                    <div className="font-semibold text-blue-800 mb-2">📋 Instructions:</div>
+                    <div className="text-blue-700">{aiResponse.instrucciones_chatter}</div>
+                  </div>
+                )}
+
+                {/* Suggested content */}
+                {aiResponse.contenido_sugerido && (
+                  <div className="bg-amber-50 border-l-4 border-amber-500 p-4 mb-4">
+                    <div className="font-semibold text-amber-800 mb-2">
+                      📦 Suggested Content:
+                    </div>
+                    <div className="text-sm text-amber-700 space-y-1">
+                      <div><strong>ID:</strong> {aiResponse.contenido_sugerido.offer_id}</div>
+                      <div><strong>Title:</strong> {aiResponse.contenido_sugerido.title}</div>
+                      <div><strong>Price:</strong> ${aiResponse.contenido_sugerido.price}</div>
+                      <div><strong>Description:</strong> {aiResponse.contenido_sugerido.description}</div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Context */}
+                {aiResponse.contexto && (
+                  <div className="bg-gray-100 rounded-lg p-4 text-sm text-gray-700 mb-4 space-y-1">
+                    <div className="font-semibold text-gray-800 mb-2">ℹ️ Context:</div>
+                    <div>Tier: {aiResponse.contexto.fan_tier}</div>
+                    <div>Total Spent: ${aiResponse.contexto.spent_total}</div>
+                    <div>Messages this session: {aiResponse.contexto.mensajes_sesion}</div>
+                    {aiResponse.contexto.recent_tip && (
+                      <div className="text-green-600 font-semibold">
+                        💰 Recent tip: ${aiResponse.contexto.recent_tip.amount} ({aiResponse.contexto.recent_tip.minutes_ago} min ago)
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Action buttons */}
+                <div className="flex gap-3">
+                  <button
+                    onClick={handleCopyAndClear}
+                    className="flex-1 bg-green-600 hover:bg-green-700 text-white py-3 rounded-lg font-semibold transition-all"
+                  >
+                    📋 Copy & Save to Chat
+                  </button>
+                  <button
+                    onClick={() => setAiResponse(null)}
+                    className="px-6 bg-gray-200 hover:bg-gray-300 text-gray-800 py-3 rounded-lg font-semibold transition-all"
+                  >
+                    ✕ Close
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
       </div>
 
       {/* Transaction Modal */}
