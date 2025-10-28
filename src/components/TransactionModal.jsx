@@ -14,8 +14,11 @@ export default function TransactionModal({
   
   // Estados para Compra
   const [catalog, setCatalog] = useState([])
+  const [filteredCatalog, setFilteredCatalog] = useState([])
+  const [catalogSearch, setCatalogSearch] = useState('')
   const [selectedOffer, setSelectedOffer] = useState(null)
   const [tierRules, setTierRules] = useState([])
+  const [customPrice, setCustomPrice] = useState('')
   
   // Estados para Tip y Suscripción
   const [amount, setAmount] = useState('')
@@ -26,8 +29,32 @@ export default function TransactionModal({
     if (isOpen) {
       loadCatalog()
       loadTierRules()
+      
+      // Actualizar payment method según el tab activo
+      if (activeTab === 'compra') {
+        setPaymentMethod('locked_content')
+      } else if (activeTab === 'tip') {
+        setPaymentMethod('tip')
+      } else if (activeTab === 'suscripcion') {
+        setPaymentMethod('subscription')
+      }
     }
-  }, [isOpen, modelId])
+  }, [isOpen, modelId, activeTab])
+
+  useEffect(() => {
+    // Filtrar catálogo según búsqueda
+    if (catalogSearch.trim() === '') {
+      setFilteredCatalog(catalog)
+    } else {
+      const filtered = catalog.filter(item => 
+        item.title.toLowerCase().includes(catalogSearch.toLowerCase()) ||
+        item.description?.toLowerCase().includes(catalogSearch.toLowerCase()) ||
+        item.tags?.toLowerCase().includes(catalogSearch.toLowerCase()) ||
+        item.offer_id.toLowerCase().includes(catalogSearch.toLowerCase())
+      )
+      setFilteredCatalog(filtered)
+    }
+  }, [catalogSearch, catalog])
 
   const loadCatalog = async () => {
     try {
@@ -39,6 +66,7 @@ export default function TransactionModal({
 
       if (error) throw error
       setCatalog(data || [])
+      setFilteredCatalog(data || [])
     } catch (error) {
       console.error('Error loading catalog:', error)
     }
@@ -83,7 +111,11 @@ export default function TransactionModal({
           return
         }
         
-        const finalPrice = calculatePrice(selectedOffer.base_price)
+        // Usar precio personalizado si existe, sino el calculado
+        const finalPrice = customPrice && parseFloat(customPrice) > 0 
+          ? parseFloat(customPrice) 
+          : calculatePrice(selectedOffer.base_price)
+        
         transactionData.amount = finalPrice
         transactionData.offer_id = selectedOffer.offer_id
         transactionData.description = selectedOffer.title
@@ -146,7 +178,15 @@ export default function TransactionModal({
     setSelectedOffer(null)
     setAmount('')
     setNotes('')
-    setPaymentMethod('locked_content')
+    setCustomPrice('')
+    setCatalogSearch('')
+    if (activeTab === 'compra') {
+      setPaymentMethod('locked_content')
+    } else if (activeTab === 'tip') {
+      setPaymentMethod('tip')
+    } else if (activeTab === 'suscripcion') {
+      setPaymentMethod('subscription')
+    }
   }
 
   if (!isOpen) return null
@@ -206,20 +246,36 @@ export default function TransactionModal({
             <div className="space-y-4">
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  🔍 Search Catalog
+                </label>
+                <input
+                  type="text"
+                  value={catalogSearch}
+                  onChange={(e) => setCatalogSearch(e.target.value)}
+                  placeholder="Search by title, tags, or offer ID..."
+                  className="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
                   Select Content from Catalog
                 </label>
-                {catalog.length === 0 ? (
+                {filteredCatalog.length === 0 ? (
                   <div className="text-center py-8 text-gray-500">
-                    No content available in catalog
+                    {catalogSearch ? 'No results found' : 'No content available in catalog'}
                   </div>
                 ) : (
                   <div className="space-y-2 max-h-64 overflow-y-auto">
-                    {catalog.map((item) => {
-                      const finalPrice = calculatePrice(item.base_price)
+                    {filteredCatalog.map((item) => {
+                      const calculatedPrice = calculatePrice(item.base_price)
                       return (
                         <div
                           key={item.offer_id}
-                          onClick={() => setSelectedOffer(item)}
+                          onClick={() => {
+                            setSelectedOffer(item)
+                            setCustomPrice('') // Reset custom price when selecting new item
+                          }}
                           className={`p-4 rounded-lg border-2 cursor-pointer transition-all ${
                             selectedOffer?.offer_id === item.offer_id
                               ? 'border-purple-600 bg-purple-50'
@@ -227,7 +283,7 @@ export default function TransactionModal({
                           }`}
                         >
                           <div className="flex justify-between items-start">
-                            <div>
+                            <div className="flex-1">
                               <div className="font-semibold text-gray-800">
                                 {item.title}
                               </div>
@@ -235,12 +291,12 @@ export default function TransactionModal({
                                 {item.description}
                               </div>
                               <div className="text-xs text-gray-400 mt-1">
-                                Level {item.nivel} • {item.tags}
+                                Level {item.nivel} • {item.tags} • ID: {item.offer_id}
                               </div>
                             </div>
-                            <div className="text-right">
+                            <div className="text-right ml-4">
                               <div className="text-lg font-bold text-green-600">
-                                ${finalPrice}
+                                ${calculatedPrice}
                               </div>
                               <div className="text-xs text-gray-500">
                                 Base: ${item.base_price}
@@ -255,18 +311,41 @@ export default function TransactionModal({
               </div>
 
               {selectedOffer && (
-                <div className="bg-purple-50 border-2 border-purple-200 rounded-lg p-4">
+                <div className="bg-purple-50 border-2 border-purple-200 rounded-lg p-4 space-y-3">
                   <div className="flex justify-between items-center">
                     <div>
                       <div className="text-sm text-gray-600">Selected:</div>
                       <div className="font-bold text-gray-800">{selectedOffer.title}</div>
                     </div>
                     <div className="text-right">
-                      <div className="text-sm text-gray-600">Final Price:</div>
+                      <div className="text-sm text-gray-600">Calculated Price:</div>
                       <div className="text-2xl font-bold text-green-600">
                         ${calculatePrice(selectedOffer.base_price)}
                       </div>
                     </div>
+                  </div>
+
+                  {/* Campo de precio personalizado */}
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">
+                      💵 Custom Price (optional - override calculated price)
+                    </label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={customPrice}
+                      onChange={(e) => setCustomPrice(e.target.value)}
+                      placeholder={`Leave empty to use $${calculatePrice(selectedOffer.base_price)}`}
+                      className="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                    />
+                    {customPrice && parseFloat(customPrice) > 0 && (
+                      <div className="mt-2 text-sm">
+                        <span className="text-amber-600 font-semibold">
+                          ⚠️ Final price will be: ${parseFloat(customPrice).toFixed(2)}
+                        </span>
+                      </div>
+                    )}
                   </div>
                 </div>
               )}
@@ -360,10 +439,22 @@ export default function TransactionModal({
                 onChange={(e) => setPaymentMethod(e.target.value)}
                 className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
               >
-                <option value="locked_content">Locked Content</option>
-                <option value="direct_tip">Direct Tip</option>
-                <option value="subscription">Subscription</option>
-                <option value="other">Other</option>
+                {activeTab === 'compra' && (
+                  <>
+                    <option value="locked_content">Locked Content</option>
+                    <option value="direct_tip">Direct Tip</option>
+                    <option value="other">Other</option>
+                  </>
+                )}
+                {activeTab === 'tip' && (
+                  <>
+                    <option value="tip">Tip</option>
+                    <option value="direct_tip">Direct Tip</option>
+                  </>
+                )}
+                {activeTab === 'suscripcion' && (
+                  <option value="subscription">Subscription</option>
+                )}
               </select>
             </div>
 
