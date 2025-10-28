@@ -47,7 +47,7 @@ export default function ChatView() {
         .from('chat')
         .select('*')
         .eq('fan_id', fanId)
-        .order('timestamp', { ascending: true })
+        .order('ts', { ascending: true })
 
       if (error) throw error
       setChatHistory(data || [])
@@ -257,13 +257,13 @@ export default function ChatView() {
                   key={idx}
                   style={{
                     padding: '0.75rem',
-                    background: msg.from === 'fan' ? '#f3f4f6' : '#dbeafe',
+                    background: msg.sender === 'fan' ? '#f3f4f6' : '#dbeafe',
                     borderRadius: '0.375rem',
-                    borderLeft: `3px solid ${msg.from === 'fan' ? '#6b7280' : '#3b82f6'}`
+                    borderLeft: `3px solid ${msg.sender === 'fan' ? '#6b7280' : '#3b82f6'}`
                   }}
                 >
                   <div style={{ fontSize: '0.75rem', fontWeight: 600, marginBottom: '0.25rem', color: '#6b7280' }}>
-                    {msg.from === 'fan' ? 'Fan' : 'Model'}
+                    {msg.sender === 'fan' ? 'Fan' : 'Model'}
                   </div>
                   <div style={{ fontSize: '0.875rem' }}>
                     {msg.message}

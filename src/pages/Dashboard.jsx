@@ -25,7 +25,7 @@ export default function Dashboard() {
         .from('fans')
         .select('*')
         .eq('model_id', modelId)
-        .order('last_message_date', { ascending: false, nullsFirst: false })
+        .order('last_update', { ascending: false, nullsFirst: false })
 
       if (error) throw error
       setFans(data || [])
