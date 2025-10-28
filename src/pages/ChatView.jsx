@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
 import Navbar from '../components/Navbar'
+import TransactionModal from '../components/TransactionModal'
 
 export default function ChatView() {
   const { fanId } = useParams()
@@ -15,6 +16,7 @@ export default function ChatView() {
   const [aiResponse, setAiResponse] = useState(null)
   const [loading, setLoading] = useState(true)
   const [generating, setGenerating] = useState(false)
+  const [showTransactionModal, setShowTransactionModal] = useState(false)
 
   useEffect(() => {
     loadFanData()
@@ -156,8 +158,8 @@ export default function ChatView() {
     return (
       <>
         <Navbar />
-        <div style={{ display: 'flex', justifyContent: 'center', padding: '3rem' }}>
-          <div className="spinner"></div>
+        <div className="flex justify-center items-center min-h-screen">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600"></div>
         </div>
       </>
     )
@@ -165,11 +167,11 @@ export default function ChatView() {
 
   const getAccionColor = (accion) => {
     switch(accion) {
-      case 'SOLO_TEXTO': return '#10b981'
-      case 'CONTENIDO_SUGERIDO': return '#f59e0b'
-      case 'ENVIAR_DESBLOQUEADO': return '#8b5cf6'
-      case 'CUSTOM_REQUEST': return '#ef4444'
-      default: return '#6b7280'
+      case 'SOLO_TEXTO': return 'bg-green-500'
+      case 'CONTENIDO_SUGERIDO': return 'bg-amber-500'
+      case 'ENVIAR_DESBLOQUEADO': return 'bg-purple-500'
+      case 'CUSTOM_REQUEST': return 'bg-red-500'
+      default: return 'bg-gray-500'
     }
   }
 
@@ -186,24 +188,28 @@ export default function ChatView() {
   return (
     <>
       <Navbar />
-      <div className="container" style={{ maxWidth: '900px' }}>
+      <div className="max-w-5xl mx-auto p-4 lg:p-6">
         {/* Header con info del fan */}
-        <div className="card" style={{ marginBottom: '1.5rem' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div className="bg-white rounded-xl shadow-lg p-6 mb-6">
+          <div className="flex justify-between items-center">
             <div>
-              <h2 style={{ fontSize: '1.5rem', fontWeight: 'bold', marginBottom: '0.25rem' }}>
+              <h2 className="text-2xl font-bold text-gray-800 mb-1">
                 {fan.name || 'Unknown'}
               </h2>
-              <p style={{ fontSize: '0.875rem', color: '#6b7280' }}>
+              <p className="text-sm text-gray-500">
                 {fan.fan_id}
               </p>
             </div>
-            <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
-              <div style={{ textAlign: 'right' }}>
-                <div style={{ fontSize: '1.25rem', fontWeight: 'bold', color: '#059669' }}>
+            <div className="flex items-center gap-4">
+              <div className="text-right">
+                <div className="text-2xl font-bold text-green-600">
                   ${fan.spent_total || 0}
                 </div>
-                <span className={`badge badge-${fan.tier.toLowerCase()}`}>
+                <span className={`inline-block px-3 py-1 rounded-full text-sm font-semibold ${
+                  fan.tier === 'WHALE' ? 'bg-purple-100 text-purple-800' :
+                  fan.tier === 'VIP' ? 'bg-blue-100 text-blue-800' :
+                  'bg-gray-100 text-gray-800'
+                }`}>
                   {fan.tier}
                 </span>
               </div>
@@ -212,60 +218,51 @@ export default function ChatView() {
         </div>
 
         {/* Botones de acción rápida */}
-        <div style={{ display: 'flex', gap: '1rem', marginBottom: '1.5rem' }}>
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
           <button
             onClick={handleReactivate}
             disabled={generating}
-            style={{
-              flex: 1,
-              padding: '0.75rem',
-              background: '#8b5cf6',
-              color: 'white',
-              borderRadius: '0.375rem',
-              fontWeight: 500
-            }}
+            className="bg-purple-600 hover:bg-purple-700 text-white py-3 px-4 rounded-lg font-semibold transition-all disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            🔄 Reactivate Fan
+            🔄 Reactivate
           </button>
           <button
             onClick={handleOfferCustom}
             disabled={generating}
-            style={{
-              flex: 1,
-              padding: '0.75rem',
-              background: '#f59e0b',
-              color: 'white',
-              borderRadius: '0.375rem',
-              fontWeight: 500
-            }}
+            className="bg-amber-600 hover:bg-amber-700 text-white py-3 px-4 rounded-lg font-semibold transition-all disabled:opacity-50 disabled:cursor-not-allowed"
           >
             🎨 Offer Custom
+          </button>
+          <button
+            onClick={() => setShowTransactionModal(true)}
+            className="bg-gradient-to-r from-green-500 to-emerald-600 hover:shadow-lg text-white py-3 px-4 rounded-lg font-semibold transition-all col-span-2"
+          >
+            💰 Register Transaction
           </button>
         </div>
 
         {/* Chat History */}
-        <div className="card" style={{ marginBottom: '1.5rem', maxHeight: '300px', overflowY: 'auto' }}>
-          <h3 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: '1rem', color: '#6b7280' }}>
+        <div className="bg-white rounded-xl shadow-lg p-6 mb-6 max-h-80 overflow-y-auto">
+          <h3 className="text-lg font-semibold text-gray-700 mb-4">
             Recent Conversation
           </h3>
           {chatHistory.length === 0 ? (
-            <p style={{ color: '#9ca3af', fontSize: '0.875rem' }}>No messages yet</p>
+            <p className="text-gray-400 text-center py-8">No messages yet</p>
           ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+            <div className="space-y-3">
               {chatHistory.slice(-10).map((msg, idx) => (
                 <div
                   key={idx}
-                  style={{
-                    padding: '0.75rem',
-                    background: msg.sender === 'fan' ? '#f3f4f6' : '#dbeafe',
-                    borderRadius: '0.375rem',
-                    borderLeft: `3px solid ${msg.sender === 'fan' ? '#6b7280' : '#3b82f6'}`
-                  }}
+                  className={`p-4 rounded-lg border-l-4 ${
+                    msg.sender === 'fan' 
+                      ? 'bg-gray-50 border-gray-400' 
+                      : 'bg-blue-50 border-blue-500'
+                  }`}
                 >
-                  <div style={{ fontSize: '0.75rem', fontWeight: 600, marginBottom: '0.25rem', color: '#6b7280' }}>
+                  <div className="text-xs font-semibold text-gray-500 mb-1">
                     {msg.sender === 'fan' ? 'Fan' : 'Model'}
                   </div>
-                  <div style={{ fontSize: '0.875rem' }}>
+                  <div className="text-sm text-gray-800">
                     {msg.message}
                   </div>
                 </div>
@@ -275,8 +272,8 @@ export default function ChatView() {
         </div>
 
         {/* Input area */}
-        <div className="card" style={{ marginBottom: '1.5rem' }}>
-          <h3 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: '1rem' }}>
+        <div className="bg-white rounded-xl shadow-lg p-6 mb-6">
+          <h3 className="text-lg font-semibold text-gray-800 mb-4">
             Fan's New Message
           </h3>
           <textarea
@@ -284,23 +281,12 @@ export default function ChatView() {
             onChange={(e) => setMessage(e.target.value)}
             placeholder="Enter fan's message here..."
             rows={4}
-            style={{
-              marginBottom: '1rem',
-              resize: 'vertical'
-            }}
+            className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent resize-none mb-4"
           />
           <button
             onClick={handleGenerate}
             disabled={generating || !message.trim()}
-            style={{
-              width: '100%',
-              padding: '0.75rem',
-              background: '#3b82f6',
-              color: 'white',
-              borderRadius: '0.375rem',
-              fontWeight: 500,
-              fontSize: '1rem'
-            }}
+            className="w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:shadow-lg text-white py-4 rounded-lg font-semibold text-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {generating ? '🤖 Generating...' : '🤖 Generate AI Response'}
           </button>
@@ -308,63 +294,36 @@ export default function ChatView() {
 
         {/* AI Response */}
         {aiResponse && (
-          <div className="card" style={{ 
-            marginBottom: '1.5rem',
-            border: `2px solid ${getAccionColor(aiResponse.accion)}`
-          }}>
-            <div style={{ 
-              display: 'flex', 
-              justifyContent: 'space-between', 
-              alignItems: 'center',
-              marginBottom: '1rem'
-            }}>
-              <h3 style={{ fontSize: '1.125rem', fontWeight: 600 }}>
+          <div className={`bg-white rounded-xl shadow-lg p-6 border-2 ${getAccionColor(aiResponse.accion)} border-opacity-50`}>
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-xl font-bold text-gray-800">
                 AI Response
               </h3>
-              <span style={{
-                padding: '0.25rem 0.75rem',
-                background: getAccionColor(aiResponse.accion),
-                color: 'white',
-                borderRadius: '0.375rem',
-                fontSize: '0.75rem',
-                fontWeight: 600
-              }}>
+              <span className={`${getAccionColor(aiResponse.accion)} text-white px-4 py-2 rounded-lg text-sm font-semibold`}>
                 {getAccionText(aiResponse.accion)}
               </span>
             </div>
 
             {/* Response text */}
-            <div style={{
-              padding: '1rem',
-              background: '#f9fafb',
-              borderRadius: '0.375rem',
-              marginBottom: '1rem',
-              fontSize: '1rem',
-              lineHeight: '1.5'
-            }}>
+            <div className="bg-gray-50 rounded-lg p-4 mb-4 text-lg leading-relaxed">
               {aiResponse.texto}
             </div>
 
             {/* Instructions */}
             {aiResponse.instrucciones_chatter && (
-              <div className="alert alert-info" style={{ marginBottom: '1rem' }}>
-                <div style={{ fontWeight: 600, marginBottom: '0.5rem' }}>📋 Instructions:</div>
-                {aiResponse.instrucciones_chatter}
+              <div className="bg-blue-50 border-l-4 border-blue-500 p-4 mb-4">
+                <div className="font-semibold text-blue-800 mb-2">📋 Instructions:</div>
+                <div className="text-blue-700">{aiResponse.instrucciones_chatter}</div>
               </div>
             )}
 
             {/* Suggested content */}
             {aiResponse.contenido_sugerido && (
-              <div style={{
-                padding: '1rem',
-                background: '#fef3c7',
-                borderRadius: '0.375rem',
-                marginBottom: '1rem'
-              }}>
-                <div style={{ fontWeight: 600, marginBottom: '0.5rem' }}>
+              <div className="bg-amber-50 border-l-4 border-amber-500 p-4 mb-4">
+                <div className="font-semibold text-amber-800 mb-2">
                   📦 Suggested Content:
                 </div>
-                <div style={{ fontSize: '0.875rem' }}>
+                <div className="text-sm text-amber-700 space-y-1">
                   <div><strong>ID:</strong> {aiResponse.contenido_sugerido.offer_id}</div>
                   <div><strong>Title:</strong> {aiResponse.contenido_sugerido.title}</div>
                   <div><strong>Price:</strong> ${aiResponse.contenido_sugerido.price}</div>
@@ -375,19 +334,13 @@ export default function ChatView() {
 
             {/* Context */}
             {aiResponse.contexto && (
-              <div style={{
-                padding: '1rem',
-                background: '#f3f4f6',
-                borderRadius: '0.375rem',
-                fontSize: '0.875rem',
-                marginBottom: '1rem'
-              }}>
-                <div style={{ fontWeight: 600, marginBottom: '0.5rem' }}>ℹ️ Context:</div>
+              <div className="bg-gray-100 rounded-lg p-4 text-sm text-gray-700 mb-4 space-y-1">
+                <div className="font-semibold text-gray-800 mb-2">ℹ️ Context:</div>
                 <div>Tier: {aiResponse.contexto.fan_tier}</div>
                 <div>Total Spent: ${aiResponse.contexto.spent_total}</div>
                 <div>Messages this session: {aiResponse.contexto.mensajes_sesion}</div>
                 {aiResponse.contexto.recent_tip && (
-                  <div style={{ color: '#059669', fontWeight: 600 }}>
+                  <div className="text-green-600 font-semibold">
                     💰 Recent tip: ${aiResponse.contexto.recent_tip.amount} ({aiResponse.contexto.recent_tip.minutes_ago} min ago)
                   </div>
                 )}
@@ -395,28 +348,16 @@ export default function ChatView() {
             )}
 
             {/* Action buttons */}
-            <div style={{ display: 'flex', gap: '1rem' }}>
+            <div className="flex gap-3">
               <button
                 onClick={handleCopyAndClear}
-                style={{
-                  flex: 1,
-                  padding: '0.75rem',
-                  background: '#10b981',
-                  color: 'white',
-                  borderRadius: '0.375rem',
-                  fontWeight: 500
-                }}
+                className="flex-1 bg-green-600 hover:bg-green-700 text-white py-3 rounded-lg font-semibold transition-all"
               >
                 📋 Copy Text & Clear
               </button>
               <button
                 onClick={() => setAiResponse(null)}
-                style={{
-                  padding: '0.75rem 1.5rem',
-                  background: '#f3f4f6',
-                  borderRadius: '0.375rem',
-                  fontWeight: 500
-                }}
+                className="px-6 bg-gray-200 hover:bg-gray-300 text-gray-800 py-3 rounded-lg font-semibold transition-all"
               >
                 ✕ Close
               </button>
@@ -424,6 +365,16 @@ export default function ChatView() {
           </div>
         )}
       </div>
+
+      {/* Transaction Modal */}
+      <TransactionModal
+        isOpen={showTransactionModal}
+        onClose={() => setShowTransactionModal(false)}
+        fanId={fanId}
+        modelId={modelId}
+        fanTier={fan?.tier || 'FREE'}
+        onSuccess={loadFanData}
+      />
     </>
   )
 }
