@@ -200,12 +200,15 @@ export default function ChatView() {
       
       loadChatHistory()
       
-      // 🔥 CRITICAL: Clear EVERYTHING when saving
+      // 🔥 IMPORTANT: Don't clear banner when saving chat
+      // Banner should only disappear when:
+      // 1. User clicks "Update Profile" (saves to DB)
+      // 2. User clicks "Dismiss" (discards info)
       setMessage('')
       setAiResponse(null)
       setShowAIModal(false)
-      setDetectedInfo(null) // Clear detected info
-      setShowUpdateBanner(false) // Hide banner
+      // DON'T clear: setDetectedInfo(null)
+      // DON'T clear: setShowUpdateBanner(false)
       
       alert('✅ Chat saved and copied to clipboard!')
     } catch (error) {
