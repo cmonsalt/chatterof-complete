@@ -30,6 +30,8 @@ export default function Settings() {
 
   // 🆕 NEW: Fan Notes
   const [fans, setFans] = useState([])
+  const [filteredFansNotes, setFilteredFansNotes] = useState([])
+  const [fanSearchQuery, setFanSearchQuery] = useState('')
   const [selectedFan, setSelectedFan] = useState(null)
   const [fanNotes, setFanNotes] = useState('')
 
@@ -41,6 +43,20 @@ export default function Settings() {
       loadFans() // 🆕 NEW
     }
   }, [modelId])
+
+  // 🆕 NEW: Filter fans based on search query
+  useEffect(() => {
+    if (fanSearchQuery.trim() === '') {
+      setFilteredFansNotes(fans)
+    } else {
+      const filtered = fans.filter(fan => 
+        fan.fan_id.toLowerCase().includes(fanSearchQuery.toLowerCase()) ||
+        fan.name?.toLowerCase().includes(fanSearchQuery.toLowerCase()) ||
+        fan.tier?.toLowerCase().includes(fanSearchQuery.toLowerCase())
+      )
+      setFilteredFansNotes(filtered)
+    }
+  }, [fanSearchQuery, fans])
 
   const loadConfig = async () => {
     try {
@@ -117,6 +133,7 @@ export default function Settings() {
 
       if (error) throw error
       setFans(data || [])
+      setFilteredFansNotes(data || [])
     } catch (error) {
       console.error('Error loading fans:', error)
     }
@@ -967,14 +984,60 @@ export default function Settings() {
                     📋 Select a Fan
                   </h3>
                   
+                  {/* 🆕 Search Bar */}
+                  <div style={{ marginBottom: '1rem' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                      <span style={{ fontSize: '1rem' }}>🔍</span>
+                      <input
+                        type="text"
+                        value={fanSearchQuery}
+                        onChange={(e) => setFanSearchQuery(e.target.value)}
+                        placeholder="Search by name, ID, or tier..."
+                        style={{
+                          flex: 1,
+                          padding: '0.5rem',
+                          border: '2px solid #e5e7eb',
+                          borderRadius: '0.375rem',
+                          fontSize: '0.875rem'
+                        }}
+                      />
+                      {fanSearchQuery && (
+                        <button
+                          onClick={() => setFanSearchQuery('')}
+                          style={{
+                            padding: '0.5rem',
+                            background: '#f3f4f6',
+                            border: 'none',
+                            borderRadius: '0.375rem',
+                            cursor: 'pointer',
+                            fontSize: '0.875rem',
+                            color: '#6b7280'
+                          }}
+                        >
+                          ✕
+                        </button>
+                      )}
+                    </div>
+                    {fanSearchQuery && (
+                      <div style={{ marginTop: '0.25rem', fontSize: '0.75rem', color: '#6b7280' }}>
+                        Found {filteredFansNotes.length} fan{filteredFansNotes.length !== 1 ? 's' : ''}
+                      </div>
+                    )}
+                  </div>
+                  
                   {fans.length === 0 ? (
                     <div style={{ textAlign: 'center', padding: '2rem', color: '#6b7280' }}>
                       <p>No fans yet.</p>
                       <p style={{ fontSize: '0.875rem' }}>Add fans from Dashboard first.</p>
                     </div>
+                  ) : filteredFansNotes.length === 0 ? (
+                    <div style={{ textAlign: 'center', padding: '2rem', color: '#6b7280' }}>
+                      <p>No fans found</p>
+                      <p style={{ fontSize: '0.875rem' }}>Try a different search</p>
+                    </div>
                   ) : (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                      {fans.map((fan) => (
+                      {filteredFansNotes.map((fan) => (
                         <button
                           key={fan.fan_id}
                           onClick={() => handleSelectFan(fan)}
