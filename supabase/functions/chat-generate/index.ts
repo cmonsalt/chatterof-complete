@@ -313,25 +313,8 @@ CRITICAL:
     const aiResponse = parsedResponse.texto || aiResponseRaw;
     const fanInfoDetected = parsedResponse.fan_info_detected || {};
 
-    // Save to DB
-    await supabase.from('chat').insert([
-      {
-        fan_id,
-        model_id: model_id,
-        from: 'fan',
-        message,
-        message_type: 'text',
-        timestamp: new Date().toISOString()
-      },
-      {
-        fan_id,
-        model_id: model_id,
-        from: 'chatter',
-        message: aiResponse,
-        message_type: 'text',
-        timestamp: new Date().toISOString()
-      }
-    ]);
+    // 🔥 REMOVED: Don't save to DB here - let the frontend do it when user clicks "Copy & Save"
+    // This prevents duplicate messages in chat history
 
     // Context analysis
     const lowerResponse = aiResponse.toLowerCase();
