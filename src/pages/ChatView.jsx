@@ -27,6 +27,14 @@ export default function ChatView() {
     loadChatHistory()
   }, [fanId])
 
+  // 🔥 EMERGENCY FIX: Force banner to stay visible if there's detected info
+  useEffect(() => {
+    if (detectedInfo && !showAIModal) {
+      // Modal closed but we have detected info - ensure banner is visible
+      setShowUpdateBanner(true)
+    }
+  }, [showAIModal, detectedInfo])
+
   const loadFanData = async () => {
     try {
       const { data, error } = await supabase
