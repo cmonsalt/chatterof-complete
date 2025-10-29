@@ -38,14 +38,31 @@ export default function Settings() {
 
   const loadConfig = async () => {
     try {
-      const { data, error } = await supabase
+      // Cargar model_configs
+      const { data: configData, error: configError } = await supabase
         .from('model_configs')
         .select('*')
         .eq('model_id', modelId)
         .single()
 
-      if (error) throw error
-      setConfig(data || {})
+      if (configError) throw configError
+
+      // Cargar models (para name, age, niche)
+      const { data: modelData, error: modelError } = await supabase
+        .from('models')
+        .select('name, age, niche')
+        .eq('model_id', modelId)
+        .single()
+
+      if (modelError) throw modelError
+
+      // Combinar datos
+      setConfig({
+        ...configData,
+        name: modelData.name,
+        age: modelData.age,
+        niche: modelData.niche
+      })
     } catch (error) {
       console.error('Error loading config:', error)
     } finally {
@@ -89,14 +106,32 @@ export default function Settings() {
     setMessage(null)
 
     try {
-      const { error } = await supabase
+      // Actualizar model_configs
+      const { error: configError } = await supabase
         .from('model_configs')
         .update(config)
         .eq('model_id', modelId)
 
-      if (error) throw error
+      if (configError) throw configError
+
+      // Actualizar models (name, age, niche)
+      const { error: modelError } = await supabase
+        .from('models')
+        .update({
+          name: config.name,
+          age: config.age,
+          niche: config.niche
+        })
+        .eq('model_id', modelId)
+
+      if (modelError) throw modelError
 
       setMessage({ type: 'success', text: '✅ Config saved successfully!' })
+      
+      // Recargar para actualizar navbar
+      setTimeout(() => {
+        window.location.reload()
+      }, 1500)
     } catch (error) {
       setMessage({ type: 'error', text: '❌ Error: ' + error.message })
     } finally {
@@ -258,6 +293,54 @@ export default function Settings() {
             {activeTab === 'config' && config && (
               <form onSubmit={handleSaveConfig} className="space-y-6">
                 
+                {/* Model Info Section */}
+                <div className="bg-purple-50 rounded-lg p-6 border-2 border-purple-200">
+                  <h3 className="text-lg font-bold text-gray-800 mb-4">📋 Model Info</h3>
+                  
+                  <div className="grid grid-cols-3 gap-4">
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-2">
+                        Model Name
+                      </label>
+                      <input
+                        type="text"
+                        value={config.name || currentModel?.name || ''}
+                        onChange={(e) => setConfig({...config, name: e.target.value})}
+                        placeholder="Sophia"
+                        className="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-2">
+                        Age
+                      </label>
+                      <input
+                        type="number"
+                        min="18"
+                        max="99"
+                        value={config.age || ''}
+                        onChange={(e) => setConfig({...config, age: parseInt(e.target.value)})}
+                        placeholder="25"
+                        className="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-2">
+                        Niche
+                      </label>
+                      <input
+                        type="text"
+                        value={config.niche || currentModel?.niche || ''}
+                        onChange={(e) => setConfig({...config, niche: e.target.value})}
+                        placeholder="Fitness, Gaming, Cosplay..."
+                        className="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                      />
+                    </div>
+                  </div>
+                </div>
+
                 {/* OpenAI API Key */}
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-2">
