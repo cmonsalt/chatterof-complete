@@ -89,11 +89,26 @@ export default function ChatView() {
       if (data.success) {
         setAiResponse(data.response)
         
-        // Check if fan info was detected (INCLUDING NAME)
+        // 🔥 Check if fan info was detected AND if it's NEW info
         if (data.response.fan_info_detected) {
           console.log('✅ Fan info detected:', data.response.fan_info_detected)
-          setDetectedInfo(data.response.fan_info_detected)
-          setShowUpdateBanner(true)
+          
+          // Check if ANY of the detected info is actually NEW (different from current fan data)
+          const detectedData = data.response.fan_info_detected
+          const hasNewInfo = 
+            (detectedData.name && detectedData.name !== fan.name) ||
+            (detectedData.age && detectedData.age !== fan.age) ||
+            (detectedData.location && detectedData.location !== fan.location) ||
+            (detectedData.occupation && detectedData.occupation !== fan.occupation) ||
+            (detectedData.interests && detectedData.interests !== fan.interests)
+          
+          if (hasNewInfo) {
+            console.log('🆕 NEW info detected - showing banner')
+            setDetectedInfo(data.response.fan_info_detected)
+            setShowUpdateBanner(true)
+          } else {
+            console.log('ℹ️ Info detected but not new - skipping banner')
+          }
         }
         
         setShowAIModal(true)
@@ -137,9 +152,13 @@ export default function ChatView() {
       if (error) throw error
 
       alert('✅ Fan profile updated successfully!')
+      
+      // 🔥 CRITICAL: Clear everything after updating
       setDetectedInfo(null)
       setShowUpdateBanner(false)
-      loadFanData()
+      
+      // Reload fan data to show updated info
+      await loadFanData()
     } catch (error) {
       console.error('Error updating fan profile:', error)
       alert('Error: ' + error.message)
@@ -169,9 +188,13 @@ export default function ChatView() {
       })
       
       loadChatHistory()
+      
+      // 🔥 CRITICAL: Clear EVERYTHING when saving
       setMessage('')
       setAiResponse(null)
       setShowAIModal(false)
+      setDetectedInfo(null) // Clear detected info
+      setShowUpdateBanner(false) // Hide banner
       
       alert('✅ Chat saved and copied to clipboard!')
     } catch (error) {
