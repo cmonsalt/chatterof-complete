@@ -379,15 +379,13 @@ CRITICAL:
         // 🔥 FIX: Don't show redundant message when info is detected (green banner is enough)
         instrucciones_chatter: hasDetectedInfo
           ? '💬 Continue building connection naturally'
-          : nameShared && aiResponse.toLowerCase().includes('llamas')
-            ? '📝 Bot asked for name. When they reply, UPDATE the fan name in system.'
-            : isCustomRequest 
-              ? '🎨 CUSTOM REQUEST - Ask for details and then YOU negotiate the price.'
-              : recentTip 
-                ? `💰 Fan sent $${recentTip.amount} tip. If they ask for content, send FREE.`
-                : mentionedContent 
-                  ? `📦 Bot mentioned ${mentionedContent.offer_id} ($${mentionedContent.base_price}). You can upload it locked.`
-                  : '💬 Just conversation. Keep building connection.'
+          : isCustomRequest 
+            ? '🎨 CUSTOM REQUEST - Ask for details and then YOU negotiate the price.'
+            : recentTip 
+              ? `💰 Fan sent $${recentTip.amount} tip. If they ask for content, send FREE.`
+              : mentionedContent 
+                ? `📦 Bot mentioned ${mentionedContent.offer_id} ($${mentionedContent.base_price}). You can upload it locked.`
+                : '💬 Just conversation. Keep building connection.'
       }
     }), {
       status: 200,

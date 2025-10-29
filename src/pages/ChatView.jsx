@@ -70,8 +70,7 @@ export default function ChatView() {
 
     setGenerating(true)
     setAiResponse(null)
-    setDetectedInfo(null)
-    setShowUpdateBanner(false)
+    // Banner will only update if NEW info is detected (see below)
 
     try {
       const { data, error } = await supabase.functions.invoke('chat-generate', {
@@ -103,12 +102,16 @@ export default function ChatView() {
             (detectedData.interests && detectedData.interests !== fan.interests)
           
           if (hasNewInfo) {
-            console.log('🆕 NEW info detected - showing banner')
+            console.log('🆕 NEW info detected - updating banner')
             setDetectedInfo(data.response.fan_info_detected)
             setShowUpdateBanner(true)
           } else {
-            console.log('ℹ️ Info detected but not new - skipping banner')
+            console.log('ℹ️ Info detected but not new - keeping existing banner state')
+            // Don't change banner state - it might still be showing previous detection
           }
+        } else {
+          console.log('ℹ️ No new info detected - keeping existing banner state')
+          // Don't clear banner - previous detection might still be pending
         }
         
         setShowAIModal(true)
