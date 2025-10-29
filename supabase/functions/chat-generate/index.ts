@@ -24,7 +24,7 @@ serve(async (req) => {
 
     const { model_id, fan_id, message, mode } = await req.json();
     
-    console.log('📥 REQUEST RECIBIDO:', { model_id, fan_id, message: message.substring(0, 50), mode });
+    console.log('📥 REQUEST:', { model_id, fan_id, message: message.substring(0, 50), mode });
 
     if (!model_id || !fan_id || !message) {
       return new Response(JSON.stringify({ error: 'Missing required fields' }), {
@@ -33,31 +33,21 @@ serve(async (req) => {
       });
     }
 
-    // Verificar acceso del usuario
+    // Auth
     const { data: { user } } = await supabase.auth.getUser();
-    console.log('👤 USER:', user?.id);
-
     if (!user) {
-      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
-        status: 401,
-        headers: corsHeaders
-      });
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: corsHeaders });
     }
 
-    // Verificar permisos
+    // Check access
     const { data: modelAccess } = await supabase
       .from('models')
       .select('model_id, owner_id')
       .eq('model_id', model_id)
       .single();
 
-    console.log('🔐 MODEL ACCESS:', modelAccess);
-
     if (!modelAccess) {
-      return new Response(JSON.stringify({ error: 'Model not found' }), {
-        status: 404,
-        headers: corsHeaders
-      });
+      return new Response(JSON.stringify({ error: 'Model not found' }), { status: 404, headers: corsHeaders });
     }
 
     const isOwner = modelAccess.owner_id === user.id;
@@ -68,17 +58,11 @@ serve(async (req) => {
       .or(`role.eq.super_admin,and(role.eq.chatter,model_id.eq.${model_id})`)
       .single();
 
-    const hasAccess = isOwner || userRole;
-    console.log('✅ ACCESS CHECK:', { isOwner, userRole: userRole?.role, hasAccess });
-
-    if (!hasAccess) {
-      return new Response(JSON.stringify({ error: 'Access denied' }), {
-        status: 403,
-        headers: corsHeaders
-      });
+    if (!isOwner && !userRole) {
+      return new Response(JSON.stringify({ error: 'Access denied' }), { status: 403, headers: corsHeaders });
     }
 
-    // Cargar datos del modelo
+    // Load model data
     const { data: model } = await supabase
       .from('models')
       .select('*')
@@ -91,35 +75,22 @@ serve(async (req) => {
       .eq('model_id', model_id)
       .single();
 
-    console.log('🤖 MODEL LOADED:', { name: model?.name, niche: model?.niche });
-    console.log('⚙️ CONFIG LOADED:', { 
-      personality: config?.personality?.substring(0, 50), 
-      tone: config?.tone,
-      gpt_model: config?.gpt_model,
-      has_api_key: !!config?.openai_api_key
-    });
+    console.log('🤖 MODEL:', model?.name, '/', model?.niche);
 
     if (!model || !config) {
-      return new Response(JSON.stringify({ error: 'Model configuration not found' }), {
-        status: 404,
-        headers: corsHeaders
-      });
+      return new Response(JSON.stringify({ error: 'Model config not found' }), { status: 404, headers: corsHeaders });
     }
 
-    // API Key de OpenAI
+    // API Key
     const openaiApiKey = config.openai_api_key || Deno.env.get('OPENAI_API_KEY');
     if (!openaiApiKey) {
-      console.log('❌ NO OPENAI API KEY');
       return new Response(JSON.stringify({
         error: 'OpenAI API key not configured',
-        message: 'Please add your OpenAI API key in model settings'
-      }), {
-        status: 402,
-        headers: corsHeaders
-      });
+        message: 'Please add your OpenAI API key in Settings'
+      }), { status: 402, headers: corsHeaders });
     }
 
-    // Cargar datos del fan
+    // Load fan
     const { data: fanData } = await supabase
       .from('fans')
       .select('*')
@@ -127,20 +98,13 @@ serve(async (req) => {
       .eq('model_id', model_id)
       .single();
 
-    console.log('👥 FAN LOADED:', { 
-      name: fanData?.name, 
-      tier: fanData?.tier, 
-      spent_total: fanData?.spent_total 
-    });
-
     if (!fanData) {
-      return new Response(JSON.stringify({ error: 'Fan not found' }), {
-        status: 404,
-        headers: corsHeaders
-      });
+      return new Response(JSON.stringify({ error: 'Fan not found' }), { status: 404, headers: corsHeaders });
     }
 
-    // Cargar historial de chat
+    console.log('👥 FAN:', fanData.name, '/', fanData.tier, '/ $', fanData.spent_total);
+
+    // Load chat history
     const { data: chatHistory } = await supabase
       .from('chat')
       .select('*')
@@ -148,127 +112,129 @@ serve(async (req) => {
       .order('timestamp', { ascending: true })
       .limit(50);
 
-    console.log('💬 CHAT HISTORY:', chatHistory?.length || 0, 'mensajes');
-
-    // Cargar transacciones
+    // Load transactions
     const { data: transactions } = await supabase
       .from('transactions')
       .select('*')
       .eq('fan_id', fan_id)
       .order('timestamp', { ascending: false });
 
-    console.log('💰 TRANSACTIONS:', transactions?.length || 0);
-
     const purchasedIds = transactions
       ?.filter((t) => t.type === 'purchase' || t.type === 'tip')
       .map((t) => t.content_id)
       .filter(Boolean) || [];
 
-    console.log('🛒 PURCHASED IDS:', purchasedIds);
-
-    // Tip reciente (últimos 10 min)
+    // Recent tip check
     const recentTip = transactions?.find((t) => {
       if (t.type !== 'tip') return false;
       const tipTime = new Date(t.timestamp).getTime();
-      const now = Date.now();
-      return now - tipTime < 10 * 60 * 1000;
+      return Date.now() - tipTime < 10 * 60 * 1000;
     });
 
-    if (recentTip) {
-      console.log('💵 RECENT TIP:', { amount: recentTip.amount, minutes_ago: Math.round((Date.now() - new Date(recentTip.timestamp).getTime()) / 60000) });
-    }
-
-    // Cargar catálogo
+    // Load catalog
     const { data: catalogData } = await supabase
       .from('catalog')
       .select('*')
-      .or(`model_id.eq.${model_id},is_global.eq.true`);
-
-    console.log('📦 CATALOG LOADED:', catalogData?.length || 0, 'items');
+      .eq('model_id', model_id);
 
     const availableContent = catalogData?.filter((item) => 
       !purchasedIds.includes(item.offer_id)
     ) || [];
 
-    console.log('📦 AVAILABLE CONTENT:', availableContent.length, 'items');
-    console.log('📦 CONTENT DETAILS:', availableContent.map(c => ({ 
-      id: c.offer_id, 
-      title: c.title, 
-      price: c.base_price,
-      nivel: c.nivel 
-    })));
+    console.log('📦 CATALOG:', availableContent.length, 'available items');
 
-    // Construir timeline
+    // Build timeline
     const timeline = (chatHistory || [])
       .map((msg) => `${msg.from === 'fan' ? 'Fan' : model.name}: "${msg.message}"`)
       .join('\n');
 
-    // System Prompt
-    let systemPrompt = `You are ${model.name}, ${model.age} year old ${model.niche} content creator.
+    // IMPROVED SYSTEM PROMPT
+    const systemPrompt = `You are ${model.name}, a ${model.age}-year-old ${model.niche} content creator on OnlyFans.
 
-PERSONALITY: ${config.personality}
-TONE: ${config.tone}
-LANGUAGE: ${config.language_code === 'es' ? 'Respond in Spanish' : 'Respond in English'}
+PERSONALITY: ${config.personality || 'Friendly and engaging'}
+TONE: ${config.tone || 'casual'}
+LANGUAGE: ${config.language_code === 'es' ? 'Always respond in Spanish' : 'Always respond in English'}
 
-CORE MISSION:
-- Build GENUINE connection with fans
-- Chat like a real person, not a salesperson  
-- Mention content ORGANICALLY when natural
-- Follow fan's energy and fantasy
-- Create authentic conversations
+═══════════════════════════════════════
+CORE BEHAVIOR - READ CAREFULLY
+═══════════════════════════════════════
 
-FAN INFO:
-- Name: ${fanData.name || 'Unknown (ask for it naturally!)'}
-- Tier: ${fanData.tier}
-- Total spent: $${fanData.spent_total}
-- Last purchase: ${fanData.last_purchase_date || 'Never'}
-- Messages: ${chatHistory?.length || 0}
+1. RESPONSE LENGTH:
+   - Keep responses SHORT: 1-2 sentences maximum
+   - Match the fan's energy - if they write short, you write short
+   - Only write longer when explaining content details if asked
 
-${recentTip ? `⚠️ IMPORTANT: Fan sent $${recentTip.amount} tip ${Math.round((Date.now() - new Date(recentTip.timestamp).getTime()) / 60000)} minutes ago. If they ask for content, they likely already paid.` : ''}
+2. GET THEIR NAME (CRITICAL):
+   - Current fan name: "${fanData.name || 'Unknown'}"
+   ${!fanData.name || fanData.name === 'Unknown' ? `
+   - Fan name is UNKNOWN - you MUST ask for their real name naturally within the first 3 messages
+   - Don't use their username/fan_id as their name
+   - Ask casually: "¿Cómo te llamas?" or "What's your name?"
+   - Once they tell you their name, tell the chatter to UPDATE IT in the system
+   ` : ''}
 
-AVAILABLE CONTENT (not yet purchased):
+3. BUILD CONNECTION FIRST:
+   - Start with genuine curiosity about them
+   - Ask about their interests related to ${model.niche}
+   - Share small personal details about yourself
+   - Don't immediately push sales
+
+4. SELLING CONTENT (Do this naturally):
+   - Mention content ONLY when it fits the conversation organically
+   - Use the TAGS to connect content to what they're talking about
+   - Start with lower intensity levels, escalate if they're interested
+   - Never sound like a salesperson - sound like you're sharing something cool
+
+═══════════════════════════════════════
+FAN INFORMATION
+═══════════════════════════════════════
+Name: ${fanData.name || 'Unknown - ASK FOR IT!'}
+Tier: ${fanData.tier} (${fanData.tier === 'FREE' ? 'New/casual fan' : fanData.tier === 'VIP' ? 'Regular supporter' : 'Top spender - very interested'})
+Total Spent: $${fanData.spent_total}
+Messages in this conversation: ${chatHistory?.length || 0}
+${recentTip ? `\n⚠️ RECENT TIP: Fan sent $${recentTip.amount} ${Math.round((Date.now() - new Date(recentTip.timestamp).getTime()) / 60000)} min ago. They may be expecting content.` : ''}
+
+═══════════════════════════════════════
+AVAILABLE CONTENT (Not purchased yet)
+═══════════════════════════════════════
 ${availableContent.length > 0 
-  ? availableContent.map((c) => `- ${c.offer_id}: "${c.title}" ($${c.base_price}) [Intensity: ${c.nivel}] - ${c.description}
-   Tags: ${c.tags || 'N/A'}`).join('\n')
-  : 'No content available (fan purchased everything or catalog empty)'}
+  ? availableContent.map((c) => `
+• ${c.offer_id}: "${c.title}"
+  Price: $${c.base_price} | Intensity: ${c.nivel}/10
+  Description: ${c.description}
+  Tags: ${c.tags || 'N/A'}
+  → Mention this when they talk about: ${c.tags?.split(',').map(t => t.trim()).join(', ')}
+`).join('\n')
+  : 'No content available right now.'}
 
-ALREADY PURCHASED:
-${purchasedIds.length > 0 ? purchasedIds.join(', ') : 'Nothing yet'}
+${purchasedIds.length > 0 ? `\nALREADY PURCHASED: ${purchasedIds.join(', ')}` : ''}
 
-CONVERSATION HISTORY:
-${timeline || 'First message'}
+═══════════════════════════════════════
+CONVERSATION HISTORY
+═══════════════════════════════════════
+${timeline || '[This is the first message - introduce yourself warmly and ask their name if unknown]'}
 
-STYLE GUIDE:
-- Max emojis: ${config.emoji_style === 'none' ? 0 : config.emoji_style === 'minimal' ? 1 : config.emoji_style === 'moderate' ? 2 : config.emoji_style === 'frequent' ? 3 : 5} per message
+═══════════════════════════════════════
+RESPONSE RULES
+═══════════════════════════════════════
+✓ Max ${config.max_emojis_per_message || 2} emojis per message
+✓ Sales approach: ${config.sales_approach || 'conversational_organic'}
+✓ Keep it conversational and natural
+✓ Match their energy level
+${mode === 'reactivacion' ? '\n🔄 SPECIAL MODE: This is a re-engagement message. They haven\'t chatted in a while - be warm and curious about what they\'ve been up to.' : ''}
+${mode === 'ofrecer_custom' ? '\n🎨 SPECIAL MODE: Offering custom content. Ask what kind of custom content they\'d like.' : ''}
 
-SALES APPROACH: ${config.sales_approach || 'conversational_organic'}
+═══════════════════════════════════════
+THEIR NEW MESSAGE
+═══════════════════════════════════════
+"${message}"
 
-RULES:
-1. Create connection FIRST - Ask about them, share about yourself
-2. Mention content ORGANICALLY - Use tags naturally
-3. Follow fan's lead - Match their energy
-4. Never be transactional - Let conversation flow
-5. Adapt to tier - FREE is friendly, VIP is intimate
-6. Use intensity levels to escalate - Start low, go higher if fan responds well
+═══════════════════════════════════════
+YOUR RESPONSE (Remember: SHORT, natural, 1-2 sentences!)
+═══════════════════════════════════════`;
 
-${mode === 'reactivacion' 
-  ? `SPECIAL MODE: REACTIVATION
-Fan hasn't messaged in a while. Re-engage naturally and friendly.`
-  : ''}
-
-${mode === 'ofrecer_custom' 
-  ? `SPECIAL MODE: OFFER CUSTOM
-Reaching out to offer custom content. Ask what they'd like.`
-  : ''}
-
-NEW MESSAGE FROM FAN: "${message}"
-
-Respond naturally as ${model.name}. Be real, build connection, mention content organically when appropriate.`;
-
-    console.log('📝 SYSTEM PROMPT LENGTH:', systemPrompt.length, 'chars');
-
-    // Llamar a OpenAI
-    console.log('🤖 CALLING OPENAI...');
+    // Call OpenAI
+    console.log('🤖 Calling OpenAI...');
     const openaiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -282,17 +248,14 @@ Respond naturally as ${model.name}. Be real, build connection, mention content o
           { role: 'user', content: message }
         ],
         temperature: 0.8,
-        max_tokens: 500
+        max_tokens: 150  // Reduced to force shorter responses
       })
     });
 
     if (!openaiResponse.ok) {
       const error = await openaiResponse.text();
-      console.log('❌ OPENAI ERROR:', error);
-      return new Response(JSON.stringify({
-        error: 'OpenAI API error',
-        details: error
-      }), {
+      console.log('❌ OpenAI error:', error);
+      return new Response(JSON.stringify({ error: 'OpenAI API error', details: error }), {
         status: 500,
         headers: corsHeaders
       });
@@ -301,9 +264,9 @@ Respond naturally as ${model.name}. Be real, build connection, mention content o
     const openaiData = await openaiResponse.json();
     const aiResponse = openaiData.choices[0].message.content;
 
-    console.log('✅ AI RESPONSE:', aiResponse.substring(0, 100));
+    console.log('✅ AI Response:', aiResponse.substring(0, 100));
 
-    // Guardar en BD
+    // Save to DB
     await supabase.from('chat').insert([
       {
         fan_id,
@@ -319,23 +282,22 @@ Respond naturally as ${model.name}. Be real, build connection, mention content o
       }
     ]);
 
-    console.log('💾 CHAT SAVED TO DB');
-
-    // Analizar contexto
+    // Context analysis
     const lowerResponse = aiResponse.toLowerCase();
     const lowerMessage = message.toLowerCase();
+    
     const isCustomRequest = lowerMessage.includes('custom') || 
                            lowerMessage.includes('personalizado') || 
-                           lowerMessage.includes('especial para mi');
+                           lowerMessage.includes('especial');
 
     const mentionedContent = availableContent.find((c) =>
       lowerResponse.includes(c.offer_id.toLowerCase()) ||
       c.tags?.split(',').some((tag) => lowerResponse.includes(tag.trim().toLowerCase()))
     );
 
-    console.log('🔍 CONTEXT ANALYSIS:', { isCustomRequest, mentionedContent: mentionedContent?.offer_id });
+    // Check if fan shared their name
+    const nameShared = !fanData.name || fanData.name === 'Unknown';
 
-    // Respuesta final
     return new Response(JSON.stringify({
       success: true,
       response: {
@@ -354,10 +316,7 @@ Respond naturally as ${model.name}. Be real, build connection, mention content o
             amount: recentTip.amount,
             minutes_ago: Math.round((Date.now() - new Date(recentTip.timestamp).getTime()) / 60000)
           } : null,
-          mensajes_sesion: chatHistory?.filter((c) => {
-            const msgTime = new Date(c.timestamp).getTime();
-            return Date.now() - msgTime < 30 * 60 * 1000;
-          }).length || 0
+          mensajes_sesion: chatHistory?.length || 0
         },
         contenido_sugerido: mentionedContent ? {
           offer_id: mentionedContent.offer_id,
@@ -367,13 +326,15 @@ Respond naturally as ${model.name}. Be real, build connection, mention content o
           nivel: mentionedContent.nivel,
           tags: mentionedContent.tags
         } : null,
-        instrucciones_chatter: isCustomRequest 
-          ? '🎨 CUSTOM REQUEST - Próximo mensaje preguntará detalles. Después TÚ tomas control para negociar.'
-          : recentTip 
-            ? `💰 Fan envió $${recentTip.amount} tip hace ${Math.round((Date.now() - new Date(recentTip.timestamp).getTime()) / 60000)} min. Si pide contenido, enviar GRATIS.`
-            : mentionedContent 
-              ? `📦 Bot mencionó ${mentionedContent.offer_id}. Considera subir bloqueado $${mentionedContent.base_price}.`
-              : '💬 Solo conversación. No subas contenido.'
+        instrucciones_chatter: nameShared && aiResponse.toLowerCase().includes('llamas')
+          ? '📝 Bot preguntó el nombre. Cuando respondan, ACTUALIZA el nombre del fan en el sistema.'
+          : isCustomRequest 
+            ? '🎨 CUSTOM REQUEST - Pregunta detalles y luego TÚ negocias el precio.'
+            : recentTip 
+              ? `💰 Fan envió tip de $${recentTip.amount}. Si pide contenido, envía GRATIS.`
+              : mentionedContent 
+                ? `📦 Bot mencionó ${mentionedContent.offer_id} ($${mentionedContent.base_price}). Puedes subirlo bloqueado.`
+                : '💬 Solo conversación. Sigue construyendo conexión.'
       }
     }), {
       status: 200,
@@ -384,7 +345,7 @@ Respond naturally as ${model.name}. Be real, build connection, mention content o
     });
 
   } catch (error) {
-    console.error('❌ FATAL ERROR:', error);
+    console.error('❌ Error:', error);
     return new Response(JSON.stringify({ error: error.message }), {
       status: 500,
       headers: corsHeaders

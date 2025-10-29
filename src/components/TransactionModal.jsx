@@ -141,6 +141,33 @@ export default function TransactionModal({
 
       if (transactionError) throw transactionError
 
+      // NUEVO: Insertar también en chat para mostrar en timeline
+      const chatMessage = {
+        fan_id: fanId,
+        from: 'system',
+        message_type: activeTab === 'compra' ? 'purchase' : 'tip',
+        timestamp: new Date().toISOString()
+      }
+
+      if (activeTab === 'compra') {
+        chatMessage.message = JSON.stringify({
+          type: 'purchase',
+          content_title: selectedOffer.title,
+          amount: transactionData.amount,
+          offer_id: selectedOffer.offer_id
+        })
+      } else if (activeTab === 'tip') {
+        chatMessage.message = JSON.stringify({
+          type: 'tip',
+          amount: transactionData.amount
+        })
+      }
+
+      // Solo insertar en chat si es compra o tip (no suscripción)
+      if (activeTab !== 'suscripcion') {
+        await supabase.from('chat').insert(chatMessage)
+      }
+
       // Actualizar spent_total del fan
       const { data: fanData, error: fanError } = await supabase
         .from('fans')
