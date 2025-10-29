@@ -448,18 +448,18 @@ export default function Settings() {
                 {/* Emoji Style */}
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    ✨ Emoji Style
+                    ✨ Max Emojis Per Message
                   </label>
                   <select
-                    value={config.emoji_style || 'moderate'}
-                    onChange={(e) => setConfig({...config, emoji_style: e.target.value})}
+                    value={config.max_emojis_per_message || 2}
+                    onChange={(e) => setConfig({...config, max_emojis_per_message: parseInt(e.target.value)})}
                     className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                   >
-                    <option value="none">None</option>
-                    <option value="minimal">Minimal</option>
-                    <option value="moderate">Moderate (Recommended)</option>
-                    <option value="frequent">Frequent</option>
-                    <option value="very_frequent">Very Frequent</option>
+                    <option value={0}>None (0)</option>
+                    <option value={1}>Minimal (1)</option>
+                    <option value={2}>Moderate (2) - Recommended</option>
+                    <option value={3}>Frequent (3)</option>
+                    <option value={5}>Very Frequent (5)</option>
                   </select>
                 </div>
 
