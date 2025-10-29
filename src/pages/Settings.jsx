@@ -542,17 +542,19 @@ export default function Settings() {
                     <div className="grid grid-cols-2 gap-4">
                       <div>
                         <label className="block text-sm font-semibold text-gray-700 mb-2">
-                          Level (1-3)
+                          Intensity Level
                         </label>
-                        <select
+                        <input
+                          type="number"
+                          min="1"
                           value={newItem.nivel}
                           onChange={(e) => setNewItem({...newItem, nivel: parseInt(e.target.value)})}
+                          placeholder="1"
                           className="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
-                        >
-                          <option value={1}>Level 1 (Basic)</option>
-                          <option value={2}>Level 2 (Premium)</option>
-                          <option value={3}>Level 3 (VIP)</option>
-                        </select>
+                        />
+                        <p className="text-xs text-gray-500 mt-1">
+                          Higher number = more explicit content
+                        </p>
                       </div>
 
                       <div>
@@ -593,11 +595,11 @@ export default function Settings() {
                           <div className="flex-1">
                             <div className="flex items-center gap-2 mb-2">
                               <span className={`px-2 py-1 rounded text-xs font-semibold ${
-                                item.nivel === 1 ? 'bg-green-100 text-green-800' :
-                                item.nivel === 2 ? 'bg-blue-100 text-blue-800' :
+                                item.nivel <= 3 ? 'bg-green-100 text-green-800' :
+                                item.nivel <= 6 ? 'bg-blue-100 text-blue-800' :
                                 'bg-purple-100 text-purple-800'
                               }`}>
-                                Level {item.nivel}
+                                Intensity {item.nivel}
                               </span>
                               <span className="text-xs text-gray-500">{item.offer_id}</span>
                             </div>
