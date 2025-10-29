@@ -106,29 +106,32 @@ export default function Settings() {
     setMessage(null)
 
     try {
-      // Actualizar model_configs
-      const { error: configError } = await supabase
-        .from('model_configs')
-        .update(config)
-        .eq('model_id', modelId)
-
-      if (configError) throw configError
+      // Separar datos para models vs model_configs
+      const { name, age, niche, ...configData } = config
 
       // Actualizar models (name, age, niche)
       const { error: modelError } = await supabase
         .from('models')
         .update({
-          name: config.name,
-          age: config.age,
-          niche: config.niche
+          name: name,
+          age: age,
+          niche: niche
         })
         .eq('model_id', modelId)
 
       if (modelError) throw modelError
 
+      // Actualizar model_configs (todo lo demás)
+      const { error: configError } = await supabase
+        .from('model_configs')
+        .update(configData)
+        .eq('model_id', modelId)
+
+      if (configError) throw configError
+
       setMessage({ type: 'success', text: '✅ Config saved successfully!' })
       
-      // Recargar para actualizar navbar
+      // Recargar para actualizar navbar con nuevo nombre
       setTimeout(() => {
         window.location.reload()
       }, 1500)
@@ -405,6 +408,24 @@ export default function Settings() {
                     <option value="playful">Playful</option>
                     <option value="bubbly">Bubbly</option>
                   </select>
+                </div>
+
+                {/* Language */}
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    🌍 Response Language
+                  </label>
+                  <select
+                    value={config.language_code || 'en'}
+                    onChange={(e) => setConfig({...config, language_code: e.target.value})}
+                    className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  >
+                    <option value="en">English</option>
+                    <option value="es">Español</option>
+                  </select>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Language the AI will use to respond to fans
+                  </p>
                 </div>
 
                 {/* Sales Approach */}
