@@ -19,8 +19,8 @@ export default function ChatView() {
   const [loading, setLoading] = useState(true)
   const [generating, setGenerating] = useState(false)
   const [showTransactionModal, setShowTransactionModal] = useState(false)
-  const [detectedInfo, setDetectedInfo] = useState(null) // 🆕 NEW
-  const [showUpdateBanner, setShowUpdateBanner] = useState(false) // 🆕 NEW
+  const [detectedInfo, setDetectedInfo] = useState(null)
+  const [showUpdateBanner, setShowUpdateBanner] = useState(false)
 
   useEffect(() => {
     loadFanData()
@@ -70,8 +70,8 @@ export default function ChatView() {
 
     setGenerating(true)
     setAiResponse(null)
-    setDetectedInfo(null) // Reset detected info
-    setShowUpdateBanner(false) // Hide banner
+    setDetectedInfo(null)
+    setShowUpdateBanner(false)
 
     try {
       const { data, error } = await supabase.functions.invoke('chat-generate', {
@@ -84,16 +84,16 @@ export default function ChatView() {
 
       if (error) throw error
 
-      console.log('🔍 AI Response:', data) // Debug
+      console.log('🔍 AI Response:', data)
 
       if (data.success) {
         setAiResponse(data.response)
         
-        // 🆕 NEW: Check if fan info was detected
+        // Check if fan info was detected (INCLUDING NAME)
         if (data.response.fan_info_detected) {
           console.log('✅ Fan info detected:', data.response.fan_info_detected)
           setDetectedInfo(data.response.fan_info_detected)
-          setShowUpdateBanner(true) // Show the banner!
+          setShowUpdateBanner(true)
         }
         
         setShowAIModal(true)
@@ -109,13 +109,15 @@ export default function ChatView() {
     }
   }
 
-  // 🆕 NEW: Handle updating fan profile with detected info
+  // Handle updating fan profile with detected info (INCLUDING NAME)
   const handleUpdateFanProfile = async () => {
     if (!detectedInfo) return
 
     try {
       const updates = {}
       
+      // 🆕 NAME is now included!
+      if (detectedInfo.name) updates.name = detectedInfo.name
       if (detectedInfo.age) updates.age = detectedInfo.age
       if (detectedInfo.location) updates.location = detectedInfo.location
       if (detectedInfo.occupation) updates.occupation = detectedInfo.occupation
@@ -137,7 +139,7 @@ export default function ChatView() {
       alert('✅ Fan profile updated successfully!')
       setDetectedInfo(null)
       setShowUpdateBanner(false)
-      loadFanData() // Reload to show updated info
+      loadFanData()
     } catch (error) {
       console.error('Error updating fan profile:', error)
       alert('Error: ' + error.message)
@@ -146,10 +148,8 @@ export default function ChatView() {
 
   const handleSaveFromModal = async (editedText) => {
     try {
-      // Copiar al portapapeles
       navigator.clipboard.writeText(editedText)
       
-      // Guardar mensaje del fan
       await supabase.from('chat').insert({
         fan_id: fanId,
         model_id: modelId,
@@ -159,7 +159,6 @@ export default function ChatView() {
         timestamp: new Date().toISOString()
       })
       
-      // Guardar respuesta del modelo (editada)
       await supabase.from('chat').insert({
         fan_id: fanId,
         model_id: modelId,
@@ -169,10 +168,7 @@ export default function ChatView() {
         timestamp: new Date().toISOString()
       })
       
-      // Actualizar historial
       loadChatHistory()
-      
-      // Limpiar y cerrar
       setMessage('')
       setAiResponse(null)
       setShowAIModal(false)
@@ -266,7 +262,6 @@ export default function ChatView() {
               <p className="text-sm text-gray-500 mb-2">
                 {fan.fan_id}
               </p>
-              {/* 🆕 NEW: Show fan details if available */}
               <div className="flex flex-wrap gap-3 text-sm">
                 {fan.age && (
                   <span className="bg-blue-50 text-blue-700 px-3 py-1 rounded-full">
@@ -313,19 +308,34 @@ export default function ChatView() {
           </div>
         </div>
 
-        {/* 🆕 NEW: PROMINENT Alert banner for detected info - SHOWS BEFORE MODAL */}
+        {/* 🆕 PROMINENT Alert banner - SHOWS NAME PROMINENTLY */}
         {showUpdateBanner && detectedInfo && (
           <div className="bg-gradient-to-r from-green-400 to-emerald-500 border-4 border-green-600 p-6 mb-6 rounded-xl shadow-2xl animate-pulse">
             <div className="flex items-center justify-between">
               <div className="flex-1">
-                <h3 className="text-white font-bold text-xl flex items-center gap-3 mb-3">
-                  <span className="text-3xl">🎉</span> 
-                  <span>New Fan Information Detected!</span>
-                </h3>
+                {/* 🆕 NAME gets SPECIAL TREATMENT if detected */}
+                {detectedInfo.name ? (
+                  <h3 className="text-white font-bold text-2xl flex items-center gap-3 mb-3">
+                    <span className="text-4xl">🎉</span> 
+                    <span>Fan Name Detected: "{detectedInfo.name}"</span>
+                  </h3>
+                ) : (
+                  <h3 className="text-white font-bold text-xl flex items-center gap-3 mb-3">
+                    <span className="text-3xl">🎉</span> 
+                    <span>New Fan Information Detected!</span>
+                  </h3>
+                )}
+                
                 <div className="bg-white/20 backdrop-blur-sm rounded-lg p-4 space-y-2">
+                  {detectedInfo.name && (
+                    <div className="text-white font-bold text-lg flex items-center gap-2 bg-white/30 p-3 rounded-lg">
+                      <span className="text-2xl">👤</span> 
+                      Name: <span className="bg-yellow-400 text-gray-900 px-4 py-1 rounded-full text-xl">{detectedInfo.name}</span>
+                    </div>
+                  )}
                   {detectedInfo.age && (
                     <div className="text-white font-semibold flex items-center gap-2">
-                      <span>👤</span> Age: <span className="bg-white/30 px-3 py-1 rounded-full">{detectedInfo.age} years old</span>
+                      <span>🎂</span> Age: <span className="bg-white/30 px-3 py-1 rounded-full">{detectedInfo.age} years old</span>
                     </div>
                   )}
                   {detectedInfo.location && (
@@ -351,7 +361,7 @@ export default function ChatView() {
                   className="bg-white hover:bg-green-50 text-green-700 py-4 px-8 rounded-xl font-bold text-lg shadow-lg hover:shadow-xl transition-all flex items-center gap-2"
                 >
                   <span className="text-2xl">✅</span>
-                  Update Profile
+                  {detectedInfo.name ? 'Update Name & Profile' : 'Update Profile'}
                 </button>
                 <button
                   onClick={() => {
@@ -380,15 +390,11 @@ export default function ChatView() {
                   <p className="text-gray-400 text-center py-8">No messages yet</p>
                 ) : (
                   chatHistory.slice(-20).map((msg, idx) => {
-                    // Mensaje de transacción (tip)
                     if (msg.message_type === 'tip') {
                       try {
                         const tipData = JSON.parse(msg.message || '{}')
                         return (
-                          <div
-                            key={idx}
-                            className="bg-green-50 border-l-4 border-green-500 p-4 rounded-lg"
-                          >
+                          <div key={idx} className="bg-green-50 border-l-4 border-green-500 p-4 rounded-lg">
                             <div className="flex items-center gap-2">
                               <span className="text-2xl">💰</span>
                               <div>
@@ -407,15 +413,11 @@ export default function ChatView() {
                       }
                     }
                     
-                    // Mensaje de transacción (compra)
                     if (msg.message_type === 'purchase') {
                       try {
                         const purchaseData = JSON.parse(msg.message || '{}')
                         return (
-                          <div
-                            key={idx}
-                            className="bg-blue-50 border-l-4 border-blue-500 p-4 rounded-lg"
-                          >
+                          <div key={idx} className="bg-blue-50 border-l-4 border-blue-500 p-4 rounded-lg">
                             <div className="flex items-center gap-2">
                               <span className="text-2xl">📦</span>
                               <div>
@@ -437,7 +439,6 @@ export default function ChatView() {
                       }
                     }
                     
-                    // Mensaje normal (texto)
                     return (
                       <div
                         key={idx}
@@ -466,8 +467,6 @@ export default function ChatView() {
 
           {/* COLUMNA DERECHA - AI Chat Generator */}
           <div className="space-y-6">
-            
-            {/* Input area */}
             <div className="bg-white rounded-xl shadow-lg p-6">
               <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
                 <span>🤖</span> AI Chat Generator
@@ -481,7 +480,6 @@ export default function ChatView() {
                 className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent resize-none mb-4"
               />
               
-              {/* Botones AI */}
               <div className="grid grid-cols-3 gap-2 mb-4">
                 <button
                   onClick={handleGenerate}
@@ -511,7 +509,6 @@ export default function ChatView() {
         </div>
       </div>
 
-      {/* AI Response Modal */}
       <AIResponseModal
         isOpen={showAIModal}
         onClose={() => setShowAIModal(false)}
@@ -519,7 +516,6 @@ export default function ChatView() {
         onSave={handleSaveFromModal}
       />
 
-      {/* Transaction Modal */}
       <TransactionModal
         isOpen={showTransactionModal}
         onClose={() => setShowTransactionModal(false)}

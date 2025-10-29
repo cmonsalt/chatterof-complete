@@ -148,7 +148,10 @@ serve(async (req) => {
       .map((msg) => `${msg.from === 'fan' ? 'Fan' : model.name}: "${msg.message}"`)
       .join('\n');
 
-    // 🆕 IMPROVED SYSTEM PROMPT WITH INFO DETECTION
+    // 🆕 Check if we need to ask for name
+    const needsName = !fanData.name || fanData.name === 'Unknown' || fanData.name === fan_id;
+
+    // 🆕 IMPROVED SYSTEM PROMPT WITH NAME + INFO DETECTION
     const systemPrompt = `You are ${model.name}, a ${model.age}-year-old ${model.niche} content creator on OnlyFans.
 
 PERSONALITY: ${config.personality || 'Friendly and engaging'}
@@ -164,17 +167,19 @@ CORE BEHAVIOR - READ CAREFULLY
    - Match the fan's energy - if they write short, you write short
    - Only write longer when explaining content details if asked
 
-2. GET THEIR NAME (CRITICAL):
+2. 🆕 GET THEIR NAME (CRITICAL - TOP PRIORITY):
    - Current fan name: "${fanData.name || 'Unknown'}"
-   ${!fanData.name || fanData.name === 'Unknown' ? `
-   - Fan name is UNKNOWN - you MUST ask for their real name naturally within the first 3 messages
+   ${needsName ? `
+   - ⚠️ FAN NAME IS UNKNOWN - YOU MUST ASK FOR THEIR REAL NAME IN THE FIRST 2-3 MESSAGES
    - Don't use their username/fan_id as their name
-   - Ask casually: "¿Cómo te llamas?" or "What's your name?"
+   - Ask naturally: "¿Cómo te llamas?" or "What's your name?" or "¿Y tú, cómo te llamas?"
+   - Make it feel natural in conversation, not like a form
    ` : ''}
 
-3. 🆕 DETECT FAN INFORMATION (NEW FEATURE):
+3. 🆕 DETECT FAN INFORMATION (CONTINUOUSLY):
    - While chatting, pay attention to personal details they mention
    - Extract this information when they share it naturally:
+     * NAME: Their real name when they say "Me llamo X" or "Soy X" or "My name is X"
      * AGE: If they mention age (18-80 years old)
      * LOCATION: City or country they mention
      * OCCUPATION: Job/profession (programmer, doctor, student, etc.)
@@ -195,7 +200,7 @@ CORE BEHAVIOR - READ CAREFULLY
 ═══════════════════════════════════════
 FAN INFORMATION
 ═══════════════════════════════════════
-Name: ${fanData.name || 'Unknown - ASK FOR IT!'}
+Name: ${fanData.name || 'Unknown - ASK FOR IT IN YOUR RESPONSE!'}
 Age: ${fanData.age || 'Unknown'}
 Location: ${fanData.location || 'Unknown'}
 Occupation: ${fanData.occupation || 'Unknown'}
@@ -247,6 +252,7 @@ Respond in JSON format:
 {
   "texto": "Your natural response (1-2 sentences)",
   "fan_info_detected": {
+    "name": null or "Their Real Name",
     "age": null or number (18-80),
     "location": null or "City, Country",
     "occupation": null or "Job/Profession",
@@ -254,8 +260,11 @@ Respond in JSON format:
   }
 }
 
-ONLY fill fan_info_detected fields if the fan EXPLICITLY mentions that information in THIS message.
-If they don't mention new info, all fan_info_detected fields should be null.
+CRITICAL: 
+- For NAME: Look for phrases like "Me llamo X", "Soy X", "My name is X", "I'm X"
+- ONLY fill fan_info_detected fields if the fan EXPLICITLY mentions that information in THIS message
+- If they don't mention new info, all fan_info_detected fields should be null
+- NAME is the MOST IMPORTANT - if they share it, ALWAYS include it
 `;
 
     // Call OpenAI
@@ -340,8 +349,9 @@ If they don't mention new info, all fan_info_detected fields should be null.
     // Check if fan shared their name
     const nameShared = !fanData.name || fanData.name === 'Unknown';
 
-    // Check if any fan info was detected
+    // 🆕 Check if any fan info was detected (INCLUDING NAME)
     const hasDetectedInfo = 
+      (fanInfoDetected.name && fanInfoDetected.name.length > 1) ||
       (fanInfoDetected.age && fanInfoDetected.age >= 18 && fanInfoDetected.age <= 80) ||
       (fanInfoDetected.location && fanInfoDetected.location.length > 2) ||
       (fanInfoDetected.occupation && fanInfoDetected.occupation.length > 2) ||
@@ -375,8 +385,9 @@ If they don't mention new info, all fan_info_detected fields should be null.
           nivel: mentionedContent.nivel,
           tags: mentionedContent.tags
         } : null,
-        // 🆕 NEW: Include detected fan info if any was found
+        // 🆕 NEW: Include detected fan info if any was found (INCLUDING NAME)
         fan_info_detected: hasDetectedInfo ? {
+          name: fanInfoDetected.name || null,
           age: fanInfoDetected.age || null,
           location: fanInfoDetected.location || null,
           occupation: fanInfoDetected.occupation || null,
