@@ -19,6 +19,7 @@ export default function TransactionModal({
   const [selectedOffer, setSelectedOffer] = useState(null)
   const [tierRules, setTierRules] = useState([])
   const [customPrice, setCustomPrice] = useState('')
+  const [purchasedOfferIds, setPurchasedOfferIds] = useState([]) // 🆕 NUEVO
   
   // Estados para Tip y Suscripción
   const [amount, setAmount] = useState('')
@@ -29,6 +30,7 @@ export default function TransactionModal({
     if (isOpen) {
       loadCatalog()
       loadTierRules()
+      loadPurchasedContent() // 🆕 NUEVO
       
       // Actualizar payment method según el tab activo
       if (activeTab === 'compra') {
@@ -83,6 +85,26 @@ export default function TransactionModal({
       setTierRules(data || [])
     } catch (error) {
       console.error('Error loading tier rules:', error)
+    }
+  }
+
+  // 🆕 NUEVA FUNCIÓN: Cargar contenido ya comprado
+  const loadPurchasedContent = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('transactions')
+        .select('offer_id')
+        .eq('fan_id', fanId)
+        .eq('model_id', modelId)
+        .eq('type', 'compra')
+
+      if (error) throw error
+      
+      const offerIds = data?.map(t => t.offer_id).filter(Boolean) || []
+      setPurchasedOfferIds(offerIds)
+      console.log('🛒 Already purchased:', offerIds)
+    } catch (error) {
+      console.error('Error loading purchased content:', error)
     }
   }
 
@@ -296,6 +318,7 @@ export default function TransactionModal({
                   <div className="space-y-2 max-h-64 overflow-y-auto">
                     {filteredCatalog.map((item) => {
                       const calculatedPrice = calculatePrice(item.base_price)
+                      const isPurchased = purchasedOfferIds.includes(item.offer_id) // 🆕 NUEVO
                       return (
                         <div
                           key={item.offer_id}
@@ -306,13 +329,20 @@ export default function TransactionModal({
                           className={`p-4 rounded-lg border-2 cursor-pointer transition-all ${
                             selectedOffer?.offer_id === item.offer_id
                               ? 'border-purple-600 bg-purple-50'
-                              : 'border-gray-200 hover:border-purple-300'
+                              : isPurchased
+                                ? 'border-green-200 bg-green-50'
+                                : 'border-gray-200 hover:border-purple-300'
                           }`}
                         >
                           <div className="flex justify-between items-start">
                             <div className="flex-1">
-                              <div className="font-semibold text-gray-800">
+                              <div className="font-semibold text-gray-800 flex items-center gap-2">
                                 {item.title}
+                                {isPurchased && (
+                                  <span className="text-xs font-bold text-green-600 bg-green-100 px-2 py-1 rounded-full">
+                                    ✅ PURCHASED
+                                  </span>
+                                )}
                               </div>
                               <div className="text-sm text-gray-500">
                                 {item.description}

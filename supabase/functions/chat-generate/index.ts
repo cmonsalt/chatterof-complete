@@ -113,16 +113,27 @@ serve(async (req) => {
       .limit(50);
 
     // Load transactions
-    const { data: transactions } = await supabase
+    const { data: transactions, error: transactionsError } = await supabase
       .from('transactions')
       .select('*')
       .eq('fan_id', fan_id)
-      .order('timestamp', { ascending: false });
+      .eq('model_id', model_id)  // 🔥 FIX: Filter by model_id
+      .order('ts', { ascending: false });  // 🔥 FIX: Use 'ts' column
+
+    if (transactionsError) {
+      console.error('❌ Error loading transactions:', transactionsError);
+    }
+
+    console.log('💳 TRANSACTIONS LOADED:', transactions?.length || 0);
 
     const purchasedIds = transactions
       ?.filter((t) => t.type === 'compra' || t.type === 'tip')
       .map((t) => t.offer_id)
       .filter(Boolean) || [];
+
+    console.log('🛒 PURCHASED IDs:', purchasedIds);
+    console.log('🔢 Total transactions:', transactions?.length || 0);
+    console.log('🔢 Compra/tip transactions:', transactions?.filter((t) => t.type === 'compra' || t.type === 'tip').length || 0);
 
     // Recent tip check
     const recentTip = transactions?.find((t) => {
@@ -141,7 +152,9 @@ serve(async (req) => {
       !purchasedIds.includes(item.offer_id)
     ) || [];
 
-    console.log('📦 CATALOG:', availableContent.length, 'available items');
+    console.log('📦 CATALOG TOTAL:', catalogData?.length || 0, 'items');
+    console.log('📦 CATALOG AVAILABLE:', availableContent.length, 'items');
+    console.log('📦 CATALOG AVAILABLE IDs:', availableContent.map(c => c.offer_id).join(', '));
 
     // Build timeline
     const timeline = (chatHistory || [])
