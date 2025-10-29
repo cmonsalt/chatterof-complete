@@ -19,6 +19,7 @@ export default function ChatView() {
   const [loading, setLoading] = useState(true)
   const [generating, setGenerating] = useState(false)
   const [showTransactionModal, setShowTransactionModal] = useState(false)
+  const [detectedInfo, setDetectedInfo] = useState(null) // 🆕 NEW
 
   useEffect(() => {
     loadFanData()
@@ -51,7 +52,7 @@ export default function ChatView() {
         .from('chat')
         .select('*')
         .eq('fan_id', fanId)
-        .order('ts', { ascending: true })
+        .order('timestamp', { ascending: true })
 
       if (error) throw error
       setChatHistory(data || [])
@@ -68,6 +69,7 @@ export default function ChatView() {
 
     setGenerating(true)
     setAiResponse(null)
+    setDetectedInfo(null) // Reset detected info
 
     try {
       const { data, error } = await supabase.functions.invoke('chat-generate', {
@@ -82,7 +84,13 @@ export default function ChatView() {
 
       if (data.success) {
         setAiResponse(data.response)
-        setShowAIModal(true) // Abrir modal con la respuesta
+        
+        // 🆕 NEW: Check if fan info was detected
+        if (data.response.fan_info_detected) {
+          setDetectedInfo(data.response.fan_info_detected)
+        }
+        
+        setShowAIModal(true)
         loadChatHistory()
       } else {
         throw new Error(data.error || 'Failed to generate response')
@@ -95,6 +103,40 @@ export default function ChatView() {
     }
   }
 
+  // 🆕 NEW: Handle updating fan profile with detected info
+  const handleUpdateFanProfile = async () => {
+    if (!detectedInfo) return
+
+    try {
+      const updates = {}
+      
+      if (detectedInfo.age) updates.age = detectedInfo.age
+      if (detectedInfo.location) updates.location = detectedInfo.location
+      if (detectedInfo.occupation) updates.occupation = detectedInfo.occupation
+      if (detectedInfo.interests) updates.interests = detectedInfo.interests
+
+      if (Object.keys(updates).length === 0) {
+        alert('No new information to update')
+        return
+      }
+
+      const { error } = await supabase
+        .from('fans')
+        .update(updates)
+        .eq('fan_id', fanId)
+        .eq('model_id', modelId)
+
+      if (error) throw error
+
+      alert('✅ Fan profile updated successfully!')
+      setDetectedInfo(null)
+      loadFanData() // Reload to show updated info
+    } catch (error) {
+      console.error('Error updating fan profile:', error)
+      alert('Error: ' + error.message)
+    }
+  }
+
   const handleSaveFromModal = async (editedText) => {
     try {
       // Copiar al portapapeles
@@ -104,16 +146,20 @@ export default function ChatView() {
       await supabase.from('chat').insert({
         fan_id: fanId,
         model_id: modelId,
-        sender: 'fan',
-        message: message
+        from: 'fan',
+        message: message,
+        message_type: 'text',
+        timestamp: new Date().toISOString()
       })
       
       // Guardar respuesta del modelo (editada)
       await supabase.from('chat').insert({
         fan_id: fanId,
         model_id: modelId,
-        sender: 'chatter',
-        message: editedText
+        from: 'chatter',
+        message: editedText,
+        message_type: 'text',
+        timestamp: new Date().toISOString()
       })
       
       // Actualizar historial
@@ -210,9 +256,32 @@ export default function ChatView() {
               <h2 className="text-2xl font-bold text-gray-800 mb-1">
                 {fan.name || 'Unknown'}
               </h2>
-              <p className="text-sm text-gray-500">
+              <p className="text-sm text-gray-500 mb-2">
                 {fan.fan_id}
               </p>
+              {/* 🆕 NEW: Show fan details if available */}
+              <div className="flex flex-wrap gap-3 text-sm">
+                {fan.age && (
+                  <span className="bg-blue-50 text-blue-700 px-3 py-1 rounded-full">
+                    👤 {fan.age} years old
+                  </span>
+                )}
+                {fan.location && (
+                  <span className="bg-green-50 text-green-700 px-3 py-1 rounded-full">
+                    📍 {fan.location}
+                  </span>
+                )}
+                {fan.occupation && (
+                  <span className="bg-purple-50 text-purple-700 px-3 py-1 rounded-full">
+                    💼 {fan.occupation}
+                  </span>
+                )}
+                {fan.interests && (
+                  <span className="bg-amber-50 text-amber-700 px-3 py-1 rounded-full">
+                    ⭐ {fan.interests}
+                  </span>
+                )}
+              </div>
             </div>
             <div className="flex items-center gap-4">
               <button
@@ -236,6 +305,31 @@ export default function ChatView() {
             </div>
           </div>
         </div>
+
+        {/* 🆕 NEW: Alert banner for detected info */}
+        {detectedInfo && (
+          <div className="bg-green-50 border-l-4 border-green-500 p-4 mb-6 rounded-r-lg">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-green-800 font-semibold flex items-center gap-2 mb-2">
+                  <span>📝</span> New Fan Information Detected!
+                </h3>
+                <div className="text-sm text-green-700 space-y-1">
+                  {detectedInfo.age && <div>• Age: {detectedInfo.age} years old</div>}
+                  {detectedInfo.location && <div>• Location: {detectedInfo.location}</div>}
+                  {detectedInfo.occupation && <div>• Occupation: {detectedInfo.occupation}</div>}
+                  {detectedInfo.interests && <div>• Interests: {detectedInfo.interests}</div>}
+                </div>
+              </div>
+              <button
+                onClick={handleUpdateFanProfile}
+                className="bg-green-600 hover:bg-green-700 text-white py-2 px-6 rounded-lg font-semibold transition-all"
+              >
+                ✅ Update Profile
+              </button>
+            </div>
+          </div>
+        )}
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           

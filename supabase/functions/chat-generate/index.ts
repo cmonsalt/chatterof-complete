@@ -120,14 +120,14 @@ serve(async (req) => {
       .order('timestamp', { ascending: false });
 
     const purchasedIds = transactions
-      ?.filter((t) => t.type === 'purchase' || t.type === 'tip')
-      .map((t) => t.content_id)
+      ?.filter((t) => t.type === 'compra' || t.type === 'tip')
+      .map((t) => t.offer_id)
       .filter(Boolean) || [];
 
     // Recent tip check
     const recentTip = transactions?.find((t) => {
       if (t.type !== 'tip') return false;
-      const tipTime = new Date(t.timestamp).getTime();
+      const tipTime = new Date(t.ts || t.timestamp).getTime();
       return Date.now() - tipTime < 10 * 60 * 1000;
     });
 
@@ -148,7 +148,7 @@ serve(async (req) => {
       .map((msg) => `${msg.from === 'fan' ? 'Fan' : model.name}: "${msg.message}"`)
       .join('\n');
 
-    // IMPROVED SYSTEM PROMPT
+    // 🆕 IMPROVED SYSTEM PROMPT WITH INFO DETECTION
     const systemPrompt = `You are ${model.name}, a ${model.age}-year-old ${model.niche} content creator on OnlyFans.
 
 PERSONALITY: ${config.personality || 'Friendly and engaging'}
@@ -170,16 +170,23 @@ CORE BEHAVIOR - READ CAREFULLY
    - Fan name is UNKNOWN - you MUST ask for their real name naturally within the first 3 messages
    - Don't use their username/fan_id as their name
    - Ask casually: "¿Cómo te llamas?" or "What's your name?"
-   - Once they tell you their name, tell the chatter to UPDATE IT in the system
    ` : ''}
 
-3. BUILD CONNECTION FIRST:
+3. 🆕 DETECT FAN INFORMATION (NEW FEATURE):
+   - While chatting, pay attention to personal details they mention
+   - Extract this information when they share it naturally:
+     * AGE: If they mention age (18-80 years old)
+     * LOCATION: City or country they mention
+     * OCCUPATION: Job/profession (programmer, doctor, student, etc.)
+     * INTERESTS: Hobbies, passions (gaming, gym, anime, travel, etc.)
+   
+4. BUILD CONNECTION FIRST:
    - Start with genuine curiosity about them
    - Ask about their interests related to ${model.niche}
    - Share small personal details about yourself
    - Don't immediately push sales
 
-4. SELLING CONTENT (Do this naturally):
+5. SELLING CONTENT (Do this naturally):
    - Mention content ONLY when it fits the conversation organically
    - Use the TAGS to connect content to what they're talking about
    - Start with lower intensity levels, escalate if they're interested
@@ -189,10 +196,14 @@ CORE BEHAVIOR - READ CAREFULLY
 FAN INFORMATION
 ═══════════════════════════════════════
 Name: ${fanData.name || 'Unknown - ASK FOR IT!'}
+Age: ${fanData.age || 'Unknown'}
+Location: ${fanData.location || 'Unknown'}
+Occupation: ${fanData.occupation || 'Unknown'}
+Interests: ${fanData.interests || 'Unknown'}
 Tier: ${fanData.tier} (${fanData.tier === 'FREE' ? 'New/casual fan' : fanData.tier === 'VIP' ? 'Regular supporter' : 'Top spender - very interested'})
 Total Spent: $${fanData.spent_total}
 Messages in this conversation: ${chatHistory?.length || 0}
-${recentTip ? `\n⚠️ RECENT TIP: Fan sent $${recentTip.amount} ${Math.round((Date.now() - new Date(recentTip.timestamp).getTime()) / 60000)} min ago. They may be expecting content.` : ''}
+${recentTip ? `\n⚠️ RECENT TIP: Fan sent $${recentTip.amount} ${Math.round((Date.now() - new Date(recentTip.ts || recentTip.timestamp).getTime()) / 60000)} min ago. They may be expecting content.` : ''}
 
 ═══════════════════════════════════════
 AVAILABLE CONTENT (Not purchased yet)
@@ -230,8 +241,22 @@ THEIR NEW MESSAGE
 "${message}"
 
 ═══════════════════════════════════════
-YOUR RESPONSE (Remember: SHORT, natural, 1-2 sentences!)
-═══════════════════════════════════════`;
+YOUR RESPONSE
+═══════════════════════════════════════
+Respond in JSON format:
+{
+  "texto": "Your natural response (1-2 sentences)",
+  "fan_info_detected": {
+    "age": null or number (18-80),
+    "location": null or "City, Country",
+    "occupation": null or "Job/Profession",
+    "interests": null or "hobby1, hobby2"
+  }
+}
+
+ONLY fill fan_info_detected fields if the fan EXPLICITLY mentions that information in THIS message.
+If they don't mention new info, all fan_info_detected fields should be null.
+`;
 
     // Call OpenAI
     console.log('🤖 Calling OpenAI...');
@@ -248,7 +273,8 @@ YOUR RESPONSE (Remember: SHORT, natural, 1-2 sentences!)
           { role: 'user', content: message }
         ],
         temperature: 0.8,
-        max_tokens: 150  // Reduced to force shorter responses
+        max_tokens: 250,
+        response_format: { type: "json_object" }
       })
     });
 
@@ -262,22 +288,38 @@ YOUR RESPONSE (Remember: SHORT, natural, 1-2 sentences!)
     }
 
     const openaiData = await openaiResponse.json();
-    const aiResponse = openaiData.choices[0].message.content;
+    const aiResponseRaw = openaiData.choices[0].message.content;
+    
+    console.log('✅ AI Response:', aiResponseRaw);
 
-    console.log('✅ AI Response:', aiResponse.substring(0, 100));
+    // Parse JSON response
+    let parsedResponse;
+    try {
+      parsedResponse = JSON.parse(aiResponseRaw);
+    } catch (e) {
+      console.error('Failed to parse JSON, using raw text');
+      parsedResponse = { texto: aiResponseRaw, fan_info_detected: {} };
+    }
+
+    const aiResponse = parsedResponse.texto || aiResponseRaw;
+    const fanInfoDetected = parsedResponse.fan_info_detected || {};
 
     // Save to DB
     await supabase.from('chat').insert([
       {
         fan_id,
+        model_id: model_id,
         from: 'fan',
         message,
+        message_type: 'text',
         timestamp: new Date().toISOString()
       },
       {
         fan_id,
-        from: 'model',
+        model_id: model_id,
+        from: 'chatter',
         message: aiResponse,
+        message_type: 'text',
         timestamp: new Date().toISOString()
       }
     ]);
@@ -298,6 +340,13 @@ YOUR RESPONSE (Remember: SHORT, natural, 1-2 sentences!)
     // Check if fan shared their name
     const nameShared = !fanData.name || fanData.name === 'Unknown';
 
+    // Check if any fan info was detected
+    const hasDetectedInfo = 
+      (fanInfoDetected.age && fanInfoDetected.age >= 18 && fanInfoDetected.age <= 80) ||
+      (fanInfoDetected.location && fanInfoDetected.location.length > 2) ||
+      (fanInfoDetected.occupation && fanInfoDetected.occupation.length > 2) ||
+      (fanInfoDetected.interests && fanInfoDetected.interests.length > 2);
+
     return new Response(JSON.stringify({
       success: true,
       response: {
@@ -314,7 +363,7 @@ YOUR RESPONSE (Remember: SHORT, natural, 1-2 sentences!)
           spent_total: fanData.spent_total,
           recent_tip: recentTip ? {
             amount: recentTip.amount,
-            minutes_ago: Math.round((Date.now() - new Date(recentTip.timestamp).getTime()) / 60000)
+            minutes_ago: Math.round((Date.now() - new Date(recentTip.ts || recentTip.timestamp).getTime()) / 60000)
           } : null,
           mensajes_sesion: chatHistory?.length || 0
         },
@@ -326,15 +375,24 @@ YOUR RESPONSE (Remember: SHORT, natural, 1-2 sentences!)
           nivel: mentionedContent.nivel,
           tags: mentionedContent.tags
         } : null,
-        instrucciones_chatter: nameShared && aiResponse.toLowerCase().includes('llamas')
-          ? '📝 Bot preguntó el nombre. Cuando respondan, ACTUALIZA el nombre del fan en el sistema.'
-          : isCustomRequest 
-            ? '🎨 CUSTOM REQUEST - Pregunta detalles y luego TÚ negocias el precio.'
-            : recentTip 
-              ? `💰 Fan envió tip de $${recentTip.amount}. Si pide contenido, envía GRATIS.`
-              : mentionedContent 
-                ? `📦 Bot mencionó ${mentionedContent.offer_id} ($${mentionedContent.base_price}). Puedes subirlo bloqueado.`
-                : '💬 Solo conversación. Sigue construyendo conexión.'
+        // 🆕 NEW: Include detected fan info if any was found
+        fan_info_detected: hasDetectedInfo ? {
+          age: fanInfoDetected.age || null,
+          location: fanInfoDetected.location || null,
+          occupation: fanInfoDetected.occupation || null,
+          interests: fanInfoDetected.interests || null
+        } : null,
+        instrucciones_chatter: hasDetectedInfo
+          ? '📝 INFO DETECTED - Click "Update Profile" button to save fan details'
+          : nameShared && aiResponse.toLowerCase().includes('llamas')
+            ? '📝 Bot preguntó el nombre. Cuando respondan, ACTUALIZA el nombre del fan en el sistema.'
+            : isCustomRequest 
+              ? '🎨 CUSTOM REQUEST - Pregunta detalles y luego TÚ negocias el precio.'
+              : recentTip 
+                ? `💰 Fan envió tip de $${recentTip.amount}. Si pide contenido, envía GRATIS.`
+                : mentionedContent 
+                  ? `📦 Bot mencionó ${mentionedContent.offer_id} ($${mentionedContent.base_price}). Puedes subirlo bloqueado.`
+                  : '💬 Solo conversación. Sigue construyendo conexión.'
       }
     }), {
       status: 200,
