@@ -24,7 +24,7 @@ serve(async (req) => {
 
     const { model_id, fan_id, message, mode } = await req.json();
     
-    console.log('📥 REQUEST:', { model_id, fan_id, message: message.substring(0, 50), mode });
+    console.log('🔥 REQUEST:', { model_id, fan_id, message: message.substring(0, 50), mode });
 
     if (!model_id || !fan_id || !message) {
       return new Response(JSON.stringify({ error: 'Missing required fields' }), {
@@ -90,7 +90,7 @@ serve(async (req) => {
       }), { status: 402, headers: corsHeaders });
     }
 
-    // Load fan
+    // Load fan (🆕 NOW INCLUDING NOTES)
     const { data: fanData } = await supabase
       .from('fans')
       .select('*')
@@ -103,6 +103,10 @@ serve(async (req) => {
     }
 
     console.log('👥 FAN:', fanData.name, '/', fanData.tier, '/ $', fanData.spent_total);
+    // 🆕 NEW: Log if fan has notes
+    if (fanData.notes) {
+      console.log('📜 FAN HAS NOTES:', fanData.notes.substring(0, 100) + '...');
+    }
 
     // Load chat history
     const { data: chatHistory } = await supabase
@@ -117,8 +121,8 @@ serve(async (req) => {
       .from('transactions')
       .select('*')
       .eq('fan_id', fan_id)
-      .eq('model_id', model_id)  // 🔥 FIX: Filter by model_id
-      .order('ts', { ascending: false });  // 🔥 FIX: Use 'ts' column
+      .eq('model_id', model_id)
+      .order('ts', { ascending: false });
 
     if (transactionsError) {
       console.error('❌ Error loading transactions:', transactionsError);
@@ -132,8 +136,6 @@ serve(async (req) => {
       .filter(Boolean) || [];
 
     console.log('🛒 PURCHASED IDs:', purchasedIds);
-    console.log('🔢 Total transactions:', transactions?.length || 0);
-    console.log('🔢 Compra/tip transactions:', transactions?.filter((t) => t.type === 'compra' || t.type === 'tip').length || 0);
 
     // Recent tip check
     const recentTip = transactions?.find((t) => {
@@ -154,26 +156,42 @@ serve(async (req) => {
 
     console.log('📦 CATALOG TOTAL:', catalogData?.length || 0, 'items');
     console.log('📦 CATALOG AVAILABLE:', availableContent.length, 'items');
-    console.log('📦 CATALOG AVAILABLE IDs:', availableContent.map(c => c.offer_id).join(', '));
 
     // Build timeline
     const timeline = (chatHistory || [])
       .map((msg) => `${msg.from === 'fan' ? 'Fan' : model.name}: "${msg.message}"`)
       .join('\n');
 
-    // 🆕 Check if we need to ask for name
+    // Check if we need to ask for name
     const needsName = !fanData.name || fanData.name === 'Unknown' || fanData.name === fan_id;
 
-    // 🆕 IMPROVED SYSTEM PROMPT WITH NAME + INFO DETECTION
+    // 🆕 NEW: Build fan background section with notes
+    const fanBackgroundSection = fanData.notes 
+      ? `╔═══════════════════════════════════════
+FAN BACKGROUND (Previous History)
+╚═══════════════════════════════════════
+${fanData.notes}
+
+⚠️ IMPORTANT: The above information is from PREVIOUS interactions. Use it to:
+- Personalize your responses
+- Reference shared history naturally
+- Remember their preferences and interests
+- Continue building on past connections
+
+DO NOT ask about information already mentioned in their background.
+`
+      : '📝 NO PREVIOUS HISTORY - This is a new fan or first interaction in this system.';
+
+    // 🆕 IMPROVED SYSTEM PROMPT WITH NOTES INTEGRATION
     const systemPrompt = `You are ${model.name}, a ${model.age}-year-old ${model.niche} content creator on OnlyFans.
 
 PERSONALITY: ${config.personality || 'Friendly and engaging'}
 TONE: ${config.tone || 'casual'}
 LANGUAGE: ${config.language_code === 'es' ? 'Always respond in Spanish' : 'Always respond in English'}
 
-═══════════════════════════════════════
+╔═══════════════════════════════════════
 CORE BEHAVIOR - READ CAREFULLY
-═══════════════════════════════════════
+╚═══════════════════════════════════════
 
 1. RESPONSE LENGTH:
    - Keep responses SHORT: 1-2 sentences maximum
@@ -198,22 +216,15 @@ CORE BEHAVIOR - READ CAREFULLY
      * OCCUPATION: Job/profession (programmer, doctor, student, etc.)
      * INTERESTS: Hobbies, passions (gaming, gym, anime, travel, etc.)
    
-4. BUILD CONNECTION FIRST:
-   - Start with genuine curiosity about them
-   - Ask about their interests related to ${model.niche}
-   - Share small personal details about yourself
-   - Don't immediately push sales
+   - ONLY detect new information they mention in THIS conversation
+   - Don't repeat information already in their background/notes
 
-5. SELLING CONTENT (Do this naturally):
-   - Mention content ONLY when it fits the conversation organically
-   - Use the TAGS to connect content to what they're talking about
-   - Start with lower intensity levels, escalate if they're interested
-   - Never sound like a salesperson - sound like you're sharing something cool
+╔═══════════════════════════════════════
+${fanBackgroundSection}
 
-═══════════════════════════════════════
-FAN INFORMATION
-═══════════════════════════════════════
-Name: ${fanData.name || 'Unknown - ASK FOR IT IN YOUR RESPONSE!'}
+CURRENT FAN STATUS
+╚═══════════════════════════════════════
+Name: ${fanData.name || 'Unknown'}
 Age: ${fanData.age || 'Unknown'}
 Location: ${fanData.location || 'Unknown'}
 Occupation: ${fanData.occupation || 'Unknown'}
@@ -223,9 +234,9 @@ Total Spent: $${fanData.spent_total}
 Messages in this conversation: ${chatHistory?.length || 0}
 ${recentTip ? `\n⚠️ RECENT TIP: Fan sent $${recentTip.amount} ${Math.round((Date.now() - new Date(recentTip.ts || recentTip.timestamp).getTime()) / 60000)} min ago. They may be expecting content.` : ''}
 
-═══════════════════════════════════════
+╔═══════════════════════════════════════
 AVAILABLE CONTENT (Not purchased yet)
-═══════════════════════════════════════
+╚═══════════════════════════════════════
 ${availableContent.length > 0 
   ? availableContent.map((c) => `
 • ${c.offer_id}: "${c.title}"
@@ -238,29 +249,30 @@ ${availableContent.length > 0
 
 ${purchasedIds.length > 0 ? `\nALREADY PURCHASED: ${purchasedIds.join(', ')}` : ''}
 
-═══════════════════════════════════════
+╔═══════════════════════════════════════
 CONVERSATION HISTORY
-═══════════════════════════════════════
-${timeline || '[This is the first message - introduce yourself warmly and ask their name if unknown]'}
+╚═══════════════════════════════════════
+${timeline || '[This is the first message - introduce yourself warmly' + (needsName ? ' and ask their name' : '') + (fanData.notes ? ' - use their background to personalize your greeting' : '') + ']'}
 
-═══════════════════════════════════════
+╔═══════════════════════════════════════
 RESPONSE RULES
-═══════════════════════════════════════
-✓ Max ${config.max_emojis_per_message || 2} emojis per message
-✓ Sales approach: ${config.sales_approach || 'conversational_organic'}
-✓ Keep it conversational and natural
-✓ Match their energy level
+╚═══════════════════════════════════════
+✔ Max ${config.max_emojis_per_message || 2} emojis per message
+✔ Sales approach: ${config.sales_approach || 'conversational_organic'}
+✔ Keep it conversational and natural
+✔ Match their energy level
+${fanData.notes ? '✔ REFERENCE their previous history naturally when relevant\n✔ Make them feel remembered and valued' : ''}
 ${mode === 'reactivacion' ? '\n🔄 SPECIAL MODE: This is a re-engagement message. They haven\'t chatted in a while - be warm and curious about what they\'ve been up to.' : ''}
 ${mode === 'ofrecer_custom' ? '\n🎨 SPECIAL MODE: Offering custom content. Ask what kind of custom content they\'d like.' : ''}
 
-═══════════════════════════════════════
+╔═══════════════════════════════════════
 THEIR NEW MESSAGE
-═══════════════════════════════════════
+╚═══════════════════════════════════════
 "${message}"
 
-═══════════════════════════════════════
+╔═══════════════════════════════════════
 YOUR RESPONSE
-═══════════════════════════════════════
+╚═══════════════════════════════════════
 Respond in JSON format:
 {
   "texto": "Your natural response (1-2 sentences)",
@@ -275,7 +287,8 @@ Respond in JSON format:
 
 CRITICAL: 
 - For NAME: Look for phrases like "Me llamo X", "Soy X", "My name is X", "I'm X"
-- ONLY fill fan_info_detected fields if the fan EXPLICITLY mentions that information in THIS message
+- ONLY fill fan_info_detected fields if the fan EXPLICITLY mentions NEW information in THIS message
+- Don't repeat information already in their background/notes
 - If they don't mention new info, all fan_info_detected fields should be null
 - NAME is the MOST IMPORTANT - if they share it, ALWAYS include it
 `;
@@ -326,9 +339,6 @@ CRITICAL:
     const aiResponse = parsedResponse.texto || aiResponseRaw;
     const fanInfoDetected = parsedResponse.fan_info_detected || {};
 
-    // 🔥 REMOVED: Don't save to DB here - let the frontend do it when user clicks "Copy & Save"
-    // This prevents duplicate messages in chat history
-
     // Context analysis
     const lowerResponse = aiResponse.toLowerCase();
     const lowerMessage = message.toLowerCase();
@@ -342,10 +352,7 @@ CRITICAL:
       c.tags?.split(',').some((tag) => lowerResponse.includes(tag.trim().toLowerCase()))
     );
 
-    // Check if fan shared their name
-    const nameShared = !fanData.name || fanData.name === 'Unknown';
-
-    // 🆕 Check if any fan info was detected (INCLUDING NAME)
+    // Check if any fan info was detected
     const hasDetectedInfo = 
       (fanInfoDetected.name && fanInfoDetected.name.length > 1) ||
       (fanInfoDetected.age && fanInfoDetected.age >= 18 && fanInfoDetected.age <= 80) ||
@@ -367,6 +374,7 @@ CRITICAL:
         contexto: {
           fan_tier: fanData.tier,
           spent_total: fanData.spent_total,
+          has_notes: !!fanData.notes, // 🆕 NEW: Indicate if fan has background notes
           recent_tip: recentTip ? {
             amount: recentTip.amount,
             minutes_ago: Math.round((Date.now() - new Date(recentTip.ts || recentTip.timestamp).getTime()) / 60000)
@@ -381,7 +389,6 @@ CRITICAL:
           nivel: mentionedContent.nivel,
           tags: mentionedContent.tags
         } : null,
-        // 🆕 NEW: Include detected fan info if any was found (INCLUDING NAME)
         fan_info_detected: hasDetectedInfo ? {
           name: fanInfoDetected.name || null,
           age: fanInfoDetected.age || null,
@@ -389,7 +396,6 @@ CRITICAL:
           occupation: fanInfoDetected.occupation || null,
           interests: fanInfoDetected.interests || null
         } : null,
-        // 🔥 FIX: Don't show redundant message when info is detected (green banner is enough)
         instrucciones_chatter: hasDetectedInfo
           ? '💬 Continue building connection naturally'
           : isCustomRequest 

@@ -28,11 +28,17 @@ export default function Settings() {
     description: ''
   })
 
+  // 🆕 NEW: Fan Notes
+  const [fans, setFans] = useState([])
+  const [selectedFan, setSelectedFan] = useState(null)
+  const [fanNotes, setFanNotes] = useState('')
+
   useEffect(() => {
     if (modelId) {
       loadConfig()
       loadTierRules()
       loadCatalog()
+      loadFans() // 🆕 NEW
     }
   }, [modelId])
 
@@ -97,6 +103,22 @@ export default function Settings() {
       setCatalog(data || [])
     } catch (error) {
       console.error('Error loading catalog:', error)
+    }
+  }
+
+  // 🆕 NEW: Load fans for notes management
+  const loadFans = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('fans')
+        .select('fan_id, name, notes, tier, spent_total')
+        .eq('model_id', modelId)
+        .order('name', { ascending: true })
+
+      if (error) throw error
+      setFans(data || [])
+    } catch (error) {
+      console.error('Error loading fans:', error)
     }
   }
 
@@ -219,12 +241,51 @@ export default function Settings() {
     }
   }
 
+  // 🆕 NEW: Handle fan notes save
+  const handleSaveFanNotes = async () => {
+    if (!selectedFan) return
+
+    setSaving(true)
+    setMessage(null)
+
+    try {
+      const { error } = await supabase
+        .from('fans')
+        .update({ notes: fanNotes.trim() || null })
+        .eq('fan_id', selectedFan.fan_id)
+        .eq('model_id', modelId)
+
+      if (error) throw error
+
+      setMessage({ type: 'success', text: '✅ Fan notes saved!' })
+      
+      // Update local state
+      setFans(fans.map(f => 
+        f.fan_id === selectedFan.fan_id 
+          ? { ...f, notes: fanNotes.trim() || null }
+          : f
+      ))
+      
+      setSelectedFan({ ...selectedFan, notes: fanNotes.trim() || null })
+    } catch (error) {
+      setMessage({ type: 'error', text: '❌ Error: ' + error.message })
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  // 🆕 NEW: Handle fan selection
+  const handleSelectFan = (fan) => {
+    setSelectedFan(fan)
+    setFanNotes(fan.notes || '')
+  }
+
   if (loading) {
     return (
       <>
         <Navbar />
-        <div className="flex justify-center items-center min-h-screen">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600"></div>
+        <div style={{ display: 'flex', justifyContent: 'center', padding: '3rem' }}>
+          <div className="spinner"></div>
         </div>
       </>
     )
@@ -233,241 +294,278 @@ export default function Settings() {
   return (
     <>
       <Navbar />
-      <div className="max-w-5xl mx-auto p-6">
-        
-        {/* Header */}
-        <div className="mb-6">
-          <h1 className="text-3xl font-bold text-gray-800">Settings</h1>
-          <p className="text-gray-600 mt-1">
-            Configure {currentModel?.name || 'your model'}
-          </p>
-        </div>
+      <div className="container" style={{ maxWidth: '1200px', margin: '0 auto', padding: '2rem' }}>
+        <h1 style={{ fontSize: '2rem', fontWeight: 'bold', marginBottom: '2rem', color: '#1f2937' }}>
+          ⚙️ Settings
+        </h1>
 
-        {/* Message */}
+        {/* Message Banner */}
         {message && (
-          <div className={`mb-6 p-4 rounded-lg ${
-            message.type === 'success' ? 'bg-green-50 text-green-800' : 'bg-red-50 text-red-800'
-          }`}>
+          <div style={{
+            padding: '1rem',
+            marginBottom: '1.5rem',
+            borderRadius: '0.5rem',
+            background: message.type === 'success' ? '#d1fae5' : '#fee2e2',
+            color: message.type === 'success' ? '#065f46' : '#991b1b',
+            border: `2px solid ${message.type === 'success' ? '#10b981' : '#ef4444'}`
+          }}>
             {message.text}
           </div>
         )}
 
         {/* Tabs */}
-        <div className="bg-white rounded-xl shadow-lg overflow-hidden">
-          
-          {/* Tab Headers */}
-          <div className="flex border-b">
+        <div style={{ 
+          display: 'flex', 
+          gap: '0.5rem', 
+          marginBottom: '2rem',
+          borderBottom: '2px solid #e5e7eb'
+        }}>
+          {[
+            { id: 'config', label: '🤖 Model Config', emoji: '🤖' },
+            { id: 'tiers', label: '💎 Tier Rules', emoji: '💎' },
+            { id: 'catalog', label: '📦 Catalog', emoji: '📦' },
+            { id: 'notes', label: '📜 Fan Notes', emoji: '📜' } // 🆕 NEW TAB
+          ].map((tab) => (
             <button
-              onClick={() => setActiveTab('config')}
-              className={`flex-1 px-6 py-4 font-semibold transition-all ${
-                activeTab === 'config'
-                  ? 'bg-purple-600 text-white'
-                  : 'bg-gray-50 text-gray-600 hover:bg-gray-100'
-              }`}
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              style={{
+                padding: '1rem 1.5rem',
+                fontWeight: activeTab === tab.id ? 600 : 400,
+                color: activeTab === tab.id ? '#7c3aed' : '#6b7280',
+                background: activeTab === tab.id ? '#f3f4f6' : 'transparent',
+                borderBottom: activeTab === tab.id ? '3px solid #7c3aed' : 'none',
+                transition: 'all 0.2s'
+              }}
             >
-              ⚙️ Model Config
+              {tab.label}
             </button>
-            <button
-              onClick={() => setActiveTab('tiers')}
-              className={`flex-1 px-6 py-4 font-semibold transition-all ${
-                activeTab === 'tiers'
-                  ? 'bg-purple-600 text-white'
-                  : 'bg-gray-50 text-gray-600 hover:bg-gray-100'
-              }`}
-            >
-              💰 Tier Rules
-            </button>
-            <button
-              onClick={() => setActiveTab('catalog')}
-              className={`flex-1 px-6 py-4 font-semibold transition-all ${
-                activeTab === 'catalog'
-                  ? 'bg-purple-600 text-white'
-                  : 'bg-gray-50 text-gray-600 hover:bg-gray-100'
-              }`}
-            >
-              📦 Catalog
-            </button>
-          </div>
+          ))}
+        </div>
 
-          {/* Tab Content */}
-          <div className="p-6">
+        {/* Tab Content */}
+        <div className="card">
+          <div style={{ padding: '1.5rem' }}>
             
             {/* TAB 1: MODEL CONFIG */}
             {activeTab === 'config' && config && (
-              <form onSubmit={handleSaveConfig} className="space-y-6">
-                
-                {/* Model Info Section */}
-                <div className="bg-purple-50 rounded-lg p-6 border-2 border-purple-200">
-                  <h3 className="text-lg font-bold text-gray-800 mb-4">📋 Model Info</h3>
+              <form onSubmit={handleSaveConfig} style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+                {/* Model Name */}
+                <div>
+                  <label style={{ display: 'block', fontWeight: 600, marginBottom: '0.5rem', color: '#374151' }}>
+                    Model Name
+                  </label>
+                  <input
+                    type="text"
+                    value={config.name || ''}
+                    onChange={(e) => setConfig({...config, name: e.target.value})}
+                    placeholder="Sofia"
+                    style={{
+                      width: '100%',
+                      padding: '0.75rem',
+                      border: '2px solid #e5e7eb',
+                      borderRadius: '0.5rem',
+                      fontSize: '1rem'
+                    }}
+                  />
+                </div>
+
+                {/* Age & Niche */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                  <div>
+                    <label style={{ display: 'block', fontWeight: 600, marginBottom: '0.5rem', color: '#374151' }}>
+                      Age
+                    </label>
+                    <input
+                      type="number"
+                      value={config.age || ''}
+                      onChange={(e) => setConfig({...config, age: parseInt(e.target.value)})}
+                      placeholder="25"
+                      style={{
+                        width: '100%',
+                        padding: '0.75rem',
+                        border: '2px solid #e5e7eb',
+                        borderRadius: '0.5rem'
+                      }}
+                    />
+                  </div>
                   
-                  <div className="grid grid-cols-3 gap-4">
-                    <div>
-                      <label className="block text-sm font-semibold text-gray-700 mb-2">
-                        Model Name
-                      </label>
-                      <input
-                        type="text"
-                        value={config.name || currentModel?.name || ''}
-                        onChange={(e) => setConfig({...config, name: e.target.value})}
-                        placeholder="Sophia"
-                        className="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                      />
-                    </div>
+                  <div>
+                    <label style={{ display: 'block', fontWeight: 600, marginBottom: '0.5rem', color: '#374151' }}>
+                      Niche
+                    </label>
+                    <input
+                      type="text"
+                      value={config.niche || ''}
+                      onChange={(e) => setConfig({...config, niche: e.target.value})}
+                      placeholder="fitness, lifestyle"
+                      style={{
+                        width: '100%',
+                        padding: '0.75rem',
+                        border: '2px solid #e5e7eb',
+                        borderRadius: '0.5rem'
+                      }}
+                    />
+                  </div>
+                </div>
 
-                    <div>
-                      <label className="block text-sm font-semibold text-gray-700 mb-2">
-                        Age
-                      </label>
-                      <input
-                        type="number"
-                        min="18"
-                        max="99"
-                        value={config.age || ''}
-                        onChange={(e) => setConfig({...config, age: parseInt(e.target.value)})}
-                        placeholder="25"
-                        className="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                      />
-                    </div>
+                {/* Personality & Tone */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                  <div>
+                    <label style={{ display: 'block', fontWeight: 600, marginBottom: '0.5rem', color: '#374151' }}>
+                      Personality
+                    </label>
+                    <input
+                      type="text"
+                      value={config.personality || ''}
+                      onChange={(e) => setConfig({...config, personality: e.target.value})}
+                      placeholder="Friendly, flirty"
+                      style={{
+                        width: '100%',
+                        padding: '0.75rem',
+                        border: '2px solid #e5e7eb',
+                        borderRadius: '0.5rem'
+                      }}
+                    />
+                  </div>
+                  
+                  <div>
+                    <label style={{ display: 'block', fontWeight: 600, marginBottom: '0.5rem', color: '#374151' }}>
+                      Tone
+                    </label>
+                    <select
+                      value={config.tone || 'casual'}
+                      onChange={(e) => setConfig({...config, tone: e.target.value})}
+                      style={{
+                        width: '100%',
+                        padding: '0.75rem',
+                        border: '2px solid #e5e7eb',
+                        borderRadius: '0.5rem'
+                      }}
+                    >
+                      <option value="casual">Casual</option>
+                      <option value="professional">Professional</option>
+                      <option value="flirty">Flirty</option>
+                    </select>
+                  </div>
+                </div>
 
-                    <div>
-                      <label className="block text-sm font-semibold text-gray-700 mb-2">
-                        Niche
-                      </label>
-                      <input
-                        type="text"
-                        value={config.niche || currentModel?.niche || ''}
-                        onChange={(e) => setConfig({...config, niche: e.target.value})}
-                        placeholder="Fitness, Gaming, Cosplay..."
-                        className="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                      />
-                    </div>
+                {/* Language & GPT Model */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                  <div>
+                    <label style={{ display: 'block', fontWeight: 600, marginBottom: '0.5rem', color: '#374151' }}>
+                      Language
+                    </label>
+                    <select
+                      value={config.language_code || 'en'}
+                      onChange={(e) => setConfig({...config, language_code: e.target.value})}
+                      style={{
+                        width: '100%',
+                        padding: '0.75rem',
+                        border: '2px solid #e5e7eb',
+                        borderRadius: '0.5rem'
+                      }}
+                    >
+                      <option value="en">English</option>
+                      <option value="es">Spanish</option>
+                    </select>
+                  </div>
+                  
+                  <div>
+                    <label style={{ display: 'block', fontWeight: 600, marginBottom: '0.5rem', color: '#374151' }}>
+                      GPT Model
+                    </label>
+                    <select
+                      value={config.gpt_model || 'gpt-4o-mini'}
+                      onChange={(e) => setConfig({...config, gpt_model: e.target.value})}
+                      style={{
+                        width: '100%',
+                        padding: '0.75rem',
+                        border: '2px solid #e5e7eb',
+                        borderRadius: '0.5rem'
+                      }}
+                    >
+                      <option value="gpt-4o-mini">GPT-4o-mini (cheaper)</option>
+                      <option value="gpt-4o">GPT-4o (smarter)</option>
+                    </select>
                   </div>
                 </div>
 
                 {/* OpenAI API Key */}
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    🔑 OpenAI API Key
+                  <label style={{ display: 'block', fontWeight: 600, marginBottom: '0.5rem', color: '#374151' }}>
+                    OpenAI API Key
                   </label>
                   <input
                     type="password"
                     value={config.openai_api_key || ''}
                     onChange={(e) => setConfig({...config, openai_api_key: e.target.value})}
                     placeholder="sk-..."
-                    className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                  />
-                  <p className="text-xs text-gray-500 mt-1">
-                    Get your key from <a href="https://platform.openai.com" target="_blank" className="text-purple-600">OpenAI Platform</a>
-                  </p>
-                </div>
-
-                {/* GPT Model */}
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    🤖 GPT Model
-                  </label>
-                  <select
-                    value={config.gpt_model || 'gpt-4o-mini'}
-                    onChange={(e) => setConfig({...config, gpt_model: e.target.value})}
-                    className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                  >
-                    <option value="gpt-4o-mini">GPT-4o Mini (Recommended - Fast & Cheap)</option>
-                    <option value="gpt-4o">GPT-4o (More Powerful)</option>
-                    <option value="gpt-4-turbo">GPT-4 Turbo</option>
-                  </select>
-                </div>
-
-                {/* Personality */}
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    🧠 Personality Description
-                  </label>
-                  <textarea
-                    value={config.personality || ''}
-                    onChange={(e) => setConfig({...config, personality: e.target.value})}
-                    rows={4}
-                    placeholder="e.g., Friendly and engaging fitness enthusiast..."
-                    className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent resize-none"
+                    style={{
+                      width: '100%',
+                      padding: '0.75rem',
+                      border: '2px solid #e5e7eb',
+                      borderRadius: '0.5rem',
+                      fontFamily: 'monospace'
+                    }}
                   />
                 </div>
 
-                {/* Tone */}
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    💬 Tone
-                  </label>
-                  <select
-                    value={config.tone || 'casual'}
-                    onChange={(e) => setConfig({...config, tone: e.target.value})}
-                    className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                  >
-                    <option value="casual">Casual</option>
-                    <option value="casual-flirty">Casual & Flirty</option>
-                    <option value="friendly">Friendly</option>
-                    <option value="professional">Professional</option>
-                    <option value="playful">Playful</option>
-                    <option value="bubbly">Bubbly</option>
-                  </select>
+                {/* Sales Approach & Max Emojis */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                  <div>
+                    <label style={{ display: 'block', fontWeight: 600, marginBottom: '0.5rem', color: '#374151' }}>
+                      Sales Approach
+                    </label>
+                    <select
+                      value={config.sales_approach || 'conversational_organic'}
+                      onChange={(e) => setConfig({...config, sales_approach: e.target.value})}
+                      style={{
+                        width: '100%',
+                        padding: '0.75rem',
+                        border: '2px solid #e5e7eb',
+                        borderRadius: '0.5rem'
+                      }}
+                    >
+                      <option value="conversational_organic">Conversational Organic</option>
+                      <option value="direct">Direct</option>
+                      <option value="subtle">Subtle</option>
+                    </select>
+                  </div>
+                  
+                  <div>
+                    <label style={{ display: 'block', fontWeight: 600, marginBottom: '0.5rem', color: '#374151' }}>
+                      Max Emojis per Message
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      max="10"
+                      value={config.max_emojis_per_message || 2}
+                      onChange={(e) => setConfig({...config, max_emojis_per_message: parseInt(e.target.value)})}
+                      style={{
+                        width: '100%',
+                        padding: '0.75rem',
+                        border: '2px solid #e5e7eb',
+                        borderRadius: '0.5rem'
+                      }}
+                    />
+                  </div>
                 </div>
 
-                {/* Language */}
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    🌍 Response Language
-                  </label>
-                  <select
-                    value={config.language_code || 'en'}
-                    onChange={(e) => setConfig({...config, language_code: e.target.value})}
-                    className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                  >
-                    <option value="en">English</option>
-                    <option value="es">Español</option>
-                  </select>
-                  <p className="text-xs text-gray-500 mt-1">
-                    Language the AI will use to respond to fans
-                  </p>
-                </div>
-
-                {/* Sales Approach */}
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    💵 Sales Approach
-                  </label>
-                  <select
-                    value={config.sales_approach || 'conversational_organic'}
-                    onChange={(e) => setConfig({...config, sales_approach: e.target.value})}
-                    className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                  >
-                    <option value="conversational_organic">Conversational & Organic (Recommended)</option>
-                    <option value="subtle_value">Subtle Value Emphasis</option>
-                    <option value="direct_offers">Direct Offers</option>
-                    <option value="scarcity_urgency">Scarcity & Urgency</option>
-                  </select>
-                </div>
-
-                {/* Emoji Style */}
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    ✨ Max Emojis Per Message
-                  </label>
-                  <select
-                    value={config.max_emojis_per_message || 2}
-                    onChange={(e) => setConfig({...config, max_emojis_per_message: parseInt(e.target.value)})}
-                    className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                  >
-                    <option value={0}>None (0)</option>
-                    <option value={1}>Minimal (1)</option>
-                    <option value={2}>Moderate (2) - Recommended</option>
-                    <option value={3}>Frequent (3)</option>
-                    <option value={5}>Very Frequent (5)</option>
-                  </select>
-                </div>
-
-                {/* Save Button */}
                 <button
                   type="submit"
                   disabled={saving}
-                  className="w-full bg-purple-600 hover:bg-purple-700 text-white py-4 rounded-lg font-semibold text-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                  style={{
+                    width: '100%',
+                    padding: '1rem',
+                    background: saving ? '#9ca3af' : '#7c3aed',
+                    color: 'white',
+                    borderRadius: '0.5rem',
+                    fontWeight: 600,
+                    fontSize: '1.125rem',
+                    cursor: saving ? 'not-allowed' : 'pointer'
+                  }}
                 >
                   {saving ? '💾 Saving...' : '💾 Save Config'}
                 </button>
@@ -476,22 +574,27 @@ export default function Settings() {
 
             {/* TAB 2: TIER RULES */}
             {activeTab === 'tiers' && (
-              <div className="space-y-6">
-                <p className="text-gray-600 mb-4">
-                  Configure price multipliers for each tier. Higher multiplier = fans pay MORE.
-                </p>
-
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
                 {tierRules.map((rule, idx) => (
-                  <div key={rule.id} className="bg-gray-50 rounded-lg p-6 border-2 border-gray-200">
-                    <h3 className="text-lg font-bold text-gray-800 mb-4">
-                      {rule.tier_name === 'FREE' && '🆓 FREE Tier'}
-                      {rule.tier_name === 'VIP' && '⭐ VIP Tier'}
-                      {rule.tier_name === 'WHALE' && '🐋 WHALE Tier'}
+                  <div key={rule.id} style={{
+                    padding: '1.5rem',
+                    background: '#f9fafb',
+                    borderRadius: '0.5rem',
+                    border: '2px solid #e5e7eb'
+                  }}>
+                    <h3 style={{
+                      fontSize: '1.25rem',
+                      fontWeight: 'bold',
+                      marginBottom: '1rem',
+                      color: rule.tier_name === 'FREE' ? '#6b7280' : 
+                             rule.tier_name === 'VIP' ? '#7c3aed' : '#eab308'
+                    }}>
+                      {rule.tier_name === 'FREE' ? '🆓' : rule.tier_name === 'VIP' ? '💎' : '🐋'} {rule.tier_name}
                     </h3>
 
-                    <div className="grid grid-cols-3 gap-4">
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem' }}>
                       <div>
-                        <label className="block text-sm font-semibold text-gray-700 mb-2">
+                        <label style={{ display: 'block', fontWeight: 600, marginBottom: '0.5rem', fontSize: '0.875rem', color: '#374151' }}>
                           Min Spent ($)
                         </label>
                         <input
@@ -503,12 +606,17 @@ export default function Settings() {
                             newRules[idx].min_spent = parseFloat(e.target.value)
                             setTierRules(newRules)
                           }}
-                          className="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
+                          style={{
+                            width: '100%',
+                            padding: '0.75rem',
+                            border: '2px solid #e5e7eb',
+                            borderRadius: '0.5rem'
+                          }}
                         />
                       </div>
 
                       <div>
-                        <label className="block text-sm font-semibold text-gray-700 mb-2">
+                        <label style={{ display: 'block', fontWeight: 600, marginBottom: '0.5rem', fontSize: '0.875rem', color: '#374151' }}>
                           Max Spent ($)
                         </label>
                         <input
@@ -520,12 +628,17 @@ export default function Settings() {
                             newRules[idx].max_spent = parseFloat(e.target.value)
                             setTierRules(newRules)
                           }}
-                          className="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
+                          style={{
+                            width: '100%',
+                            padding: '0.75rem',
+                            border: '2px solid #e5e7eb',
+                            borderRadius: '0.5rem'
+                          }}
                         />
                       </div>
 
                       <div>
-                        <label className="block text-sm font-semibold text-gray-700 mb-2">
+                        <label style={{ display: 'block', fontWeight: 600, marginBottom: '0.5rem', fontSize: '0.875rem', color: '#374151' }}>
                           Price Multiplier
                         </label>
                         <input
@@ -537,9 +650,14 @@ export default function Settings() {
                             newRules[idx].price_multiplier = parseFloat(e.target.value)
                             setTierRules(newRules)
                           }}
-                          className="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
+                          style={{
+                            width: '100%',
+                            padding: '0.75rem',
+                            border: '2px solid #e5e7eb',
+                            borderRadius: '0.5rem'
+                          }}
                         />
-                        <p className="text-xs text-gray-500 mt-1">
+                        <p style={{ fontSize: '0.75rem', color: '#6b7280', marginTop: '0.25rem' }}>
                           {rule.price_multiplier > 1 ? `+${((rule.price_multiplier - 1) * 100).toFixed(0)}% more` : 
                            rule.price_multiplier < 1 ? `${((1 - rule.price_multiplier) * 100).toFixed(0)}% discount` : 
                            'Base price'}
@@ -547,10 +665,10 @@ export default function Settings() {
                       </div>
                     </div>
 
-                    <div className="mt-4 p-3 bg-purple-50 rounded-lg">
-                      <p className="text-sm text-gray-700">
+                    <div style={{ marginTop: '1rem', padding: '0.75rem', background: '#ede9fe', borderRadius: '0.5rem' }}>
+                      <p style={{ fontSize: '0.875rem', color: '#374151' }}>
                         <strong>Example:</strong> A fan who spent ${rule.min_spent} will pay{' '}
-                        <span className="font-bold text-purple-600">
+                        <span style={{ fontWeight: 'bold', color: '#7c3aed' }}>
                           ${(50 * rule.price_multiplier).toFixed(2)}
                         </span>{' '}
                         for a $50 item.
@@ -562,7 +680,16 @@ export default function Settings() {
                 <button
                   onClick={handleSaveTierRules}
                   disabled={saving}
-                  className="w-full bg-purple-600 hover:bg-purple-700 text-white py-4 rounded-lg font-semibold text-lg transition-all disabled:opacity-50"
+                  style={{
+                    width: '100%',
+                    padding: '1rem',
+                    background: saving ? '#9ca3af' : '#7c3aed',
+                    color: 'white',
+                    borderRadius: '0.5rem',
+                    fontWeight: 600,
+                    fontSize: '1.125rem',
+                    cursor: saving ? 'not-allowed' : 'pointer'
+                  }}
                 >
                   {saving ? '💾 Saving...' : '💾 Save Tier Rules'}
                 </button>
@@ -571,22 +698,38 @@ export default function Settings() {
 
             {/* TAB 3: CATALOG */}
             {activeTab === 'catalog' && (
-              <div className="space-y-6">
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
                 
                 {/* Add New Button */}
                 <button
                   onClick={() => setShowAddCatalog(!showAddCatalog)}
-                  className="w-full bg-green-600 hover:bg-green-700 text-white py-3 rounded-lg font-semibold transition-all"
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem',
+                    background: showAddCatalog ? '#f3f4f6' : '#10b981',
+                    color: showAddCatalog ? '#374151' : 'white',
+                    borderRadius: '0.5rem',
+                    fontWeight: 600,
+                    cursor: 'pointer'
+                  }}
                 >
                   {showAddCatalog ? '✕ Cancel' : '➕ Add New Content'}
                 </button>
 
                 {/* Add Form */}
                 {showAddCatalog && (
-                  <form onSubmit={handleAddCatalogItem} className="bg-gray-50 rounded-lg p-6 border-2 border-gray-200 space-y-4">
-                    <div className="grid grid-cols-2 gap-4">
+                  <form onSubmit={handleAddCatalogItem} style={{
+                    padding: '1.5rem',
+                    background: '#f9fafb',
+                    borderRadius: '0.5rem',
+                    border: '2px solid #e5e7eb',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '1rem'
+                  }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                       <div>
-                        <label className="block text-sm font-semibold text-gray-700 mb-2">
+                        <label style={{ display: 'block', fontWeight: 600, marginBottom: '0.5rem', fontSize: '0.875rem', color: '#374151' }}>
                           Offer ID
                         </label>
                         <input
@@ -595,12 +738,17 @@ export default function Settings() {
                           value={newItem.offer_id}
                           onChange={(e) => setNewItem({...newItem, offer_id: e.target.value})}
                           placeholder="offer_001"
-                          className="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
+                          style={{
+                            width: '100%',
+                            padding: '0.75rem',
+                            border: '2px solid #e5e7eb',
+                            borderRadius: '0.5rem'
+                          }}
                         />
                       </div>
 
                       <div>
-                        <label className="block text-sm font-semibold text-gray-700 mb-2">
+                        <label style={{ display: 'block', fontWeight: 600, marginBottom: '0.5rem', fontSize: '0.875rem', color: '#374151' }}>
                           Base Price ($)
                         </label>
                         <input
@@ -610,13 +758,18 @@ export default function Settings() {
                           value={newItem.base_price}
                           onChange={(e) => setNewItem({...newItem, base_price: e.target.value})}
                           placeholder="25.00"
-                          className="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
+                          style={{
+                            width: '100%',
+                            padding: '0.75rem',
+                            border: '2px solid #e5e7eb',
+                            borderRadius: '0.5rem'
+                          }}
                         />
                       </div>
                     </div>
 
                     <div>
-                      <label className="block text-sm font-semibold text-gray-700 mb-2">
+                      <label style={{ display: 'block', fontWeight: 600, marginBottom: '0.5rem', fontSize: '0.875rem', color: '#374151' }}>
                         Title
                       </label>
                       <input
@@ -625,12 +778,17 @@ export default function Settings() {
                         value={newItem.title}
                         onChange={(e) => setNewItem({...newItem, title: e.target.value})}
                         placeholder="Exclusive Photo Pack"
-                        className="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
+                        style={{
+                          width: '100%',
+                          padding: '0.75rem',
+                          border: '2px solid #e5e7eb',
+                          borderRadius: '0.5rem'
+                        }}
                       />
                     </div>
 
                     <div>
-                      <label className="block text-sm font-semibold text-gray-700 mb-2">
+                      <label style={{ display: 'block', fontWeight: 600, marginBottom: '0.5rem', fontSize: '0.875rem', color: '#374151' }}>
                         Description
                       </label>
                       <textarea
@@ -639,13 +797,20 @@ export default function Settings() {
                         onChange={(e) => setNewItem({...newItem, description: e.target.value})}
                         placeholder="10 exclusive behind-the-scenes photos"
                         rows={3}
-                        className="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 resize-none"
+                        style={{
+                          width: '100%',
+                          padding: '0.75rem',
+                          border: '2px solid #e5e7eb',
+                          borderRadius: '0.5rem',
+                          resize: 'none',
+                          fontFamily: 'inherit'
+                        }}
                       />
                     </div>
 
-                    <div className="grid grid-cols-2 gap-4">
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                       <div>
-                        <label className="block text-sm font-semibold text-gray-700 mb-2">
+                        <label style={{ display: 'block', fontWeight: 600, marginBottom: '0.5rem', fontSize: '0.875rem', color: '#374151' }}>
                           Intensity Level
                         </label>
                         <input
@@ -654,15 +819,20 @@ export default function Settings() {
                           value={newItem.nivel}
                           onChange={(e) => setNewItem({...newItem, nivel: parseInt(e.target.value)})}
                           placeholder="1"
-                          className="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
+                          style={{
+                            width: '100%',
+                            padding: '0.75rem',
+                            border: '2px solid #e5e7eb',
+                            borderRadius: '0.5rem'
+                          }}
                         />
-                        <p className="text-xs text-gray-500 mt-1">
+                        <p style={{ fontSize: '0.75rem', color: '#6b7280', marginTop: '0.25rem' }}>
                           Higher number = more explicit content
                         </p>
                       </div>
 
                       <div>
-                        <label className="block text-sm font-semibold text-gray-700 mb-2">
+                        <label style={{ display: 'block', fontWeight: 600, marginBottom: '0.5rem', fontSize: '0.875rem', color: '#374151' }}>
                           Tags (comma-separated)
                         </label>
                         <input
@@ -670,7 +840,12 @@ export default function Settings() {
                           value={newItem.tags}
                           onChange={(e) => setNewItem({...newItem, tags: e.target.value})}
                           placeholder="photos,exclusive,fitness"
-                          className="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
+                          style={{
+                            width: '100%',
+                            padding: '0.75rem',
+                            border: '2px solid #e5e7eb',
+                            borderRadius: '0.5rem'
+                          }}
                         />
                       </div>
                     </div>
@@ -678,7 +853,15 @@ export default function Settings() {
                     <button
                       type="submit"
                       disabled={saving}
-                      className="w-full bg-purple-600 hover:bg-purple-700 text-white py-3 rounded-lg font-semibold transition-all disabled:opacity-50"
+                      style={{
+                        width: '100%',
+                        padding: '0.75rem',
+                        background: saving ? '#9ca3af' : '#7c3aed',
+                        color: 'white',
+                        borderRadius: '0.5rem',
+                        fontWeight: 600,
+                        cursor: saving ? 'not-allowed' : 'pointer'
+                      }}
                     >
                       {saving ? 'Adding...' : 'Add to Catalog'}
                     </button>
@@ -686,33 +869,42 @@ export default function Settings() {
                 )}
 
                 {/* Catalog List */}
-                <div className="space-y-3">
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
                   {catalog.length === 0 ? (
-                    <div className="text-center py-12 text-gray-500">
-                      <p className="text-lg">No content in catalog yet.</p>
-                      <p className="text-sm">Click "Add New Content" to get started.</p>
+                    <div style={{ textAlign: 'center', padding: '3rem', color: '#6b7280' }}>
+                      <p style={{ fontSize: '1.125rem' }}>No content in catalog yet.</p>
+                      <p style={{ fontSize: '0.875rem' }}>Click "Add New Content" to get started.</p>
                     </div>
                   ) : (
                     catalog.map((item) => (
-                      <div key={item.offer_id} className="bg-white border-2 border-gray-200 rounded-lg p-4 hover:border-purple-300 transition-all">
-                        <div className="flex justify-between items-start">
-                          <div className="flex-1">
-                            <div className="flex items-center gap-2 mb-2">
-                              <span className={`px-2 py-1 rounded text-xs font-semibold ${
-                                item.nivel <= 3 ? 'bg-green-100 text-green-800' :
-                                item.nivel <= 6 ? 'bg-blue-100 text-blue-800' :
-                                'bg-purple-100 text-purple-800'
-                              }`}>
+                      <div key={item.offer_id} style={{
+                        background: 'white',
+                        border: '2px solid #e5e7eb',
+                        borderRadius: '0.5rem',
+                        padding: '1rem',
+                        transition: 'border-color 0.2s'
+                      }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                          <div style={{ flex: 1 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                              <span style={{
+                                padding: '0.25rem 0.5rem',
+                                borderRadius: '0.25rem',
+                                fontSize: '0.75rem',
+                                fontWeight: 600,
+                                background: item.nivel <= 3 ? '#d1fae5' : item.nivel <= 6 ? '#dbeafe' : '#ede9fe',
+                                color: item.nivel <= 3 ? '#065f46' : item.nivel <= 6 ? '#1e3a8a' : '#5b21b6'
+                              }}>
                                 Intensity {item.nivel}
                               </span>
-                              <span className="text-xs text-gray-500">{item.offer_id}</span>
+                              <span style={{ fontSize: '0.75rem', color: '#6b7280' }}>{item.offer_id}</span>
                             </div>
-                            <h3 className="text-lg font-bold text-gray-800">{item.title}</h3>
-                            <p className="text-sm text-gray-600 mt-1">{item.description}</p>
-                            <div className="flex items-center gap-3 mt-2">
-                              <span className="text-2xl font-bold text-green-600">${item.base_price}</span>
+                            <h3 style={{ fontSize: '1.125rem', fontWeight: 'bold', color: '#1f2937' }}>{item.title}</h3>
+                            <p style={{ fontSize: '0.875rem', color: '#6b7280', marginTop: '0.25rem' }}>{item.description}</p>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginTop: '0.5rem' }}>
+                              <span style={{ fontSize: '1.5rem', fontWeight: 'bold', color: '#10b981' }}>${item.base_price}</span>
                               {item.tags && (
-                                <span className="text-xs text-gray-500">
+                                <span style={{ fontSize: '0.75rem', color: '#6b7280' }}>
                                   🏷️ {item.tags}
                                 </span>
                               )}
@@ -720,13 +912,185 @@ export default function Settings() {
                           </div>
                           <button
                             onClick={() => handleDeleteCatalogItem(item.offer_id)}
-                            className="ml-4 px-4 py-2 bg-red-100 text-red-600 rounded-lg hover:bg-red-200 transition-all font-semibold text-sm"
+                            style={{
+                              marginLeft: '1rem',
+                              padding: '0.5rem 1rem',
+                              background: '#fee2e2',
+                              color: '#991b1b',
+                              borderRadius: '0.5rem',
+                              fontWeight: 600,
+                              fontSize: '0.875rem',
+                              cursor: 'pointer',
+                              transition: 'background 0.2s'
+                            }}
                           >
                             🗑️ Delete
                           </button>
                         </div>
                       </div>
                     ))
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* 🆕 TAB 4: FAN NOTES */}
+            {activeTab === 'notes' && (
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '1.5rem', minHeight: '500px' }}>
+                
+                {/* Left: Fan List */}
+                <div style={{
+                  borderRight: '2px solid #e5e7eb',
+                  paddingRight: '1.5rem',
+                  overflowY: 'auto',
+                  maxHeight: '600px'
+                }}>
+                  <h3 style={{ fontSize: '1.125rem', fontWeight: 600, marginBottom: '1rem', color: '#374151' }}>
+                    📋 Select a Fan
+                  </h3>
+                  
+                  {fans.length === 0 ? (
+                    <div style={{ textAlign: 'center', padding: '2rem', color: '#6b7280' }}>
+                      <p>No fans yet.</p>
+                      <p style={{ fontSize: '0.875rem' }}>Add fans from Dashboard first.</p>
+                    </div>
+                  ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                      {fans.map((fan) => (
+                        <button
+                          key={fan.fan_id}
+                          onClick={() => handleSelectFan(fan)}
+                          style={{
+                            padding: '0.75rem',
+                            textAlign: 'left',
+                            background: selectedFan?.fan_id === fan.fan_id ? '#ede9fe' : 'white',
+                            border: `2px solid ${selectedFan?.fan_id === fan.fan_id ? '#7c3aed' : '#e5e7eb'}`,
+                            borderRadius: '0.5rem',
+                            cursor: 'pointer',
+                            transition: 'all 0.2s'
+                          }}
+                        >
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <div>
+                              <div style={{ fontWeight: 600, color: '#1f2937', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                {fan.name || 'Unknown'}
+                                {fan.notes && (
+                                  <span style={{
+                                    fontSize: '0.7rem',
+                                    padding: '0.15rem 0.4rem',
+                                    background: '#dbeafe',
+                                    color: '#1e40af',
+                                    borderRadius: '0.25rem',
+                                    fontWeight: 600
+                                  }}>
+                                    📜
+                                  </span>
+                                )}
+                              </div>
+                              <div style={{ fontSize: '0.75rem', color: '#6b7280' }}>{fan.fan_id}</div>
+                            </div>
+                            <div style={{ textAlign: 'right' }}>
+                              <div style={{ fontSize: '0.875rem', fontWeight: 600, color: '#10b981' }}>
+                                ${fan.spent_total || 0}
+                              </div>
+                              <span style={{
+                                fontSize: '0.7rem',
+                                padding: '0.2rem 0.4rem',
+                                background: fan.tier === 'FREE' ? '#f3f4f6' : fan.tier === 'VIP' ? '#ede9fe' : '#fef3c7',
+                                color: fan.tier === 'FREE' ? '#6b7280' : fan.tier === 'VIP' ? '#5b21b6' : '#92400e',
+                                borderRadius: '0.25rem',
+                                fontWeight: 600
+                              }}>
+                                {fan.tier}
+                              </span>
+                            </div>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Right: Notes Editor */}
+                <div>
+                  {selectedFan ? (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', height: '100%' }}>
+                      <div>
+                        <h3 style={{ fontSize: '1.25rem', fontWeight: 600, color: '#1f2937', marginBottom: '0.25rem' }}>
+                          {selectedFan.name || 'Unknown'}
+                        </h3>
+                        <div style={{ fontSize: '0.875rem', color: '#6b7280' }}>
+                          {selectedFan.fan_id} • {selectedFan.tier} • ${selectedFan.spent_total} spent
+                        </div>
+                      </div>
+
+                      <div style={{
+                        padding: '1rem',
+                        background: '#fef3c7',
+                        borderRadius: '0.5rem',
+                        border: '1px solid #fbbf24'
+                      }}>
+                        <p style={{ fontSize: '0.875rem', color: '#92400e', margin: 0 }}>
+                          💡 <strong>Add context about this fan</strong> that the AI will use to personalize responses.
+                          Include: name, age, interests, purchase history, preferences, etc.
+                        </p>
+                      </div>
+
+                      <textarea
+                        value={fanNotes}
+                        onChange={(e) => setFanNotes(e.target.value)}
+                        placeholder={`Example:
+
+- Miguel, 28 years old from Madrid
+- Subscribed for 6 months (~$150 spent)
+- Loves gaming and anime content
+- Always tips on weekends
+- Asked about custom videos twice
+- Prefers feet content over other types
+- Very respectful, easy to talk to`}
+                        rows={15}
+                        style={{
+                          width: '100%',
+                          padding: '1rem',
+                          border: '2px solid #e5e7eb',
+                          borderRadius: '0.5rem',
+                          fontSize: '0.9rem',
+                          fontFamily: 'inherit',
+                          resize: 'vertical',
+                          flex: 1
+                        }}
+                      />
+
+                      <button
+                        onClick={handleSaveFanNotes}
+                        disabled={saving}
+                        style={{
+                          width: '100%',
+                          padding: '1rem',
+                          background: saving ? '#9ca3af' : '#7c3aed',
+                          color: 'white',
+                          borderRadius: '0.5rem',
+                          fontWeight: 600,
+                          fontSize: '1.125rem',
+                          cursor: saving ? 'not-allowed' : 'pointer'
+                        }}
+                      >
+                        {saving ? '💾 Saving...' : '💾 Save Notes'}
+                      </button>
+                    </div>
+                  ) : (
+                    <div style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      height: '100%',
+                      color: '#6b7280'
+                    }}>
+                      <div style={{ textAlign: 'center' }}>
+                        <p style={{ fontSize: '1.125rem', marginBottom: '0.5rem' }}>👈 Select a fan to edit their notes</p>
+                        <p style={{ fontSize: '0.875rem' }}>Notes help the AI personalize responses based on past history</p>
+                      </div>
+                    </div>
                   )}
                 </div>
               </div>
