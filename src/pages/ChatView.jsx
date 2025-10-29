@@ -4,6 +4,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
 import Navbar from '../components/Navbar'
 import TransactionModal from '../components/TransactionModal'
+import AIResponseModal from '../components/AIResponseModal'
 
 export default function ChatView() {
   const { fanId } = useParams()
@@ -14,6 +15,7 @@ export default function ChatView() {
   const [chatHistory, setChatHistory] = useState([])
   const [message, setMessage] = useState('')
   const [aiResponse, setAiResponse] = useState(null)
+  const [showAIModal, setShowAIModal] = useState(false)
   const [loading, setLoading] = useState(true)
   const [generating, setGenerating] = useState(false)
   const [showTransactionModal, setShowTransactionModal] = useState(false)
@@ -80,6 +82,7 @@ export default function ChatView() {
 
       if (data.success) {
         setAiResponse(data.response)
+        setShowAIModal(true) // Abrir modal con la respuesta
         loadChatHistory()
       } else {
         throw new Error(data.error || 'Failed to generate response')
@@ -92,40 +95,39 @@ export default function ChatView() {
     }
   }
 
-  const handleCopyAndClear = async () => {
-    if (aiResponse) {
-      try {
-        // Copiar al portapapeles
-        navigator.clipboard.writeText(aiResponse.texto)
-        
-        // Guardar mensaje del fan
-        await supabase.from('chat').insert({
-          fan_id: fanId,
-          model_id: modelId,
-          sender: 'fan',
-          message: message
-        })
-        
-        // Guardar respuesta del modelo
-        await supabase.from('chat').insert({
-          fan_id: fanId,
-          model_id: modelId,
-          sender: 'chatter',
-          message: aiResponse.texto
-        })
-        
-        // Actualizar historial
-        loadChatHistory()
-        
-        // Limpiar
-        setMessage('')
-        setAiResponse(null)
-        
-        alert('✅ Chat saved and copied to clipboard!')
-      } catch (error) {
-        console.error('Error saving chat:', error)
-        alert('Error saving chat: ' + error.message)
-      }
+  const handleSaveFromModal = async (editedText) => {
+    try {
+      // Copiar al portapapeles
+      navigator.clipboard.writeText(editedText)
+      
+      // Guardar mensaje del fan
+      await supabase.from('chat').insert({
+        fan_id: fanId,
+        model_id: modelId,
+        sender: 'fan',
+        message: message
+      })
+      
+      // Guardar respuesta del modelo (editada)
+      await supabase.from('chat').insert({
+        fan_id: fanId,
+        model_id: modelId,
+        sender: 'chatter',
+        message: editedText
+      })
+      
+      // Actualizar historial
+      loadChatHistory()
+      
+      // Limpiar y cerrar
+      setMessage('')
+      setAiResponse(null)
+      setShowAIModal(false)
+      
+      alert('✅ Chat saved and copied to clipboard!')
+    } catch (error) {
+      console.error('Error saving chat:', error)
+      alert('Error saving chat: ' + error.message)
     }
   }
 
@@ -147,6 +149,7 @@ export default function ChatView() {
 
       if (data.success) {
         setAiResponse(data.response)
+        setShowAIModal(true)
         loadChatHistory()
       }
     } catch (error) {
@@ -174,6 +177,7 @@ export default function ChatView() {
 
       if (data.success) {
         setAiResponse(data.response)
+        setShowAIModal(true)
         loadChatHistory()
       }
     } catch (error) {
@@ -192,26 +196,6 @@ export default function ChatView() {
         </div>
       </>
     )
-  }
-
-  const getAccionColor = (accion) => {
-    switch(accion) {
-      case 'SOLO_TEXTO': return 'bg-green-500'
-      case 'CONTENIDO_SUGERIDO': return 'bg-amber-500'
-      case 'ENVIAR_DESBLOQUEADO': return 'bg-purple-500'
-      case 'CUSTOM_REQUEST': return 'bg-red-500'
-      default: return 'bg-gray-500'
-    }
-  }
-
-  const getAccionText = (accion) => {
-    switch(accion) {
-      case 'SOLO_TEXTO': return '💬 SOLO TEXTO'
-      case 'CONTENIDO_SUGERIDO': return '📦 CONTENIDO SUGERIDO'
-      case 'ENVIAR_DESBLOQUEADO': return '💰 ENVIAR GRATIS'
-      case 'CUSTOM_REQUEST': return '🎨 CUSTOM REQUEST'
-      default: return accion
-    }
   }
 
   return (
@@ -333,82 +317,17 @@ export default function ChatView() {
                 </button>
               </div>
             </div>
-
-            {/* AI Response */}
-            {aiResponse && (
-              <div className={`bg-white rounded-xl shadow-lg p-6 border-2 ${getAccionColor(aiResponse.accion)} border-opacity-50`}>
-                <div className="flex justify-between items-center mb-4">
-                  <h3 className="text-xl font-bold text-gray-800">
-                    AI Response
-                  </h3>
-                  <span className={`${getAccionColor(aiResponse.accion)} text-white px-4 py-2 rounded-lg text-sm font-semibold`}>
-                    {getAccionText(aiResponse.accion)}
-                  </span>
-                </div>
-
-                {/* Response text */}
-                <div className="bg-gray-50 rounded-lg p-4 mb-4 text-lg leading-relaxed">
-                  {aiResponse.texto}
-                </div>
-
-                {/* Instructions */}
-                {aiResponse.instrucciones_chatter && (
-                  <div className="bg-blue-50 border-l-4 border-blue-500 p-4 mb-4">
-                    <div className="font-semibold text-blue-800 mb-2">📋 Instructions:</div>
-                    <div className="text-blue-700">{aiResponse.instrucciones_chatter}</div>
-                  </div>
-                )}
-
-                {/* Suggested content */}
-                {aiResponse.contenido_sugerido && (
-                  <div className="bg-amber-50 border-l-4 border-amber-500 p-4 mb-4">
-                    <div className="font-semibold text-amber-800 mb-2">
-                      📦 Suggested Content:
-                    </div>
-                    <div className="text-sm text-amber-700 space-y-1">
-                      <div><strong>ID:</strong> {aiResponse.contenido_sugerido.offer_id}</div>
-                      <div><strong>Title:</strong> {aiResponse.contenido_sugerido.title}</div>
-                      <div><strong>Price:</strong> ${aiResponse.contenido_sugerido.price}</div>
-                      <div><strong>Description:</strong> {aiResponse.contenido_sugerido.description}</div>
-                    </div>
-                  </div>
-                )}
-
-                {/* Context */}
-                {aiResponse.contexto && (
-                  <div className="bg-gray-100 rounded-lg p-4 text-sm text-gray-700 mb-4 space-y-1">
-                    <div className="font-semibold text-gray-800 mb-2">ℹ️ Context:</div>
-                    <div>Tier: {aiResponse.contexto.fan_tier}</div>
-                    <div>Total Spent: ${aiResponse.contexto.spent_total}</div>
-                    <div>Messages this session: {aiResponse.contexto.mensajes_sesion}</div>
-                    {aiResponse.contexto.recent_tip && (
-                      <div className="text-green-600 font-semibold">
-                        💰 Recent tip: ${aiResponse.contexto.recent_tip.amount} ({aiResponse.contexto.recent_tip.minutes_ago} min ago)
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {/* Action buttons */}
-                <div className="flex gap-3">
-                  <button
-                    onClick={handleCopyAndClear}
-                    className="flex-1 bg-green-600 hover:bg-green-700 text-white py-3 rounded-lg font-semibold transition-all"
-                  >
-                    📋 Copy & Save to Chat
-                  </button>
-                  <button
-                    onClick={() => setAiResponse(null)}
-                    className="px-6 bg-gray-200 hover:bg-gray-300 text-gray-800 py-3 rounded-lg font-semibold transition-all"
-                  >
-                    ✕ Close
-                  </button>
-                </div>
-              </div>
-            )}
           </div>
         </div>
       </div>
+
+      {/* AI Response Modal */}
+      <AIResponseModal
+        isOpen={showAIModal}
+        onClose={() => setShowAIModal(false)}
+        aiResponse={aiResponse}
+        onSave={handleSaveFromModal}
+      />
 
       {/* Transaction Modal */}
       <TransactionModal
