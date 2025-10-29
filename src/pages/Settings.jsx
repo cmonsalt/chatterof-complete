@@ -447,6 +447,9 @@ export default function Settings() {
                       <option value="professional">Professional</option>
                       <option value="flirty">Flirty</option>
                     </select>
+                    <p style={{ fontSize: '0.875rem', color: '#6b7280', marginTop: '0.5rem' }}>
+                      The overall communication style
+                    </p>
                   </div>
                 </div>
 
@@ -509,6 +512,17 @@ export default function Settings() {
                       fontFamily: 'monospace'
                     }}
                   />
+                  <p style={{ fontSize: '0.875rem', color: '#6b7280', marginTop: '0.5rem' }}>
+                    Need an API key? Get it here:{' '}
+                    <a 
+                      href="https://platform.openai.com/api-keys" 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      style={{ color: '#3b82f6', textDecoration: 'underline' }}
+                    >
+                      https://platform.openai.com/api-keys
+                    </a>
+                  </p>
                 </div>
 
                 {/* Sales Approach & Max Emojis */}
@@ -527,10 +541,14 @@ export default function Settings() {
                         borderRadius: '0.5rem'
                       }}
                     >
-                      <option value="conversational_organic">Conversational Organic</option>
-                      <option value="direct">Direct</option>
-                      <option value="subtle">Subtle</option>
+                      <option value="subtle">Subtle (Soft mentions)</option>
+                      <option value="conversational_organic">Conversational Organic (Natural flow)</option>
+                      <option value="direct">Direct (Clear offers)</option>
+                      <option value="aggressive">Aggressive (Push sales, create urgency)</option>
                     </select>
+                    <p style={{ fontSize: '0.875rem', color: '#6b7280', marginTop: '0.5rem' }}>
+                      How the AI approaches selling content to fans
+                    </p>
                   </div>
                   
                   <div>
