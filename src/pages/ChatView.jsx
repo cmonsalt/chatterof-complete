@@ -426,7 +426,7 @@ export default function ChatView() {
                 {chatHistory.length === 0 ? (
                   <p className="text-gray-400 text-center py-8">No messages yet</p>
                 ) : (
-                  chatHistory.slice(-20).map((msg, idx) => {
+                  chatHistory.slice(-100).map((msg, idx) => {
                     if (msg.message_type === 'tip') {
                       try {
                         const tipData = JSON.parse(msg.message || '{}')

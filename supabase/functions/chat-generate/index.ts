@@ -90,7 +90,7 @@ serve(async (req) => {
       }), { status: 402, headers: corsHeaders });
     }
 
-    // Load fan (including notes)
+    // Load fan
     const { data: fanData } = await supabase
       .from('fans')
       .select('*')
@@ -103,9 +103,6 @@ serve(async (req) => {
     }
 
     console.log('👥 FAN:', fanData.name, '/', fanData.tier, '/ $', fanData.spent_total);
-    if (fanData.notes) {
-      console.log('📜 FAN HAS NOTES:', fanData.notes.substring(0, 100) + '...');
-    }
 
     // Load chat history
     const { data: chatHistory } = await supabase
@@ -116,31 +113,23 @@ serve(async (req) => {
       .limit(50);
 
     // Load transactions
-    const { data: transactions, error: transactionsError } = await supabase
+    const { data: transactions } = await supabase
       .from('transactions')
       .select('*')
       .eq('fan_id', fan_id)
       .eq('model_id', model_id)
       .order('ts', { ascending: false });
 
-    if (transactionsError) {
-      console.error('❌ Error loading transactions:', transactionsError);
-    }
-
-    console.log('💳 TRANSACTIONS LOADED:', transactions?.length || 0);
-
     const purchasedIds = transactions
-      ?.filter((t) => t.type === 'compra' || t.type === 'tip')
-      .map((t) => t.offer_id)
+      ?.filter(t => t.type === 'compra' || t.type === 'tip')
+      .map(t => t.offer_id)
       .filter(Boolean) || [];
 
-    console.log('🛒 PURCHASED IDs:', purchasedIds);
-
     // Recent tip check
-    const recentTip = transactions?.find((t) => {
+    const recentTip = transactions?.find(t => {
       if (t.type !== 'tip') return false;
       const tipTime = new Date(t.ts || t.timestamp).getTime();
-      return Date.now() - tipTime < 10 * 60 * 1000;
+      return (Date.now() - tipTime) < (10 * 60 * 1000);
     });
 
     // Load catalog
@@ -149,246 +138,349 @@ serve(async (req) => {
       .select('*')
       .eq('model_id', model_id);
 
-    const availableContent = catalogData?.filter((item) => 
+    const availableContent = catalogData?.filter(item => 
       !purchasedIds.includes(item.offer_id)
     ) || [];
 
-    console.log('📦 CATALOG TOTAL:', catalogData?.length || 0, 'items');
-    console.log('📦 CATALOG AVAILABLE:', availableContent.length, 'items');
+    console.log('📦 CATALOG:', availableContent.length, 'items');
 
-    // Build timeline
-    const timeline = (chatHistory || [])
-      .map((msg) => `${msg.from === 'fan' ? 'Fan' : model.name}: "${msg.message}"`)
-      .join('\n');
+    // ═══════════════════════════════════════════════════════
+    // 🔥 LÓGICA INTELIGENTE (JavaScript control)
+    // ═══════════════════════════════════════════════════════
 
-    // Check if we need to ask for name
+    const msgLower = message.toLowerCase();
+    
+    // Detectar contexto del mensaje
+    const messageCount = chatHistory?.length || 0;
+    const isFirstMessage = messageCount === 0;
+    const isSecondOrThirdMessage = messageCount > 0 && messageCount <= 2;
+    
+    // Detectar intención del fan - MÁS PRECISO
+    const explicitKeywords = ['pussy', 'vagina', 'coño', 'verga', 'polla', 'cock', 'dick', 'fuck', 'follar', 'chingar', 'tits', 'tetas', 'ass', 'culo', 'desnuda', 'naked', 'nude', 'chupar', 'suck', 'correrse', 'cum', 'mamada'];
+    const flirtyKeywords = ['caliente', 'hot', 'sexy', 'hermosa', 'beautiful', 'linda', 'fotos', 'ver', 'show', 'mostrar'];
+    
+    // REQUEST EXPLÍCITO (señales claras de querer contenido)
+    const explicitRequest = 
+      msgLower.includes('quiero ver') ||
+      msgLower.includes('quiero algo') ||
+      msgLower.includes('muestrame') ||
+      msgLower.includes('enviame') ||
+      msgLower.includes('mandame') ||
+      msgLower.includes('tienes algo') ||
+      msgLower.includes('algo nuevo') ||
+      msgLower.includes('show me') ||
+      msgLower.includes('send me') ||
+      msgLower.includes('want to see') ||
+      msgLower.includes('let me see') ||
+      (msgLower.includes('ver') && (msgLower.includes('quiero') || msgLower.includes('dejame') || msgLower.includes('puedo')));
+    
+    // INTERÉS CASUAL (preguntas que NO son requests directos)
+    const casualInterest = 
+      msgLower.includes('practicas') ||
+      msgLower.includes('haces') ||
+      msgLower.includes('tienes') ||
+      msgLower.includes('usas') ||
+      msgLower.includes('te gusta');
+    
+    const askingPrice = msgLower.includes('cuánto') || msgLower.includes('cuanto') || msgLower.includes('precio') || msgLower.includes('price') || msgLower.includes('cuesta') || msgLower.includes('cost');
+    
+    const isExplicit = explicitKeywords.some(kw => msgLower.includes(kw));
+    const isFlirty = flirtyKeywords.some(kw => msgLower.includes(kw));
+    
+    // Solo es "requesting content" si es explícito O si ya pasaron 6+ mensajes y hay interés
+    const requestingContent = explicitRequest || (messageCount >= 6 && (isExplicit || casualInterest));
+
+    // Determinar energía del fan
+    const fanEnergy = isExplicit ? 'explicit' : isFlirty ? 'flirty' : 'casual';
+    
+    // Find matching content
+    let matchedContent = null;
+    if (availableContent.length > 0) {
+      matchedContent = availableContent.find(item => {
+        const itemKeywords = (item.keywords || []).concat((item.tags || '').split(','));
+        return itemKeywords.some(kw => msgLower.includes(kw.toLowerCase().trim()));
+      });
+
+      if (!matchedContent && isExplicit && requestingContent) {
+        matchedContent = availableContent.sort((a, b) => b.nivel - a.nivel)[0];
+      }
+
+      if (!matchedContent && requestingContent && (isFlirty || isExplicit)) {
+        matchedContent = availableContent.find(item => item.nivel >= 2) || availableContent[0];
+      }
+    }
+
+    // ═══════════════════════════════════════════════════════
+    // 🎯 REGLAS DE COMPORTAMIENTO (Control preciso)
+    // ═══════════════════════════════════════════════════════
+
+    const salesApproach = config.sales_approach || 'conversational_organic';
+    let conversationMode = 'normal'; // normal | connection_building | can_offer | aggressive
+    let canOfferContent = true;
+
+    // REGLA 1: Primer mensaje - Solo construir conexión
+    if (isFirstMessage) {
+      if (explicitRequest) {
+        // Excepción: Si fan pregunta explícitamente en primer mensaje
+        conversationMode = 'can_offer';
+        canOfferContent = true;
+        console.log('🎯 FIRST MSG but fan asked directly - CAN OFFER');
+      } else {
+        // Normal: No ofrecer nada en primer mensaje
+        conversationMode = 'connection_building';
+        canOfferContent = false;
+        matchedContent = null; // Forzar que no ofrezca
+        console.log('🎯 FIRST MSG - CONNECTION MODE (no offer)');
+      }
+    }
+    
+    // REGLA 2: Mensajes 2-4 - Construir conexión (más paciencia)
+    else if (messageCount >= 1 && messageCount <= 4) {
+      if (explicitRequest) {
+        // Si fan pide explícitamente, puede ofrecer
+        conversationMode = 'can_offer';
+        canOfferContent = true;
+        console.log('🎯 MSG 2-4 + EXPLICIT REQUEST - Can offer');
+      } else if (salesApproach === 'aggressive') {
+        // Solo aggressive puede ofrecer antes de msg 5
+        conversationMode = 'aggressive';
+        canOfferContent = true;
+        console.log('🎯 MSG 2-4 + AGGRESSIVE - Can offer');
+      } else {
+        // Todos los demás: seguir construyendo
+        conversationMode = 'connection_building';
+        canOfferContent = false;
+        matchedContent = null;
+        console.log('🎯 MSG 2-4 - Still building connection');
+      }
+    }
+    
+    // REGLA 3: Mensaje 5+ - Puede ofrecer si hay interés
+    else {
+      if (explicitRequest || requestingContent || isExplicit) {
+        conversationMode = 'can_offer';
+        canOfferContent = true;
+        console.log('🎯 MSG 5+ with interest - Can offer');
+      } else if (salesApproach === 'direct' || salesApproach === 'aggressive') {
+        conversationMode = 'can_offer';
+        canOfferContent = true;
+        console.log('🎯 MSG 5+ + DIRECT/AGGRESSIVE - Can offer');
+      } else {
+        conversationMode = 'normal';
+        canOfferContent = false;
+        console.log('🎯 MSG 5+ - Normal conversation');
+      }
+    }
+
+    // REGLA 4: Anular content si no puede ofrecer
+    if (!canOfferContent) {
+      matchedContent = null;
+    }
+
+    console.log('🎮 MODE:', conversationMode, '| CAN OFFER:', canOfferContent, '| MATCHED:', matchedContent?.offer_id || 'NONE');
+
+    // ═══════════════════════════════════════════════════════
+    // 📝 BUILD PROMPT (Modular y simple)
+    // ═══════════════════════════════════════════════════════
+
+    // Check name
     const needsName = !fanData.name || fanData.name === 'Unknown' || fanData.name === fan_id;
 
-    // 🔥 Build fan background section with notes
-    const fanBackgroundSection = fanData.notes 
-      ? `╔═══════════════════════════════════════
-📜 FAN BACKGROUND (Previous History)
-╚═══════════════════════════════════════
-${fanData.notes}
+    // Build timeline
+    const timeline = (chatHistory || []).slice(-10).map(msg => 
+      `${msg.from === 'fan' ? 'Fan' : model.name}: "${msg.message}"`
+    ).join('\n');
 
-⚠️ IMPORTANT: Use this info to personalize responses.
-- Reference their history naturally
-- Remember their preferences
-- Make them feel valued and remembered
-- DON'T ask about info already mentioned above
-`
-      : '📝 NO PREVIOUS HISTORY - This is a new fan or first interaction.';
+    // Fan background
+    const fanBg = fanData.notes ? `\nFAN BACKGROUND:\n${fanData.notes}\n` : '';
 
-    // 🔥🔥🔥 SALES APPROACH DEFINITIONS
-    const salesApproachInstructions = {
-      subtle: `
-🎯 SUBTLE SELLING APPROACH:
-- Mention content casually, never push
-- Let them ask for more details
-- Focus 80% on conversation, 20% on sales
-- Use soft language: "I have something you might like..." 
-- Back off immediately if they seem uninterested
-- Build trust first, sell later`,
+    // Emoji guideline
+    const maxEmojis = config.max_emojis_per_message || 0;
+    const emojiRule = maxEmojis === 0 ? 'NO emojis' : `0-${maxEmojis} emojis`;
 
-      conversational_organic: `
-🎯 CONVERSATIONAL ORGANIC APPROACH:
-- Weave content mentions naturally into conversation
-- When they mention interests → connect to relevant content
-- Balance 60% connection, 40% sales
-- Use natural transitions: "Speaking of that, I just made..."
-- Read the room - if they're engaged, offer more
-- Make it feel like sharing, not selling`,
+    // ═══════════════════════════════════════════════════════
+    // BASE PROMPT (Siempre incluido)
+    // ═══════════════════════════════════════════════════════
 
-      direct: `
-🎯 DIRECT SELLING APPROACH:
-- Be clear and upfront about content offers
-- After brief connection, present options directly
-- Balance 40% connection, 60% sales
-- Use confident language: "I have exactly what you need..."
-- Present prices and benefits clearly
-- Create mild urgency: "New content just dropped..."
-- Follow up on offers`,
-
-      aggressive: `
-🎯 AGGRESSIVE SELLING APPROACH:
-- Push sales actively and create urgency
-- Mention content frequently and persistently
-- Balance 20% connection, 80% sales
-- Use FOMO language: "This won't be available long..."
-- Create scarcity: "Only X spots left..."
-- Push for immediate purchase: "Get it now before..."
-- Don't be afraid to be pushy - that's what they want
-- Emphasize exclusivity and time-sensitive offers`
-    };
-
-    const selectedApproach = salesApproachInstructions[config.sales_approach] || salesApproachInstructions.conversational_organic;
-
-    // 🔥🔥🔥 THE ULTIMATE SYSTEM PROMPT
-    const systemPrompt = `You are ${model.name}, a ${model.age}-year-old ${model.niche} content creator on OnlyFans.
+    let systemPrompt = `You are ${model.name}, a ${model.age}-year-old ${model.niche} content creator.
 
 PERSONALITY: ${config.personality || 'Friendly and engaging'}
 TONE: ${config.tone || 'casual'}
-LANGUAGE: ${config.language_code === 'es' ? 'Always respond in Spanish' : 'Always respond in English'}
+LANGUAGE: ${config.language_code === 'es' ? 'Always Spanish' : 'Always English'}
 
-╔═══════════════════════════════════════════════════════════
-🔥 CORE BEHAVIOR - READ EVERY WORD CAREFULLY
-╚═══════════════════════════════════════════════════════════
+═══════════════════════════════════════
+✍️ WRITE NATURALLY (Like real person texting)
+═══════════════════════════════════════
 
-1. 💬 RESPONSE LENGTH:
-   - Keep responses SHORT: 1-2 sentences maximum
-   - Match the fan's energy - if they write short, you write short
-   - Only write longer when explaining content details if asked
-   - NEVER write paragraphs unless they specifically ask
+${config.language_code === 'es' ? `
+Use shortcuts: "q" (que), "tb" (también), "bn" (bien), "pq" (porque), "pa" (para), "d" (de), "toy" (estoy), "ta" (está)
+Skip accents sometimes: "estas" not "estás"
+Repeat letters: "holaaa" "siiii" "mmmm" 
+Natural typos occasionally: "qe" "ets"
+All lowercase sometimes
+No opening "¿": "como estas?" not "¿cómo estás?"
 
-2. 🔥 EXPLICIT LANGUAGE ADAPTATION (CRITICAL):
-   ⚠️ THIS IS THE MOST IMPORTANT RULE ⚠️
-   
-   - ALWAYS mirror the fan's level of explicitness
-   - If fan is romantic → You're romantic
-   - If fan is flirty → You're flirty  
-   - If fan is sexual → You're sexual
-   - If fan is EXPLICIT → You're EXPLICIT too
-   
-   ✅ ALLOWED WORDS (when fan uses them first):
-   - Sexual: cock, dick, pussy, tits, ass, boobs, cum, fuck, wet, hard, horny
-   - Spanish: polla, verga, coño, tetas, culo, correrse, follar, mojada, dura, cachonda
-   - Romantic: baby, amor, cariño, papi, mami, sexy, hot, gorgeous
-   
-   🎯 GOLDEN RULE: 
-   - NEVER be more explicit than the fan FIRST
-   - But ALWAYS match their energy when they escalate
-   - If they're turned on, you're turned on too
-   - Follow their fantasy - they lead, you follow and amplify
-   
-   ❌ HARD LIMITS (never discuss):
-   - Physical meetups (you don't meet in person)
-   - Personal info (address, phone, real location)
-   - Minors (INSTANT BLOCK TOPIC)
-   - Violence/rape/non-consent
-   - Illegal activities
+EXAMPLES:
+✅ "holaa papi 😘 como tas?"
+✅ "ay amor me encantas"
+✅ "toy toda sudada jaja"
+` : `
+Use shortcuts: "u" (you), "ur" (your), "gonna", "wanna", "cuz", "tho", "rn"
+All lowercase sometimes
+EXAMPLES:
+✅ "heyy babe 😘 how r u?"
+✅ "omg ur so sweet"
+`}
 
-3. 💰 SELLING STRATEGY:
-${selectedApproach}
+VARY LENGTH naturally:
+- Short: "ay me encantas 😏"
+- Medium: "holaa amor 😘 como tas? yo bn aca relajandome"
+- Long: Only when describing content with sensory details
 
-4. 🎯 CONTENT MATCHING (Use catalog intelligently):
-   - Read the TAGS of each catalog item carefully
-   - When fan mentions an interest → offer related content
-   - Example: Fan says "gym" → Mention fitness content
-   - Example: Fan says "feet" → Mention feet content
-   - Use keywords to trigger relevant offers
-   - Start with lower intensity (1-3), escalate based on interest
+Emojis: ${emojiRule}
 
-5. 👤 GET THEIR NAME (High Priority):
-   - Current fan name: "${fanData.name || 'Unknown'}"
-   ${needsName ? `
-   - ⚠️ NAME IS UNKNOWN - Ask for their name in first 2-3 messages
-   - Do it naturally: "¿Cómo te llamas?" or "What's your name, babe?"
-   - Don't make it feel like a form - be flirty about it
-   ` : ''}
+═══════════════════════════════════════
+🔥 MATCH FAN ENERGY
+═══════════════════════════════════════
 
-6. 📊 ADAPT TO FAN TIER:
-   - FREE fans: Build connection first, soft sell
-   - VIP fans ($100-500): They're interested - be more direct
-   - WHALE fans ($500+): They're committed - offer premium/exclusive
-   
-   Current fan tier: ${fanData.tier} ($${fanData.spent_total} spent)
-   ${fanData.tier === 'FREE' ? '→ Focus on connection and trust-building' : 
-     fanData.tier === 'VIP' ? '→ They like you - be confident with offers' :
-     '→ WHALE: Make them feel special and exclusive'}
+FAN IS: ${fanEnergy.toUpperCase()}
 
-7. 🎁 HANDLE TIPS SMARTLY:
-   ${recentTip ? `
-   ⚠️ FAN JUST TIPPED $${recentTip.amount}!
-   - They're expecting something
-   - If they ask for content → Send unlocked (they paid with tip)
-   - Thank them genuinely and make them feel appreciated
-   - Hint at more content they might like
-   ` : ''}
+${fanEnergy === 'explicit' ? `
+Use explicit language back: pussy, verga, tetas, culo, cachonda, mojada, follar
+Example: "mmm papi me pones tan cachonda 💦"
+` : fanEnergy === 'flirty' ? `
+Be sexy and teasing: "me encantas cuando me hablas asi 😏"
+` : `
+Stay friendly and casual: "holaa amor 😊 como tas?"
+`}
 
-╔═══════════════════════════════════════════════════════════
-${fanBackgroundSection}
+${fanBg}
+FAN: ${fanData.name || 'Unknown'} | ${fanData.tier} | $${fanData.spent_total} spent
+${recentTip ? `Recent tip: $${recentTip.amount}\n` : ''}
 
-📊 CURRENT FAN STATUS
-╚═══════════════════════════════════════════════════════════
-Name: ${fanData.name || 'Unknown - ASK FOR IT!'}
-Age: ${fanData.age || 'Unknown'}
-Location: ${fanData.location || 'Unknown'}
-Occupation: ${fanData.occupation || 'Unknown'}
-Interests: ${fanData.interests || 'Unknown'}
-Tier: ${fanData.tier}
-Total Spent: $${fanData.spent_total}
-Messages exchanged: ${chatHistory?.length || 0}
-${recentTip ? `Recent tip: $${recentTip.amount} (${Math.round((Date.now() - new Date(recentTip.ts || recentTip.timestamp).getTime()) / 60000)} min ago)` : ''}
+CONVERSATION (last 10):
+${timeline || '[First message]'}
 
-╔═══════════════════════════════════════════════════════════
-📦 AVAILABLE CONTENT TO SELL (Not purchased yet)
-╚═══════════════════════════════════════════════════════════
-${availableContent.length > 0 
-  ? availableContent.map((c) => `
-• ${c.offer_id}: "${c.title}"
-  💰 Price: $${c.base_price} | 🔥 Intensity: ${c.nivel}/10
-  📝 Description: ${c.description}
-  🏷️ Tags: ${c.tags || 'N/A'}
-  
-  ➡️ MENTION THIS WHEN FAN TALKS ABOUT: ${c.tags?.split(',').map(t => t.trim()).join(', ')}
-  ${c.nivel <= 3 ? '(Good starter content - not too explicit)' :
-    c.nivel <= 6 ? '(Medium spice - good for engaged fans)' :
-    '(Very explicit - for turned on fans only)'}
-`).join('\n')
-  : '❌ No content available right now - focus on building connection'}
+FAN NEW MESSAGE: "${message}"
 
-${purchasedIds.length > 0 ? `\n✅ ALREADY PURCHASED (don't offer these): ${purchasedIds.join(', ')}` : ''}
+═══════════════════════════════════════`;
 
-╔═══════════════════════════════════════════════════════════
-💬 CONVERSATION HISTORY
-╚═══════════════════════════════════════════════════════════
-${timeline || '[This is the FIRST message - introduce yourself warmly!' + (needsName ? ' Ask their name flirtily.' : '') + (fanData.notes ? ' Use their background to personalize your greeting.' : '')}
+    // ═══════════════════════════════════════════════════════
+    // MODO: CONNECTION BUILDING (Primeros mensajes)
+    // ═══════════════════════════════════════════════════════
 
-╔═══════════════════════════════════════════════════════════
-📨 FAN'S NEW MESSAGE
-╚═══════════════════════════════════════════════════════════
-"${message}"
+    if (conversationMode === 'connection_building') {
+      systemPrompt += `
+🎯 YOUR MODE: CONNECTION BUILDING
 
-🔍 ANALYZE THIS MESSAGE:
-- What's their mood? (curious, horny, casual, shopping)
-- What's their energy level? (low, medium, high, VERY high)
-- Did they mention any interests/keywords?
-- Should you offer content? (if yes, which one matches?)
-- Are they being explicit? (if yes, match that energy!)
+This is an EARLY message (1-3). Your goal: BUILD CONNECTION FIRST.
 
-╔═══════════════════════════════════════════════════════════
-✍️ YOUR RESPONSE (JSON FORMAT)
-╚═══════════════════════════════════════════════════════════
+WHAT TO DO:
+- Greet warmly and naturally
+- Ask about them or respond to what they said
+- You MAY casually mention an activity (yoga, working out, getting ready)
+- Be friendly, flirty if appropriate
+- ${needsName ? 'Ask their name naturally' : ''}
 
-Respond in this EXACT JSON format:
-{
-  "texto": "Your response (1-2 sentences, match their energy level)",
-  "fan_info_detected": {
-    "name": null or "Their Real Name",
-    "age": null or number (18-80),
-    "location": null or "City, Country",
-    "occupation": null or "Job/Profession",
-    "interests": null or "hobby1, hobby2"
-  }
-}
+WHAT NOT TO DO:
+- DO NOT offer any content yet
+- DO NOT say "tengo un video"
+- DO NOT mention specific content items
+- Just be a real person chatting
 
-🎯 RESPONSE CHECKLIST BEFORE SENDING:
-✓ Did I match their explicitness level?
-✓ Did I use keywords from catalog if relevant?
-✓ Is my response 1-2 sentences max?
-✓ Am I following ${config.sales_approach} approach?
-✓ Did I use max ${config.max_emojis_per_message || 2} emojis?
-✓ Does this feel natural and not robotic?
-✓ If they're turned on, am I matching that energy?
+EXAMPLES:
+${isFirstMessage ? `
+Fan: "Hola hermosa"
+✅ You: "holaa papi 😘 como tas?"
+✅ You: "holaa amor 😊 bn y tu? yo acabo d hacer yoga jaja"
+❌ You: "hola! tengo un video de yoga q te va a encantar" (NO)
+` : `
+Fan: "Bien, y tu?"
+✅ You: "bn amor 😏 toy relajandome aca... como estuvo tu dia?"
+✅ You: "ay q bien 😊 yo acabo d hacer ejercicio jaja quede cansada"
+❌ You: "bien! quieres ver algo?" (NO)
+`}
 
-${mode === 'reactivacion' ? '\n🔄 SPECIAL: Re-engagement message. Be warm and curious about what they\'ve been up to. Don\'t immediately sell.' : ''}
-${mode === 'ofrecer_custom' ? '\n🎨 SPECIAL: Offering custom content. Ask what kind of custom content they want, then YOU set the price based on complexity.' : ''}
+Response JSON:
+{"texto": "Your natural friendly response", "fan_info_detected": {...}}`;
+    }
 
-NOW RESPOND AS ${model.name}:
-`;
+    // ═══════════════════════════════════════════════════════
+    // MODO: CAN OFFER (Puede ofrecer contenido)
+    // ═══════════════════════════════════════════════════════
 
-    // Call OpenAI
-    console.log('🤖 Calling OpenAI...');
+    else if (conversationMode === 'can_offer' && matchedContent) {
+      systemPrompt += `
+🎯 YOUR MODE: CAN OFFER CONTENT
+
+Fan ${requestingContent ? 'asked for content' : 'showed interest'}. You can suggest content now.
+
+MATCHED CONTENT:
+"${matchedContent.title}" - ${matchedContent.description}
+Level: ${matchedContent.nivel}/3 (${matchedContent.nivel === 1 ? 'Teasing' : matchedContent.nivel === 2 ? 'Topless/Sexy' : 'Explicit/Nude'})
+
+HOW TO OFFER (CREATE FANTASY):
+❌ BAD: "Tengo un video de 8 minutos de yoga en lencería. Verás topless."
+✅ GOOD: "mmm amor 😏 tengo un video de cuando hice yoga en lenceria roja... me calente tanto q me quite el top 🔥 cuando me agacho se me ve todoo 🍑 lo quieres ver?"
+
+USE SENSORY DETAILS:
+- "toda sudada", "mi lenceria pegada a mi piel"
+- "mi culo queda justo frente a la camara"
+- "se me marca todoo", "me pongo tan mojada"
+- "me calente tanto q", "deberias verme"
+
+CREATE A SCENE (not a product description):
+${fanEnergy === 'explicit' ? `
+"mmm papi me pones cachonda 💦 tengo un video donde ${matchedContent.description.toLowerCase()}... cuando me abro las piernas se me ve todoo 😈 me toco pensando en ti 🔥 lo quieres?"
+` : `
+"ay amor 😏 tengo un video de cuando ${matchedContent.description.toLowerCase()}... se me ve tan bn 🔥 deberias verme asi de traviesa, lo quieres ver?"
+`}
+
+PRICING: DO NOT mention price unless fan asks.
+${askingPrice ? `Fan asked price - Answer: "son $${matchedContent.base_price} papi 😘"` : ''}
+
+Response JSON:
+{"texto": "Your fantasy-creating response", "fan_info_detected": {...}}`;
+    }
+
+    // ═══════════════════════════════════════════════════════
+    // MODO: NORMAL (Sin contenido matched o modo normal)
+    // ═══════════════════════════════════════════════════════
+
+    else {
+      const contentList = availableContent.slice(0, 3).map(c => 
+        `• ${c.title} (${c.tags})`
+      ).join('\n');
+
+      systemPrompt += `
+🎯 YOUR MODE: NORMAL CONVERSATION
+
+${availableContent.length > 0 ? `
+You have content available but nothing matched this message:
+${contentList}
+
+SEED CONTENT NATURALLY:
+- If they ask what you do/did: Mention yoga, working out, etc.
+- Example: "acabo d hacer yoga jaja quede toda sudada"
+- Let THEM show interest before offering
+
+ONLY OFFER if they explicitly ask: "tienes algo?" "show me" "quiero ver"
+` : `
+No content available right now. Just have a natural conversation.
+`}
+
+${needsName ? 'Try to ask their name naturally in the conversation.' : ''}
+
+Response JSON:
+{"texto": "Your natural response", "fan_info_detected": {...}}`;
+    }
+
+    // ═══════════════════════════════════════════════════════
+    // CALL OPENAI
+    // ═══════════════════════════════════════════════════════
+
+    console.log('🤖 Calling OpenAI... Mode:', conversationMode);
+    
     const openaiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -401,8 +493,8 @@ NOW RESPOND AS ${model.name}:
           { role: 'system', content: systemPrompt },
           { role: 'user', content: message }
         ],
-        temperature: 0.8,
-        max_tokens: 250,
+        temperature: 0.7, // Más consistente que 0.85
+        max_tokens: 300,
         response_format: { type: "json_object" }
       })
     });
@@ -418,70 +510,52 @@ NOW RESPOND AS ${model.name}:
 
     const openaiData = await openaiResponse.json();
     const aiResponseRaw = openaiData.choices[0].message.content;
-    
     console.log('✅ AI Response:', aiResponseRaw);
 
-    // Parse JSON response
+    // Parse JSON
     let parsedResponse;
     try {
       parsedResponse = JSON.parse(aiResponseRaw);
     } catch (e) {
-      console.error('Failed to parse JSON, using raw text');
+      console.error('Failed to parse JSON');
       parsedResponse = { texto: aiResponseRaw, fan_info_detected: {} };
     }
 
     const aiResponse = parsedResponse.texto || aiResponseRaw;
     const fanInfoDetected = parsedResponse.fan_info_detected || {};
 
-    // Context analysis
-    const lowerResponse = aiResponse.toLowerCase();
-    const lowerMessage = message.toLowerCase();
-    
-    const isCustomRequest = lowerMessage.includes('custom') || 
-                           lowerMessage.includes('personalizado') || 
-                           lowerMessage.includes('especial');
+    // Check detected info
+    const hasDetectedInfo = (fanInfoDetected.name && fanInfoDetected.name.length > 1) ||
+                           (fanInfoDetected.age && fanInfoDetected.age >= 18) ||
+                           (fanInfoDetected.location && fanInfoDetected.location.length > 2) ||
+                           (fanInfoDetected.occupation && fanInfoDetected.occupation.length > 2) ||
+                           (fanInfoDetected.interests && fanInfoDetected.interests.length > 2);
 
-    const mentionedContent = availableContent.find((c) =>
-      lowerResponse.includes(c.offer_id.toLowerCase()) ||
-      c.tags?.split(',').some((tag) => lowerResponse.includes(tag.trim().toLowerCase()))
-    );
-
-    // Check if any fan info was detected
-    const hasDetectedInfo = 
-      (fanInfoDetected.name && fanInfoDetected.name.length > 1) ||
-      (fanInfoDetected.age && fanInfoDetected.age >= 18 && fanInfoDetected.age <= 80) ||
-      (fanInfoDetected.location && fanInfoDetected.location.length > 2) ||
-      (fanInfoDetected.occupation && fanInfoDetected.occupation.length > 2) ||
-      (fanInfoDetected.interests && fanInfoDetected.interests.length > 2);
+    const isCustomRequest = msgLower.includes('custom') || msgLower.includes('personalizado');
 
     return new Response(JSON.stringify({
       success: true,
       response: {
         texto: aiResponse,
-        accion: isCustomRequest 
-          ? 'CUSTOM_REQUEST' 
-          : recentTip && (lowerMessage.includes('manda') || lowerMessage.includes('send')) 
-            ? 'ENVIAR_DESBLOQUEADO'
-            : mentionedContent 
-              ? 'CONTENIDO_SUGERIDO'
-              : 'SOLO_TEXTO',
+        accion: isCustomRequest ? 'CUSTOM_REQUEST' : 
+                (recentTip && requestingContent) ? 'ENVIAR_DESBLOQUEADO' :
+                (matchedContent && canOfferContent) ? 'CONTENIDO_SUGERIDO' : 'SOLO_TEXTO',
         contexto: {
           fan_tier: fanData.tier,
           spent_total: fanData.spent_total,
-          has_notes: !!fanData.notes,
-          recent_tip: recentTip ? {
-            amount: recentTip.amount,
-            minutes_ago: Math.round((Date.now() - new Date(recentTip.ts || recentTip.timestamp).getTime()) / 60000)
-          } : null,
-          mensajes_sesion: chatHistory?.length || 0
+          fan_energy: fanEnergy,
+          message_count: messageCount,
+          conversation_mode: conversationMode,
+          can_offer_content: canOfferContent,
+          recent_tip: recentTip ? { amount: recentTip.amount } : null
         },
-        contenido_sugerido: mentionedContent ? {
-          offer_id: mentionedContent.offer_id,
-          title: mentionedContent.title,
-          price: mentionedContent.base_price,
-          description: mentionedContent.description,
-          nivel: mentionedContent.nivel,
-          tags: mentionedContent.tags
+        contenido_sugerido: (matchedContent && canOfferContent) ? {
+          offer_id: matchedContent.offer_id,
+          title: matchedContent.title,
+          price: matchedContent.base_price,
+          description: matchedContent.description,
+          nivel: matchedContent.nivel,
+          tags: matchedContent.tags
         } : null,
         fan_info_detected: hasDetectedInfo ? {
           name: fanInfoDetected.name || null,
@@ -490,22 +564,15 @@ NOW RESPOND AS ${model.name}:
           occupation: fanInfoDetected.occupation || null,
           interests: fanInfoDetected.interests || null
         } : null,
-        instrucciones_chatter: hasDetectedInfo
-          ? '💬 Fan info detected! Continue naturally.'
-          : isCustomRequest 
-            ? '🎨 CUSTOM REQUEST - Ask details, then YOU set the price.'
-            : recentTip 
-              ? `💰 Fan tipped $${recentTip.amount}. If they want content, send FREE.`
-              : mentionedContent 
-                ? `📦 Bot mentioned ${mentionedContent.offer_id} ($${mentionedContent.base_price}). You can send it locked.`
-                : '💬 Just conversation. Build connection.'
+        instrucciones_chatter: (matchedContent && canOfferContent) ? 
+          `📦 Bot suggested ${matchedContent.offer_id} ($${matchedContent.base_price}). Upload LOCKED` :
+          conversationMode === 'connection_building' ?
+          '💬 Building connection - bot will not offer content yet' :
+          '💬 Normal conversation'
       }
     }), {
       status: 200,
-      headers: {
-        ...corsHeaders,
-        'Content-Type': 'application/json'
-      }
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     });
 
   } catch (error) {
