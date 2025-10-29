@@ -534,7 +534,10 @@ export default function ChatView() {
 
       <AIResponseModal
         isOpen={showAIModal}
-        onClose={() => setShowAIModal(false)}
+        onClose={() => {
+          setShowAIModal(false)
+          // 🔥 Banner stays visible - only clears when saving chat or updating profile
+        }}
         aiResponse={aiResponse}
         onSave={handleSaveFromModal}
       />

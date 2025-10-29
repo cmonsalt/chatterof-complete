@@ -376,17 +376,18 @@ CRITICAL:
           occupation: fanInfoDetected.occupation || null,
           interests: fanInfoDetected.interests || null
         } : null,
+        // 🔥 FIX: Don't show redundant message when info is detected (green banner is enough)
         instrucciones_chatter: hasDetectedInfo
-          ? '📝 INFO DETECTED - Click "Update Profile" button to save fan details'
+          ? '💬 Continue building connection naturally'
           : nameShared && aiResponse.toLowerCase().includes('llamas')
-            ? '📝 Bot preguntó el nombre. Cuando respondan, ACTUALIZA el nombre del fan en el sistema.'
+            ? '📝 Bot asked for name. When they reply, UPDATE the fan name in system.'
             : isCustomRequest 
-              ? '🎨 CUSTOM REQUEST - Pregunta detalles y luego TÚ negocias el precio.'
+              ? '🎨 CUSTOM REQUEST - Ask for details and then YOU negotiate the price.'
               : recentTip 
-                ? `💰 Fan envió tip de $${recentTip.amount}. Si pide contenido, envía GRATIS.`
+                ? `💰 Fan sent $${recentTip.amount} tip. If they ask for content, send FREE.`
                 : mentionedContent 
-                  ? `📦 Bot mencionó ${mentionedContent.offer_id} ($${mentionedContent.base_price}). Puedes subirlo bloqueado.`
-                  : '💬 Solo conversación. Sigue construyendo conexión.'
+                  ? `📦 Bot mentioned ${mentionedContent.offer_id} ($${mentionedContent.base_price}). You can upload it locked.`
+                  : '💬 Just conversation. Keep building connection.'
       }
     }), {
       status: 200,
