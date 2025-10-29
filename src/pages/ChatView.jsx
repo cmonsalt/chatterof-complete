@@ -20,6 +20,7 @@ export default function ChatView() {
   const [generating, setGenerating] = useState(false)
   const [showTransactionModal, setShowTransactionModal] = useState(false)
   const [detectedInfo, setDetectedInfo] = useState(null) // 🆕 NEW
+  const [showUpdateBanner, setShowUpdateBanner] = useState(false) // 🆕 NEW
 
   useEffect(() => {
     loadFanData()
@@ -70,6 +71,7 @@ export default function ChatView() {
     setGenerating(true)
     setAiResponse(null)
     setDetectedInfo(null) // Reset detected info
+    setShowUpdateBanner(false) // Hide banner
 
     try {
       const { data, error } = await supabase.functions.invoke('chat-generate', {
@@ -82,12 +84,16 @@ export default function ChatView() {
 
       if (error) throw error
 
+      console.log('🔍 AI Response:', data) // Debug
+
       if (data.success) {
         setAiResponse(data.response)
         
         // 🆕 NEW: Check if fan info was detected
         if (data.response.fan_info_detected) {
+          console.log('✅ Fan info detected:', data.response.fan_info_detected)
           setDetectedInfo(data.response.fan_info_detected)
+          setShowUpdateBanner(true) // Show the banner!
         }
         
         setShowAIModal(true)
@@ -130,6 +136,7 @@ export default function ChatView() {
 
       alert('✅ Fan profile updated successfully!')
       setDetectedInfo(null)
+      setShowUpdateBanner(false)
       loadFanData() // Reload to show updated info
     } catch (error) {
       console.error('Error updating fan profile:', error)
@@ -306,27 +313,56 @@ export default function ChatView() {
           </div>
         </div>
 
-        {/* 🆕 NEW: Alert banner for detected info */}
-        {detectedInfo && (
-          <div className="bg-green-50 border-l-4 border-green-500 p-4 mb-6 rounded-r-lg">
+        {/* 🆕 NEW: PROMINENT Alert banner for detected info - SHOWS BEFORE MODAL */}
+        {showUpdateBanner && detectedInfo && (
+          <div className="bg-gradient-to-r from-green-400 to-emerald-500 border-4 border-green-600 p-6 mb-6 rounded-xl shadow-2xl animate-pulse">
             <div className="flex items-center justify-between">
-              <div>
-                <h3 className="text-green-800 font-semibold flex items-center gap-2 mb-2">
-                  <span>📝</span> New Fan Information Detected!
+              <div className="flex-1">
+                <h3 className="text-white font-bold text-xl flex items-center gap-3 mb-3">
+                  <span className="text-3xl">🎉</span> 
+                  <span>New Fan Information Detected!</span>
                 </h3>
-                <div className="text-sm text-green-700 space-y-1">
-                  {detectedInfo.age && <div>• Age: {detectedInfo.age} years old</div>}
-                  {detectedInfo.location && <div>• Location: {detectedInfo.location}</div>}
-                  {detectedInfo.occupation && <div>• Occupation: {detectedInfo.occupation}</div>}
-                  {detectedInfo.interests && <div>• Interests: {detectedInfo.interests}</div>}
+                <div className="bg-white/20 backdrop-blur-sm rounded-lg p-4 space-y-2">
+                  {detectedInfo.age && (
+                    <div className="text-white font-semibold flex items-center gap-2">
+                      <span>👤</span> Age: <span className="bg-white/30 px-3 py-1 rounded-full">{detectedInfo.age} years old</span>
+                    </div>
+                  )}
+                  {detectedInfo.location && (
+                    <div className="text-white font-semibold flex items-center gap-2">
+                      <span>📍</span> Location: <span className="bg-white/30 px-3 py-1 rounded-full">{detectedInfo.location}</span>
+                    </div>
+                  )}
+                  {detectedInfo.occupation && (
+                    <div className="text-white font-semibold flex items-center gap-2">
+                      <span>💼</span> Occupation: <span className="bg-white/30 px-3 py-1 rounded-full">{detectedInfo.occupation}</span>
+                    </div>
+                  )}
+                  {detectedInfo.interests && (
+                    <div className="text-white font-semibold flex items-center gap-2">
+                      <span>⭐</span> Interests: <span className="bg-white/30 px-3 py-1 rounded-full">{detectedInfo.interests}</span>
+                    </div>
+                  )}
                 </div>
               </div>
-              <button
-                onClick={handleUpdateFanProfile}
-                className="bg-green-600 hover:bg-green-700 text-white py-2 px-6 rounded-lg font-semibold transition-all"
-              >
-                ✅ Update Profile
-              </button>
+              <div className="flex flex-col gap-3 ml-6">
+                <button
+                  onClick={handleUpdateFanProfile}
+                  className="bg-white hover:bg-green-50 text-green-700 py-4 px-8 rounded-xl font-bold text-lg shadow-lg hover:shadow-xl transition-all flex items-center gap-2"
+                >
+                  <span className="text-2xl">✅</span>
+                  Update Profile
+                </button>
+                <button
+                  onClick={() => {
+                    setShowUpdateBanner(false)
+                    setDetectedInfo(null)
+                  }}
+                  className="bg-red-500 hover:bg-red-600 text-white py-2 px-8 rounded-xl font-semibold transition-all"
+                >
+                  ✕ Dismiss
+                </button>
+              </div>
             </div>
           </div>
         )}
