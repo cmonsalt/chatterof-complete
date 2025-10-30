@@ -28,7 +28,7 @@ export default function Settings() {
     description: ''
   })
 
-  // NEW: Fan Notes
+  // ðŸ†• NEW: Fan Notes
   const [fans, setFans] = useState([])
   const [filteredFansNotes, setFilteredFansNotes] = useState([])
   const [fanSearchQuery, setFanSearchQuery] = useState('')
@@ -40,11 +40,11 @@ export default function Settings() {
       loadConfig()
       loadTierRules()
       loadCatalog()
-      loadFans() // NEW
+      loadFans() // ðŸ†• NEW
     }
   }, [modelId])
 
-  // NEW: Filter fans based on search query
+  // ðŸ†• NEW: Filter fans based on search query
   useEffect(() => {
     if (fanSearchQuery.trim() === '') {
       setFilteredFansNotes(fans)
@@ -123,7 +123,7 @@ export default function Settings() {
     }
   }
 
-  // NEW: Load fans for notes management
+  // ðŸ†• NEW: Load fans for notes management
   const loadFans = async () => {
     try {
       const { data, error } = await supabase
@@ -260,7 +260,7 @@ export default function Settings() {
     }
   }
 
-  // NEW: Handle fan notes save
+  // ðŸ†• NEW: Handle fan notes save
   const handleSaveFanNotes = async () => {
     if (!selectedFan) return
 
@@ -293,7 +293,7 @@ export default function Settings() {
     }
   }
 
-  // NEW: Handle fan selection
+  // ðŸ†• NEW: Handle fan selection
   const handleSelectFan = (fan) => {
     setSelectedFan(fan)
     setFanNotes(fan.notes || '')
@@ -340,10 +340,10 @@ export default function Settings() {
           borderBottom: '2px solid #e5e7eb'
         }}>
           {[
-            { id: 'config', label: 'Model Config' },
-            { id: 'tiers', label: 'Tier Rules' },
-            { id: 'catalog', label: 'Catalog' },
-            { id: 'notes', label: 'Fan Notes' }
+            { id: 'config', label: 'ðŸ¤– Model Config', emoji: 'ðŸ¤–' },
+            { id: 'tiers', label: 'ðŸ’Ž Tier Rules', emoji: 'ðŸ’Ž' },
+            { id: 'catalog', label: 'ðŸ“¦ Catalog', emoji: 'ðŸ“¦' },
+            { id: 'notes', label: 'ðŸ“œ Fan Notes', emoji: 'ðŸ“œ' } // ðŸ†• NEW TAB
           ].map((tab) => (
             <button
               key={tab.id}
@@ -604,7 +604,7 @@ export default function Settings() {
                     cursor: saving ? 'not-allowed' : 'pointer'
                   }}
                 >
-                  {saving ? 'Saving...' : 'Save Config'}
+                  {saving ? 'ðŸ’¾ Saving...' : 'ðŸ’¾ Save Config'}
                 </button>
               </form>
             )}
@@ -626,7 +626,7 @@ export default function Settings() {
                       color: rule.tier_name === 'FREE' ? '#6b7280' : 
                              rule.tier_name === 'VIP' ? '#7c3aed' : '#eab308'
                     }}>
-                      {rule.tier_name === 'FREE' ? ': rule.tier_name === 'VIP' ? ': '{rule.tier_name}
+                      {rule.tier_name === 'FREE' ? 'ðŸ†“' : rule.tier_name === 'VIP' ? 'ðŸ’Ž' : 'ðŸ‹'} {rule.tier_name}
                     </h3>
 
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem' }}>
@@ -728,7 +728,7 @@ export default function Settings() {
                     cursor: saving ? 'not-allowed' : 'pointer'
                   }}
                 >
-                  {saving ? 'Saving...' : 'Save Tier Rules'}
+                  {saving ? 'ðŸ’¾ Saving...' : 'ðŸ’¾ Save Tier Rules'}
                 </button>
               </div>
             )}
@@ -942,7 +942,7 @@ export default function Settings() {
                               <span style={{ fontSize: '1.5rem', fontWeight: 'bold', color: '#10b981' }}>${item.base_price}</span>
                               {item.tags && (
                                 <span style={{ fontSize: '0.75rem', color: '#6b7280' }}>
-                                  {item.tags}
+                                  ðŸ·ï¸ {item.tags}
                                 </span>
                               )}
                             </div>
@@ -961,7 +961,7 @@ export default function Settings() {
                               transition: 'background 0.2s'
                             }}
                           >
-                            Delete
+                            ðŸ—‘ï¸ Delete
                           </button>
                         </div>
                       </div>
@@ -971,7 +971,7 @@ export default function Settings() {
               </div>
             )}
 
-            {/* TAB 4: FAN NOTES */}
+            {/* ðŸ†• TAB 4: FAN NOTES */}
             {activeTab === 'notes' && (
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '1.5rem', minHeight: '500px' }}>
                 
@@ -983,10 +983,10 @@ export default function Settings() {
                   maxHeight: '600px'
                 }}>
                   <h3 style={{ fontSize: '1.125rem', fontWeight: 600, marginBottom: '1rem', color: '#374151' }}>
-                    Select a Fan
+                    ðŸ“‹ Select a Fan
                   </h3>
                   
-                  {/* Search Bar */}
+                  {/* ðŸ†• Search Bar */}
                   <div style={{ marginBottom: '1rem' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                       <span style={{ fontSize: '1rem' }}>ðŸ”</span>
@@ -1114,7 +1114,7 @@ export default function Settings() {
                         border: '1px solid #fbbf24'
                       }}>
                         <p style={{ fontSize: '0.875rem', color: '#92400e', margin: 0 }}>
-                          <strong>Add context about this fan</strong> that the AI will use to personalize responses.
+                          ðŸ’¡ <strong>Add context about this fan</strong> that the AI will use to personalize responses.
                           Include: name, age, interests, purchase history, preferences, etc.
                         </p>
                       </div>
@@ -1158,7 +1158,7 @@ export default function Settings() {
                           cursor: saving ? 'not-allowed' : 'pointer'
                         }}
                       >
-                        {saving ? 'Saving...' : 'Save Notes'}
+                        {saving ? 'ðŸ’¾ Saving...' : 'ðŸ’¾ Save Notes'}
                       </button>
                     </div>
                   ) : (
@@ -1170,7 +1170,7 @@ export default function Settings() {
                       color: '#6b7280'
                     }}>
                       <div style={{ textAlign: 'center' }}>
-                        <p style={{ fontSize: '1.125rem', marginBottom: '0.5rem' }}>Select a fan to edit their notes</p>
+                        <p style={{ fontSize: '1.125rem', marginBottom: '0.5rem' }}>ðŸ‘ˆ Select a fan to edit their notes</p>
                         <p style={{ fontSize: '0.875rem' }}>Notes help the AI personalize responses based on past history</p>
                       </div>
                     </div>
