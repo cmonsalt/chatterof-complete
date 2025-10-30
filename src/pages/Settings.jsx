@@ -1,3 +1,7 @@
+// Settings.jsx
+/* eslint-disable */
+// UTF-8 encoded file
+
 import { useState, useEffect } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
