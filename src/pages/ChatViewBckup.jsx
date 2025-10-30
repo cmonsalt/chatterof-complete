@@ -99,11 +99,11 @@ export default function ChatViewEnhanced() {
         setAiSuggestion(data.response)
         
         // Check for detected info
-        if (data.response.detected_info) {
-          const hasNewInfo = Object.values(data.response.detected_info).some(v => v !== null && v !== undefined && v !== '')
+        if (data.response.fan_info_detected) {
+          const hasNewInfo = Object.values(data.response.fan_info_detected).some(v => v !== null && v !== undefined && v !== '')
           
           if (hasNewInfo) {
-            setDetectedInfo(data.response.detected_info)
+            setDetectedInfo(data.response.fan_info_detected)
             setShowUpdateBanner(true)
           }
         }
