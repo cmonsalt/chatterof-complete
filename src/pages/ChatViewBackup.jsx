@@ -20,17 +20,12 @@ export default function ChatViewEnhanced() {
   const [showTransactionModal, setShowTransactionModal] = useState(false)
   const [detectedInfo, setDetectedInfo] = useState(null)
   const [showUpdateBanner, setShowUpdateBanner] = useState(false)
-  const [showMarkSaleModal, setShowMarkSaleModal] = useState(false)
-  const [selectedMessage, setSelectedMessage] = useState(null)
-  const [catalog, setCatalog] = useState([])
-  const [selectedContent, setSelectedContent] = useState(null)
 
   const chatEndRef = useRef(null)
 
   useEffect(() => {
     loadFanData()
     loadChatHistory()
-    loadCatalog()
     
     // Auto-refresh chat every 10 seconds
     const interval = setInterval(() => {
@@ -77,59 +72,6 @@ export default function ChatViewEnhanced() {
       setChatHistory(data || [])
     } catch (error) {
       console.error('Error loading chat:', error)
-    }
-  }
-
-  const loadCatalog = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('catalog')
-        .select('*')
-        .eq('model_id', modelId)
-        .order('nivel', { ascending: true })
-
-      if (error) throw error
-      setCatalog(data || [])
-    } catch (error) {
-      console.error('Error loading catalog:', error)
-    }
-  }
-
-  const handleMarkSale = (msg) => {
-    setSelectedMessage(msg)
-    setShowMarkSaleModal(true)
-  }
-
-  const handleCreateNotification = async () => {
-    if (!selectedContent) {
-      alert('Please select content')
-      return
-    }
-
-    try {
-      const { error } = await supabase
-        .from('notifications')
-        .insert({
-          model_id: modelId,
-          fan_id: fanId,
-          fan_name: fan.name || 'Unknown',
-          type: 'OFERTA_ACEPTADA',
-          message: `${fan.name} accepted offer: ${selectedContent.title}`,
-          action_data: {
-            offer_id: selectedContent.offer_id,
-            title: selectedContent.title,
-            price: selectedContent.base_price,
-            description: selectedContent.description
-          }
-        })
-
-      if (error) throw error
-
-      alert('✅ Notification created!')
-      setShowMarkSaleModal(false)
-      setSelectedContent(null)
-    } catch (error) {
-      alert('Error: ' + error.message)
     }
   }
 
@@ -387,42 +329,23 @@ export default function ChatViewEnhanced() {
                   <p className="text-gray-400 text-center py-8">No messages yet</p>
                 ) : (
                   chatHistory.map((msg, idx) => (
-                    <div key={idx}>
-                      <div
-                        className={`p-4 rounded-lg ${
-                          msg.from === 'fan'
-                            ? 'bg-gray-100 ml-8'
-                            : 'bg-blue-50 mr-8'
-                        }`}
-                      >
-                        <div className="flex items-center gap-2 mb-2">
-                          <span className="font-semibold text-sm">
-                            {msg.from === 'fan' ? '👤 Fan' : '💎 Model'}
-                          </span>
-                          <span className="text-xs text-gray-500">
-                            {new Date(msg.timestamp).toLocaleString()}
-                          </span>
-                        </div>
-                        <p className="text-sm">{msg.message}</p>
+                    <div
+                      key={idx}
+                      className={`p-4 rounded-lg ${
+                        msg.from === 'fan'
+                          ? 'bg-gray-100 ml-8'
+                          : 'bg-blue-50 mr-8'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2 mb-2">
+                        <span className="font-semibold text-sm">
+                          {msg.from === 'fan' ? '👤 Fan' : '💎 Model'}
+                        </span>
+                        <span className="text-xs text-gray-500">
+                          {new Date(msg.timestamp).toLocaleString()}
+                        </span>
                       </div>
-                      
-                      {/* Quick Action Buttons for Fan Messages */}
-                      {msg.from === 'fan' && (
-                        <div className="ml-8 mt-2 flex gap-2">
-                          <button
-                            onClick={() => handleMarkSale(msg)}
-                            className="text-xs bg-green-500 hover:bg-green-600 text-white px-3 py-1 rounded-lg font-semibold transition-all"
-                          >
-                            ✅ Mark Sale
-                          </button>
-                          <button
-                            onClick={() => setShowTransactionModal(true)}
-                            className="text-xs bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded-lg font-semibold transition-all"
-                          >
-                            💰 Payment
-                          </button>
-                        </div>
-                      )}
+                      <p className="text-sm">{msg.message}</p>
                     </div>
                   ))
                 )}
@@ -551,78 +474,6 @@ export default function ChatViewEnhanced() {
   fanTier={fan?.tier || 'FREE'}
   onSuccess={loadFanData}
 />
-      )}
-
-      {/* Mark Sale Modal */}
-      {showMarkSaleModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-            <div className="sticky top-0 bg-white border-b px-6 py-4 flex items-center justify-between rounded-t-2xl">
-              <h2 className="text-2xl font-bold text-gray-800">✅ Mark as Sale</h2>
-              <button 
-                onClick={() => setShowMarkSaleModal(false)}
-                className="text-gray-400 hover:text-gray-600 text-2xl font-bold"
-              >
-                ✕
-              </button>
-            </div>
-
-            <div className="p-6 space-y-4">
-              <div className="bg-blue-50 border-l-4 border-blue-500 p-4 rounded-r-lg">
-                <div className="font-semibold text-blue-800 mb-2">Fan's Message:</div>
-                <div className="text-blue-700">{selectedMessage?.message}</div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Select Content that Fan Accepted:
-                </label>
-                <div className="space-y-2 max-h-[400px] overflow-y-auto">
-                  {catalog.map((item) => (
-                    <button
-                      key={item.offer_id}
-                      onClick={() => setSelectedContent(item)}
-                      className={`w-full text-left p-4 rounded-lg border-2 transition-all ${
-                        selectedContent?.offer_id === item.offer_id
-                          ? 'border-green-500 bg-green-50'
-                          : 'border-gray-200 hover:border-green-300'
-                      }`}
-                    >
-                      <div className="flex justify-between items-start">
-                        <div>
-                          <div className="font-semibold text-gray-800">{item.title}</div>
-                          <div className="text-sm text-gray-600 mt-1">{item.description}</div>
-                          <div className="text-xs text-gray-500 mt-2">
-                            Level {item.nivel}/3 • ID: {item.offer_id}
-                          </div>
-                        </div>
-                        <div className="text-lg font-bold text-green-600">
-                          ${item.base_price}
-                        </div>
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </div>
-
-            <div className="sticky bottom-0 bg-white border-t px-6 py-4 flex gap-3">
-              <button
-                onClick={() => setShowMarkSaleModal(false)}
-                className="flex-1 px-6 py-4 bg-gray-100 text-gray-700 rounded-lg font-semibold hover:bg-gray-200 transition-all text-lg"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleCreateNotification}
-                disabled={!selectedContent}
-                className="flex-1 px-6 py-4 bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-lg font-semibold hover:shadow-xl transition-all text-lg disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                ✅ Create Notification
-              </button>
-            </div>
-          </div>
-        </div>
       )}
     </>
   )

@@ -175,11 +175,12 @@ USA DETALLES SENSUALES:
 - "mi culo queda justo frente a la camara"
 - "me pongo tan mojada", "me toco pensando en ti"
 
-NO MENCIONES EL PRECIO a menos que el fan pregunte.
+CRÍTICO - NUNCA menciones números de precio ($XX). 
+Solo pregunta "lo quieres?" y si acepta → "ok amor te lo mando 😘"
 
 ${lang === 'es' 
-  ? 'Responde en JSON: {"texto": "tu respuesta en español", "offer_id": "id_del_contenido_si_ofreces" o null}'
-  : 'Respond in JSON: {"texto": "your response in english", "offer_id": "content_id_if_offering" or null}'
+  ? 'Responde en JSON: {"texto": "tu respuesta en español", "offer_id": "id_del_contenido_si_ofreces" o null, "fan_accepted": true si el fan aceptó comprar, false si no}'
+  : 'Respond in JSON: {"texto": "your response in english", "offer_id": "content_id_if_offering" or null, "fan_accepted": true if fan accepted to buy, false if not}'
 }`;
 
     // ═══════════════════════════════════════════════════════════════
@@ -210,7 +211,7 @@ ${lang === 'es'
       body: JSON.stringify({
         model: config.gpt_model || 'gpt-4o-mini',
         messages: messages,
-        temperature: 0.8,
+        temperature: config.temperature || 0.8,
         max_tokens: 300,
         response_format: { type: "json_object" }
       })
@@ -238,13 +239,23 @@ ${lang === 'es'
 
     const responseText = parsed.texto || aiResponseRaw;
     const offerId = parsed.offer_id;
+    const fanAccepted = parsed.fan_accepted === true; // GPT decide si aceptó
 
     console.log('✅ Response:', responseText.substring(0, 80) + '...');
     console.log('💰 Offering:', offerId || 'nothing');
+    console.log('🎯 Fan accepted:', fanAccepted);
 
     // ═══════════════════════════════════════════════════════════════
-    // 📤 PREPARAR RESPUESTA
+    // 🔔 CREAR NOTIFICACIONES
     // ═══════════════════════════════════════════════════════════════
+
+    // Buscar tip reciente (últimos 10 minutos)
+    const recentTip = transactions.find(t => {
+      if (t.type !== 'tip') return false;
+      const tipTime = new Date(t.ts).getTime();
+      const now = Date.now();
+      return (now - tipTime) < 10 * 60 * 1000; // 10 minutos
+    });
 
     let contentToOffer = null;
     if (offerId) {
@@ -253,6 +264,65 @@ ${lang === 'es'
         console.log(`🎯 Matched content: ${contentToOffer.title} ($${contentToOffer.base_price})`);
       }
     }
+
+    // Si GPT dice que fan aceptó Y hay contenido ofrecido → notificación
+    if (fanAccepted && contentToOffer) {
+      await supabase.from('notifications').insert({
+        model_id: model_id,
+        fan_id: fan_id,
+        fan_name: fan.name || 'Unknown',
+        type: 'OFERTA_ACEPTADA',
+        message: `${fan.name} accepted offer: ${contentToOffer.title}`,
+        action_data: {
+          offer_id: contentToOffer.offer_id,
+          title: contentToOffer.title,
+          price: contentToOffer.base_price,
+          description: contentToOffer.description
+        }
+      });
+      console.log('🔔 Notification created: OFERTA_ACEPTADA');
+    }
+
+    // Detectar pago reciente O mención de pago
+    const fanMentionedPayment = /\b(pag[uoé]|tip|envi[eé]|mand[eé]|ya te|deposit)\b/i.test(message);
+    
+    if (recentTip || fanMentionedPayment) {
+      await supabase.from('notifications').insert({
+        model_id: model_id,
+        fan_id: fan_id,
+        fan_name: fan.name || 'Unknown',
+        type: 'PAGO_RECIBIDO',
+        message: recentTip 
+          ? `${fan.name} sent $${recentTip.amount} tip`
+          : `${fan.name} mentioned sending payment`,
+        action_data: {
+          amount: recentTip?.amount || null,
+          timestamp: recentTip?.ts || new Date().toISOString(),
+          fan_message: message
+        }
+      });
+      console.log('🔔 Notification created: PAGO_RECIBIDO');
+    }
+
+    // Detectar custom request
+    const isCustomRequest = /\b(custom|personalizado|especial|para m[ií]|my name|mi nombre|con mi nombre)\b/i.test(message);
+    if (isCustomRequest) {
+      await supabase.from('notifications').insert({
+        model_id: model_id,
+        fan_id: fan_id,
+        fan_name: fan.name || 'Unknown',
+        type: 'CUSTOM_REQUEST',
+        message: `${fan.name} is requesting custom content`,
+        action_data: {
+          fan_message: message
+        }
+      });
+      console.log('🔔 Notification created: CUSTOM_REQUEST');
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // 📤 PREPARAR RESPUESTA
+    // ═══════════════════════════════════════════════════════════════
 
     return new Response(JSON.stringify({
       success: true,
