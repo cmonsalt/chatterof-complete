@@ -2,7 +2,6 @@ import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
-import Navbar from '../components/Navbar'
 
 export default function ChatterDashboard() {
   const { modelId } = useAuth()
@@ -244,7 +243,6 @@ export default function ChatterDashboard() {
 
   return (
     <>
-      <Navbar />
       <div className="min-h-screen bg-gray-50">
         <div className="max-w-7xl mx-auto p-6">
           
