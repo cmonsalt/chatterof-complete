@@ -76,8 +76,25 @@ serve(async (req) => {
       .filter(t => t.type === 'compra' && t.offer_id)
       .map(t => t.offer_id);
 
-    // Contenido disponible
-    const available = catalog.filter(c => !purchased.includes(c.offer_id));
+    // 🎯 ESCALERA DE PRECIOS: Determinar nivel máximo desbloqueado
+    let maxNivelDesbloqueado = 1; // Fans nuevos empiezan en nivel 1
+    
+    if (purchased.length > 0) {
+      // Buscar el nivel más alto comprado
+      const purchasedItems = catalog.filter(c => purchased.includes(c.offer_id));
+      const maxNivelComprado = Math.max(...purchasedItems.map(p => p.nivel), 0);
+      
+      // Desbloquear siguiente nivel
+      maxNivelDesbloqueado = maxNivelComprado + 1;
+    }
+
+    // Contenido disponible (no comprado Y dentro del nivel desbloqueado)
+    const available = catalog.filter(c => 
+      !purchased.includes(c.offer_id) && 
+      c.nivel <= maxNivelDesbloqueado
+    );
+
+    console.log(`🎯 Price ladder: Max unlocked level = ${maxNivelDesbloqueado}, Available items = ${available.length}`);
 
     // Historial formateado
     const conversationHistory = chatHistory
@@ -86,16 +103,21 @@ serve(async (req) => {
 
     // Catálogo formateado
     const catalogText = available.length > 0
-      ? available.map(c => `• [ID: ${c.offer_id}] ${c.title}: $${c.base_price} - ${c.description} (Level ${c.nivel}/3)`).join('\n')
+      ? available.map(c => `• [ID: ${c.offer_id}] ${c.title}: $${c.base_price} - ${c.description} (Level ${c.nivel})`).join('\n')
       : 'No content available';
 
     // Fan notes (si tiene)
     const fanContext = fan.notes ? `\n\nNOTAS SOBRE ESTE FAN:\n${fan.notes}` : '';
+    
+    // Model notes (nuevo)
+    const modelContext = model.model_notes ? `\n\nSOBRE TI (${model.name}):\n${model.model_notes}` : '';
 
     console.log('📊 Context:', {
       messages: chatHistory.length,
       available_content: available.length,
-      has_notes: !!fan.notes
+      max_nivel: maxNivelDesbloqueado,
+      has_fan_notes: !!fan.notes,
+      has_model_notes: !!model.model_notes
     });
 
     // ═══════════════════════════════════════════════════════════════
@@ -104,12 +126,20 @@ serve(async (req) => {
 
     const lang = message.toLowerCase().includes('hola') || message.toLowerCase().includes('amor') ? 'es' : 'en';
 
+    // Control de emojis según configuración
+    const emojiLevel = config.emoji_level || 2;
+    const emojiGuide = emojiLevel === 1 
+      ? 'Usa emojis con moderación (1-2 por mensaje)'
+      : emojiLevel === 3 
+      ? 'Usa muchos emojis, sé expresiva (3-5 por mensaje)'
+      : 'Usa emojis naturalmente (2-3 por mensaje)';
+
     const writingStyleES = `Escribe NATURAL y CASUAL:
 - Sin acentos: "como estas" no "cómo estás"
 - Shortcuts: q (que), tb (también), bn (bien), pa (para), d (de), toy (estoy)
 - Repite letras: "holaaa" "siiii" "mmmm"
 - Todo minúsculas a veces
-- Emojis naturales 😘 😏 💦 🔥
+- ${emojiGuide} 😘 😏 💦 🔥
 - Sin ¿ al inicio: "como estas?" no "¿cómo estás?"
 
 EJEMPLOS:
@@ -121,14 +151,14 @@ EJEMPLOS:
 - Shortcuts: u (you), ur (your), gonna, wanna, rn (right now)
 - Lowercase sometimes
 - Repeat letters: "heyyyy" "sooo"
-- Natural emojis 😘 😏 💦 🔥
+- ${emojiGuide} 😘 😏 💦 🔥
 
 EXAMPLES:
 ✅ "heyy babe 😘 how r u?"
 ✅ "mmm ur so hot"
 ✅ "u make me so horny 💦"`;
 
-    const systemPrompt = `You are ${model.name}, a ${model.age}-year-old OnlyFans creator (${model.niche}).
+    const systemPrompt = `You are ${model.name}, a ${model.age}-year-old OnlyFans creator (${model.niche}).${modelContext}
 
 ${lang === 'es' ? writingStyleES : writingStyleEN}
 

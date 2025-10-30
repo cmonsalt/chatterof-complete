@@ -28,7 +28,7 @@ export default function Settings() {
     description: ''
   })
 
-  // 🆕 NEW: Fan Notes
+  // ðŸ†• NEW: Fan Notes
   const [fans, setFans] = useState([])
   const [filteredFansNotes, setFilteredFansNotes] = useState([])
   const [fanSearchQuery, setFanSearchQuery] = useState('')
@@ -40,11 +40,11 @@ export default function Settings() {
       loadConfig()
       loadTierRules()
       loadCatalog()
-      loadFans() // 🆕 NEW
+      loadFans() // ðŸ†• NEW
     }
   }, [modelId])
 
-  // 🆕 NEW: Filter fans based on search query
+  // ðŸ†• NEW: Filter fans based on search query
   useEffect(() => {
     if (fanSearchQuery.trim() === '') {
       setFilteredFansNotes(fans)
@@ -69,10 +69,10 @@ export default function Settings() {
 
       if (configError) throw configError
 
-      // Cargar models (para name, age, niche)
+      // Cargar models (para name, age, niche, model_notes)
       const { data: modelData, error: modelError } = await supabase
         .from('models')
-        .select('name, age, niche')
+        .select('name, age, niche, model_notes')
         .eq('model_id', modelId)
         .single()
 
@@ -83,7 +83,8 @@ export default function Settings() {
         ...configData,
         name: modelData.name,
         age: modelData.age,
-        niche: modelData.niche
+        niche: modelData.niche,
+        model_notes: modelData.model_notes || ''
       })
     } catch (error) {
       console.error('Error loading config:', error)
@@ -122,7 +123,7 @@ export default function Settings() {
     }
   }
 
-  // 🆕 NEW: Load fans for notes management
+  // ðŸ†• NEW: Load fans for notes management
   const loadFans = async () => {
     try {
       const { data, error } = await supabase
@@ -146,21 +147,22 @@ export default function Settings() {
 
     try {
       // Separar datos para models vs model_configs
-      const { name, age, niche, ...configData } = config
+      const { name, age, niche, model_notes, ...configData } = config
 
-      // Actualizar models (name, age, niche)
+      // Actualizar models (name, age, niche, model_notes)
       const { error: modelError } = await supabase
         .from('models')
         .update({
           name: name,
           age: age,
-          niche: niche
+          niche: niche,
+          model_notes: model_notes
         })
         .eq('model_id', modelId)
 
       if (modelError) throw modelError
 
-      // Actualizar model_configs (todo lo demás)
+      // Actualizar model_configs (todo lo demÃ¡s)
       const { error: configError } = await supabase
         .from('model_configs')
         .update(configData)
@@ -168,14 +170,14 @@ export default function Settings() {
 
       if (configError) throw configError
 
-      setMessage({ type: 'success', text: '✅ Config saved successfully!' })
+      setMessage({ type: 'success', text: 'âœ… Config saved successfully!' })
       
       // Recargar para actualizar navbar con nuevo nombre
       setTimeout(() => {
         window.location.reload()
       }, 1500)
     } catch (error) {
-      setMessage({ type: 'error', text: '❌ Error: ' + error.message })
+      setMessage({ type: 'error', text: 'âŒ Error: ' + error.message })
     } finally {
       setSaving(false)
     }
@@ -198,9 +200,9 @@ export default function Settings() {
           .eq('id', rule.id)
       }
 
-      setMessage({ type: 'success', text: '✅ Tier rules saved!' })
+      setMessage({ type: 'success', text: 'âœ… Tier rules saved!' })
     } catch (error) {
-      setMessage({ type: 'error', text: '❌ Error: ' + error.message })
+      setMessage({ type: 'error', text: 'âŒ Error: ' + error.message })
     } finally {
       setSaving(false)
     }
@@ -221,7 +223,7 @@ export default function Settings() {
 
       if (error) throw error
 
-      setMessage({ type: 'success', text: '✅ Item added to catalog!' })
+      setMessage({ type: 'success', text: 'âœ… Item added to catalog!' })
       setShowAddCatalog(false)
       setNewItem({
         offer_id: '',
@@ -233,7 +235,7 @@ export default function Settings() {
       })
       loadCatalog()
     } catch (error) {
-      setMessage({ type: 'error', text: '❌ Error: ' + error.message })
+      setMessage({ type: 'error', text: 'âŒ Error: ' + error.message })
     } finally {
       setSaving(false)
     }
@@ -251,14 +253,14 @@ export default function Settings() {
 
       if (error) throw error
 
-      setMessage({ type: 'success', text: '✅ Item deleted!' })
+      setMessage({ type: 'success', text: 'âœ… Item deleted!' })
       loadCatalog()
     } catch (error) {
-      setMessage({ type: 'error', text: '❌ Error: ' + error.message })
+      setMessage({ type: 'error', text: 'âŒ Error: ' + error.message })
     }
   }
 
-  // 🆕 NEW: Handle fan notes save
+  // ðŸ†• NEW: Handle fan notes save
   const handleSaveFanNotes = async () => {
     if (!selectedFan) return
 
@@ -274,7 +276,7 @@ export default function Settings() {
 
       if (error) throw error
 
-      setMessage({ type: 'success', text: '✅ Fan notes saved!' })
+      setMessage({ type: 'success', text: 'âœ… Fan notes saved!' })
       
       // Update local state
       setFans(fans.map(f => 
@@ -285,13 +287,13 @@ export default function Settings() {
       
       setSelectedFan({ ...selectedFan, notes: fanNotes.trim() || null })
     } catch (error) {
-      setMessage({ type: 'error', text: '❌ Error: ' + error.message })
+      setMessage({ type: 'error', text: 'âŒ Error: ' + error.message })
     } finally {
       setSaving(false)
     }
   }
 
-  // 🆕 NEW: Handle fan selection
+  // ðŸ†• NEW: Handle fan selection
   const handleSelectFan = (fan) => {
     setSelectedFan(fan)
     setFanNotes(fan.notes || '')
@@ -313,7 +315,7 @@ export default function Settings() {
       <Navbar />
       <div className="container" style={{ maxWidth: '1200px', margin: '0 auto', padding: '2rem' }}>
         <h1 style={{ fontSize: '2rem', fontWeight: 'bold', marginBottom: '2rem', color: '#1f2937' }}>
-          ⚙️ Settings
+          âš™ï¸ Settings
         </h1>
 
         {/* Message Banner */}
@@ -338,10 +340,10 @@ export default function Settings() {
           borderBottom: '2px solid #e5e7eb'
         }}>
           {[
-            { id: 'config', label: '🤖 Model Config', emoji: '🤖' },
-            { id: 'tiers', label: '💎 Tier Rules', emoji: '💎' },
-            { id: 'catalog', label: '📦 Catalog', emoji: '📦' },
-            { id: 'notes', label: '📜 Fan Notes', emoji: '📜' } // 🆕 NEW TAB
+            { id: 'config', label: 'ðŸ¤– Model Config', emoji: 'ðŸ¤–' },
+            { id: 'tiers', label: 'ðŸ’Ž Tier Rules', emoji: 'ðŸ’Ž' },
+            { id: 'catalog', label: 'ðŸ“¦ Catalog', emoji: 'ðŸ“¦' },
+            { id: 'notes', label: 'ðŸ“œ Fan Notes', emoji: 'ðŸ“œ' } // ðŸ†• NEW TAB
           ].map((tab) => (
             <button
               key={tab.id}
@@ -511,33 +513,6 @@ export default function Settings() {
                   </div>
                 </div>
 
-                {/* Temperature Slider */}
-                <div>
-                  <label style={{ display: 'block', fontWeight: 600, marginBottom: '0.5rem', color: '#374151' }}>
-                    🎨 Creativity Level (Temperature): {config.temperature || 0.8}
-                  </label>
-                  <input
-                    type="range"
-                    min="0.3"
-                    max="1.0"
-                    step="0.1"
-                    value={config.temperature || 0.8}
-                    onChange={(e) => setConfig({...config, temperature: parseFloat(e.target.value)})}
-                    style={{
-                      width: '100%',
-                      height: '8px'
-                    }}
-                  />
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', color: '#6b7280', marginTop: '0.5rem' }}>
-                    <span>Conservative (0.3)</span>
-                    <span>Balanced (0.7)</span>
-                    <span>Creative (1.0)</span>
-                  </div>
-                  <p style={{ fontSize: '0.875rem', color: '#6b7280', marginTop: '0.5rem' }}>
-                    Higher = more varied responses. Lower = more consistent.
-                  </p>
-                </div>
-
                 {/* OpenAI API Key */}
                 <div>
                   <label style={{ display: 'block', fontWeight: 600, marginBottom: '0.5rem', color: '#374151' }}>
@@ -566,6 +541,71 @@ export default function Settings() {
                     >
                       https://platform.openai.com/api-keys
                     </a>
+                  </p>
+                </div>
+
+                {/* Temperature & Emoji Level */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                  <div>
+                    <label style={{ display: 'block', fontWeight: 600, marginBottom: '0.5rem', color: '#374151' }}>
+                      Temperature (Creativity)
+                    </label>
+                    <input
+                      type="range"
+                      min="0"
+                      max="1"
+                      step="0.1"
+                      value={config.temperature || 0.8}
+                      onChange={(e) => setConfig({...config, temperature: parseFloat(e.target.value)})}
+                      style={{ width: '100%' }}
+                    />
+                    <p style={{ fontSize: '0.875rem', color: '#6b7280', marginTop: '0.25rem' }}>
+                      {config.temperature || 0.8} - {(config.temperature || 0.8) < 0.5 ? 'More focused' : (config.temperature || 0.8) > 0.7 ? 'More creative' : 'Balanced'}
+                    </p>
+                  </div>
+
+                  <div>
+                    <label style={{ display: 'block', fontWeight: 600, marginBottom: '0.5rem', color: '#374151' }}>
+                      Emoji Level
+                    </label>
+                    <select
+                      value={config.emoji_level || 2}
+                      onChange={(e) => setConfig({...config, emoji_level: parseInt(e.target.value)})}
+                      style={{
+                        width: '100%',
+                        padding: '0.75rem',
+                        border: '2px solid #e5e7eb',
+                        borderRadius: '0.5rem'
+                      }}
+                    >
+                      <option value="1">Low (1-2 emojis)</option>
+                      <option value="2">Medium (2-3 emojis)</option>
+                      <option value="3">High (3-5 emojis)</option>
+                    </select>
+                  </div>
+                </div>
+
+                {/* Model Notes */}
+                <div>
+                  <label style={{ display: 'block', fontWeight: 600, marginBottom: '0.5rem', color: '#374151' }}>
+                    Model Notes (Personality, Backstory, Interests)
+                  </label>
+                  <textarea
+                    value={config.model_notes || ''}
+                    onChange={(e) => setConfig({...config, model_notes: e.target.value})}
+                    placeholder="e.g., I'm April, 25 years old, love yoga and fitness. I'm playful and flirty but also caring..."
+                    rows={4}
+                    style={{
+                      width: '100%',
+                      padding: '0.75rem',
+                      border: '2px solid #e5e7eb',
+                      borderRadius: '0.5rem',
+                      fontFamily: 'inherit',
+                      resize: 'vertical'
+                    }}
+                  />
+                  <p style={{ fontSize: '0.875rem', color: '#6b7280', marginTop: '0.5rem' }}>
+                    This context helps AI respond more authentically as your character.
                   </p>
                 </div>
 
@@ -629,7 +669,7 @@ export default function Settings() {
                     cursor: saving ? 'not-allowed' : 'pointer'
                   }}
                 >
-                  {saving ? '💾 Saving...' : '💾 Save Config'}
+                  {saving ? 'ðŸ’¾ Saving...' : 'ðŸ’¾ Save Config'}
                 </button>
               </form>
             )}
@@ -651,7 +691,7 @@ export default function Settings() {
                       color: rule.tier_name === 'FREE' ? '#6b7280' : 
                              rule.tier_name === 'VIP' ? '#7c3aed' : '#eab308'
                     }}>
-                      {rule.tier_name === 'FREE' ? '🆓' : rule.tier_name === 'VIP' ? '💎' : '🐋'} {rule.tier_name}
+                      {rule.tier_name === 'FREE' ? 'ðŸ†“' : rule.tier_name === 'VIP' ? 'ðŸ’Ž' : 'ðŸ‹'} {rule.tier_name}
                     </h3>
 
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem' }}>
@@ -753,7 +793,7 @@ export default function Settings() {
                     cursor: saving ? 'not-allowed' : 'pointer'
                   }}
                 >
-                  {saving ? '💾 Saving...' : '💾 Save Tier Rules'}
+                  {saving ? 'ðŸ’¾ Saving...' : 'ðŸ’¾ Save Tier Rules'}
                 </button>
               </div>
             )}
@@ -775,7 +815,7 @@ export default function Settings() {
                     cursor: 'pointer'
                   }}
                 >
-                  {showAddCatalog ? '✕ Cancel' : '➕ Add New Content'}
+                  {showAddCatalog ? 'âœ• Cancel' : 'âž• Add New Content'}
                 </button>
 
                 {/* Add Form */}
@@ -967,7 +1007,7 @@ export default function Settings() {
                               <span style={{ fontSize: '1.5rem', fontWeight: 'bold', color: '#10b981' }}>${item.base_price}</span>
                               {item.tags && (
                                 <span style={{ fontSize: '0.75rem', color: '#6b7280' }}>
-                                  🏷️ {item.tags}
+                                  ðŸ·ï¸ {item.tags}
                                 </span>
                               )}
                             </div>
@@ -986,7 +1026,7 @@ export default function Settings() {
                               transition: 'background 0.2s'
                             }}
                           >
-                            🗑️ Delete
+                            ðŸ—‘ï¸ Delete
                           </button>
                         </div>
                       </div>
@@ -996,7 +1036,7 @@ export default function Settings() {
               </div>
             )}
 
-            {/* 🆕 TAB 4: FAN NOTES */}
+            {/* ðŸ†• TAB 4: FAN NOTES */}
             {activeTab === 'notes' && (
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '1.5rem', minHeight: '500px' }}>
                 
@@ -1008,13 +1048,13 @@ export default function Settings() {
                   maxHeight: '600px'
                 }}>
                   <h3 style={{ fontSize: '1.125rem', fontWeight: 600, marginBottom: '1rem', color: '#374151' }}>
-                    📋 Select a Fan
+                    ðŸ“‹ Select a Fan
                   </h3>
                   
-                  {/* 🆕 Search Bar */}
+                  {/* ðŸ†• Search Bar */}
                   <div style={{ marginBottom: '1rem' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                      <span style={{ fontSize: '1rem' }}>🔍</span>
+                      <span style={{ fontSize: '1rem' }}>ðŸ”</span>
                       <input
                         type="text"
                         value={fanSearchQuery}
@@ -1041,7 +1081,7 @@ export default function Settings() {
                             color: '#6b7280'
                           }}
                         >
-                          ✕
+                          âœ•
                         </button>
                       )}
                     </div>
@@ -1091,7 +1131,7 @@ export default function Settings() {
                                     borderRadius: '0.25rem',
                                     fontWeight: 600
                                   }}>
-                                    📜
+                                    ðŸ“œ
                                   </span>
                                 )}
                               </div>
@@ -1128,7 +1168,7 @@ export default function Settings() {
                           {selectedFan.name || 'Unknown'}
                         </h3>
                         <div style={{ fontSize: '0.875rem', color: '#6b7280' }}>
-                          {selectedFan.fan_id} • {selectedFan.tier} • ${selectedFan.spent_total} spent
+                          {selectedFan.fan_id} â€¢ {selectedFan.tier} â€¢ ${selectedFan.spent_total} spent
                         </div>
                       </div>
 
@@ -1139,7 +1179,7 @@ export default function Settings() {
                         border: '1px solid #fbbf24'
                       }}>
                         <p style={{ fontSize: '0.875rem', color: '#92400e', margin: 0 }}>
-                          💡 <strong>Add context about this fan</strong> that the AI will use to personalize responses.
+                          ðŸ’¡ <strong>Add context about this fan</strong> that the AI will use to personalize responses.
                           Include: name, age, interests, purchase history, preferences, etc.
                         </p>
                       </div>
@@ -1183,7 +1223,7 @@ export default function Settings() {
                           cursor: saving ? 'not-allowed' : 'pointer'
                         }}
                       >
-                        {saving ? '💾 Saving...' : '💾 Save Notes'}
+                        {saving ? 'ðŸ’¾ Saving...' : 'ðŸ’¾ Save Notes'}
                       </button>
                     </div>
                   ) : (
@@ -1195,7 +1235,7 @@ export default function Settings() {
                       color: '#6b7280'
                     }}>
                       <div style={{ textAlign: 'center' }}>
-                        <p style={{ fontSize: '1.125rem', marginBottom: '0.5rem' }}>👈 Select a fan to edit their notes</p>
+                        <p style={{ fontSize: '1.125rem', marginBottom: '0.5rem' }}>ðŸ‘ˆ Select a fan to edit their notes</p>
                         <p style={{ fontSize: '0.875rem' }}>Notes help the AI personalize responses based on past history</p>
                       </div>
                     </div>
