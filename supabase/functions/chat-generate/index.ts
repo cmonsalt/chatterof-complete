@@ -238,8 +238,8 @@ Solo pregunta "lo quieres?" y si acepta → "ok amor te lo mando 😘"
 NO uses puntos suspensivos (...) - sé directa.
 
 ${lang === 'es' 
-  ? 'Responde en JSON: {"texto": "tu respuesta en español", "offer_id": "id_del_contenido_si_ofreces" o null, "fan_accepted": true/false, "detected_info": {"name": "nombre si lo mencionó", "interests": "hobbies", "occupation": "trabajo", "location": "ciudad", "birthday": "fecha", "relationship_status": "estado"} - solo incluye campos que detectaste}'
-  : 'Respond in JSON: {"texto": "your response in english", "offer_id": "content_id_if_offering" or null, "fan_accepted": true/false, "detected_info": {"name": "if mentioned", "interests": "hobbies", "occupation": "job", "location": "city", "birthday": "date", "relationship_status": "status"} - only include detected fields}'
+  ? 'Responde en JSON: {"texto": "tu respuesta en español", "offer_id": "id_del_contenido_si_ofreces" o null, "fan_accepted": true/false, "detected_info": {"name": "nombre si lo mencionó", "interests": "hobbies", "occupation": "trabajo", "location": "ciudad", "birthday": "YYYY-MM-DD formato (ej: 2005-12-24)", "relationship_status": "estado"} - solo incluye campos que detectaste}'
+  : 'Respond in JSON: {"texto": "your response in english", "offer_id": "content_id_if_offering" or null, "fan_accepted": true/false, "detected_info": {"name": "if mentioned", "interests": "hobbies", "occupation": "job", "location": "city", "birthday": "YYYY-MM-DD format (e.g. 2005-12-24)", "relationship_status": "status"} - only include detected fields}'
 }`;
 
     // ═══════════════════════════════════════════════════════════════

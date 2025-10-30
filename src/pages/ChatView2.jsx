@@ -98,13 +98,13 @@ export default function ChatViewEnhanced() {
       if (data.success) {
         setAiSuggestion(data.response)
         
-        // Check for detected info - only show banner if it's ACTUALLY NEW
+        // 🔥 AUTO-SAVE detected info silently (no banner)
         if (data.response.detected_info) {
           const detectedData = data.response.detected_info
           
-          // Check if ANY of the detected info is actually NEW (different from current fan data)
+          // Check if ANY of the detected info is actually NEW
           const hasNewInfo = 
-            (detectedData.name && detectedData.name !== fan?.name && fan?.name !== detectedData.name) ||
+            (detectedData.name && detectedData.name !== fan?.name) ||
             (detectedData.location && detectedData.location !== fan?.location) ||
             (detectedData.occupation && detectedData.occupation !== fan?.occupation) ||
             (detectedData.interests && detectedData.interests !== fan?.interests) ||
@@ -112,11 +112,35 @@ export default function ChatViewEnhanced() {
             (detectedData.relationship_status && detectedData.relationship_status !== fan?.relationship_status)
           
           if (hasNewInfo) {
-            console.log('🆕 NEW info detected:', detectedData)
-            setDetectedInfo(data.response.detected_info)
-            setShowUpdateBanner(true)
-          } else {
-            console.log('ℹ️ Info detected but not new, ignoring')
+            console.log('🆕 NEW info detected, auto-saving:', detectedData)
+            
+            // Auto-save to database silently
+            const updates = {}
+            if (detectedData.name && detectedData.name !== fan?.name) updates.name = detectedData.name
+            if (detectedData.location && detectedData.location !== fan?.location) updates.location = detectedData.location
+            if (detectedData.occupation && detectedData.occupation !== fan?.occupation) updates.occupation = detectedData.occupation
+            if (detectedData.interests && detectedData.interests !== fan?.interests) updates.interests = detectedData.interests
+            if (detectedData.birthday && detectedData.birthday !== fan?.birthday) updates.birthday = detectedData.birthday
+            if (detectedData.relationship_status && detectedData.relationship_status !== fan?.relationship_status) {
+              updates.relationship_status = detectedData.relationship_status
+            }
+            
+            if (Object.keys(updates).length > 0) {
+              supabase
+                .from('fans')
+                .update(updates)
+                .eq('fan_id', fanId)
+                .eq('model_id', modelId)
+                .then(({ error }) => {
+                  if (error) {
+                    console.error('Error auto-saving fan info:', error)
+                  } else {
+                    console.log('✅ Fan info auto-saved:', updates)
+                    // Reload fan data to reflect changes
+                    loadFanData()
+                  }
+                })
+            }
           }
         }
       }
@@ -168,32 +192,6 @@ export default function ChatViewEnhanced() {
     }
   }
 
-  const handleUpdateFanProfile = async () => {
-    if (!detectedInfo) return
-
-    try {
-      const updates = {}
-      if (detectedInfo.name) updates.name = detectedInfo.name
-      if (detectedInfo.age) updates.age = detectedInfo.age
-      if (detectedInfo.location) updates.location = detectedInfo.location
-      if (detectedInfo.occupation) updates.occupation = detectedInfo.occupation
-      if (detectedInfo.interests) updates.interests = detectedInfo.interests
-
-      await supabase
-        .from('fans')
-        .update(updates)
-        .eq('fan_id', fanId)
-        .eq('model_id', modelId)
-
-      setShowUpdateBanner(false)
-      setDetectedInfo(null)
-      loadFanData()
-      alert('✅ Fan profile updated!')
-    } catch (error) {
-      console.error('Error updating fan:', error)
-      alert('Error updating profile')
-    }
-  }
 
   if (loading) {
     return (
@@ -272,63 +270,6 @@ export default function ChatViewEnhanced() {
           </div>
 
           {/* Update Banner */}
-          {showUpdateBanner && detectedInfo && (
-            <div className="bg-gradient-to-r from-green-400 to-emerald-500 border-4 border-green-600 p-6 mb-6 rounded-xl shadow-2xl">
-              <div className="flex items-center justify-between">
-                <div className="flex-1">
-                  <h3 className="text-white font-bold text-xl flex items-center gap-3 mb-3">
-                    <span className="text-3xl">🎉</span> 
-                    <span>New Fan Information Detected!</span>
-                  </h3>
-                  
-                  <div className="bg-white/20 backdrop-blur-sm rounded-lg p-4 space-y-2">
-                    {detectedInfo.name && (
-                      <div className="text-white font-bold flex items-center gap-2">
-                        <span>👤 Name:</span>
-                        <span className="bg-yellow-400 text-gray-900 px-3 py-1 rounded-full">{detectedInfo.name}</span>
-                      </div>
-                    )}
-                    {detectedInfo.age && (
-                      <div className="text-white font-semibold flex items-center gap-2">
-                        <span>🎂 Age:</span>
-                        <span className="bg-white/30 px-3 py-1 rounded-full">{detectedInfo.age}</span>
-                      </div>
-                    )}
-                    {detectedInfo.location && (
-                      <div className="text-white font-semibold flex items-center gap-2">
-                        <span>📍 Location:</span>
-                        <span className="bg-white/30 px-3 py-1 rounded-full">{detectedInfo.location}</span>
-                      </div>
-                    )}
-                    {detectedInfo.occupation && (
-                      <div className="text-white font-semibold flex items-center gap-2">
-                        <span>💼 Occupation:</span>
-                        <span className="bg-white/30 px-3 py-1 rounded-full">{detectedInfo.occupation}</span>
-                      </div>
-                    )}
-                  </div>
-                </div>
-                <div className="flex flex-col gap-3 ml-6">
-                  <button
-                    onClick={handleUpdateFanProfile}
-                    className="bg-white hover:bg-green-50 text-green-700 py-4 px-8 rounded-xl font-bold text-lg shadow-lg"
-                  >
-                    ✅ Update Profile
-                  </button>
-                  <button
-                    onClick={() => {
-                      setShowUpdateBanner(false)
-                      setDetectedInfo(null)
-                    }}
-                    className="bg-red-500 hover:bg-red-600 text-white py-2 px-8 rounded-xl font-semibold"
-                  >
-                    ✕ Dismiss
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
-
           <div className="grid grid-cols-2 gap-6">
             
             {/* Left: Chat History */}
