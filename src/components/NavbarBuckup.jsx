@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { useNavigate } from 'react-router-dom'
+import NotificationCenter from './NotificationCenter'
 
 export default function Navbar() {
   const { user, models, currentModel, switchModel, signOut } = useAuth()
@@ -62,6 +63,9 @@ export default function Navbar() {
         </h1>
         
         <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+          {/* Notification Center */}
+          <NotificationCenter />
+
           {/* Chatter Mode Button - NUEVO */}
           <button
             onClick={() => navigate('/chatter')}

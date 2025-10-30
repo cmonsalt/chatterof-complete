@@ -86,7 +86,7 @@ serve(async (req) => {
 
     // Catálogo formateado
     const catalogText = available.length > 0
-      ? available.map(c => `• ${c.title}: $${c.base_price} - ${c.description} (Level ${c.nivel}/3)`).join('\n')
+      ? available.map(c => `• [ID: ${c.offer_id}] ${c.title}: $${c.base_price} - ${c.description} (Level ${c.nivel}/3)`).join('\n')
       : 'No content available';
 
     // Fan notes (si tiene)
