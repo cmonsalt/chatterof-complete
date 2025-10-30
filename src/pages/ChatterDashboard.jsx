@@ -104,9 +104,6 @@ export default function ChatterDashboard() {
       // Filter out fans with no actual messages
       const fansWithMessages = chatsWithMessages.filter(chat => chat.history.length > 0)
 
-      // Filter out fans with no actual messages
-      const fansWithMessages = chatsWithMessages.filter(chat => chat.history.length > 0)
-
       // Sort by priority: needs response first, then by time
       const sorted = fansWithMessages.sort((a, b) => {
         if (a.needsResponse && !b.needsResponse) return -1
@@ -343,7 +340,8 @@ export default function ChatterDashboard() {
                       {chat.lastMessage}
                     </div>
                   </div>
-                ))}
+                  ))
+                )}
               </div>
             </div>
 
