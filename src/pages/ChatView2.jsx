@@ -98,13 +98,25 @@ export default function ChatViewEnhanced() {
       if (data.success) {
         setAiSuggestion(data.response)
         
-        // Check for detected info
+        // Check for detected info - only show banner if it's ACTUALLY NEW
         if (data.response.detected_info) {
-          const hasNewInfo = Object.values(data.response.detected_info).some(v => v !== null && v !== undefined && v !== '')
+          const detectedData = data.response.detected_info
+          
+          // Check if ANY of the detected info is actually NEW (different from current fan data)
+          const hasNewInfo = 
+            (detectedData.name && detectedData.name !== fan?.name && fan?.name !== detectedData.name) ||
+            (detectedData.location && detectedData.location !== fan?.location) ||
+            (detectedData.occupation && detectedData.occupation !== fan?.occupation) ||
+            (detectedData.interests && detectedData.interests !== fan?.interests) ||
+            (detectedData.birthday && detectedData.birthday !== fan?.birthday) ||
+            (detectedData.relationship_status && detectedData.relationship_status !== fan?.relationship_status)
           
           if (hasNewInfo) {
+            console.log('🆕 NEW info detected:', detectedData)
             setDetectedInfo(data.response.detected_info)
             setShowUpdateBanner(true)
+          } else {
+            console.log('ℹ️ Info detected but not new, ignoring')
           }
         }
       }
