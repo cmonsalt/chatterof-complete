@@ -340,10 +340,10 @@ export default function Settings() {
           borderBottom: '2px solid #e5e7eb'
         }}>
           {[
-            { id: 'config', label: 'Model Config', emoji: '},
-            { id: 'tiers', label: 'Tier Rules', emoji: '},
-            { id: 'catalog', label: 'Catalog', emoji: '},
-            { id: 'notes', label: 'Fan Notes', emoji: '} // NEW TAB
+            { id: 'config', label: 'Model Config' },
+            { id: 'tiers', label: 'Tier Rules' },
+            { id: 'catalog', label: 'Catalog' },
+            { id: 'notes', label: 'Fan Notes' }
           ].map((tab) => (
             <button
               key={tab.id}
