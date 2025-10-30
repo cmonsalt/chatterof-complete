@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
+import Navbar from '../components/Navbar'
 
 export default function ChatterDashboard() {
   const { modelId } = useAuth()
@@ -49,7 +50,7 @@ export default function ChatterDashboard() {
 
   const loadActiveChats = async () => {
     try {
-      // Get all fans with recent activity (last 7 days)
+      // Get all fans with recent activity (last 7 days) AND that have messages
       const sevenDaysAgo = new Date()
       sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7)
 
@@ -57,10 +58,14 @@ export default function ChatterDashboard() {
         .from('fans')
         .select('*')
         .eq('model_id', modelId)
+        .not('last_message_date', 'is', null)  // ✅ Solo fans con mensajes
         .gte('last_message_date', sevenDaysAgo.toISOString())
         .order('last_message_date', { ascending: false })
 
-      if (!fans) return
+      if (!fans || fans.length === 0) {
+        setActiveChats([])
+        return
+      }
 
       // Get last message for each fan
       const chatsWithMessages = await Promise.all(
@@ -96,8 +101,14 @@ export default function ChatterDashboard() {
         })
       )
 
+      // Filter out fans with no actual messages
+      const fansWithMessages = chatsWithMessages.filter(chat => chat.history.length > 0)
+
+      // Filter out fans with no actual messages
+      const fansWithMessages = chatsWithMessages.filter(chat => chat.history.length > 0)
+
       // Sort by priority: needs response first, then by time
-      const sorted = chatsWithMessages.sort((a, b) => {
+      const sorted = fansWithMessages.sort((a, b) => {
         if (a.needsResponse && !b.needsResponse) return -1
         if (!a.needsResponse && b.needsResponse) return 1
         return (b.lastMessageTime?.getTime() || 0) - (a.lastMessageTime?.getTime() || 0)
@@ -243,6 +254,7 @@ export default function ChatterDashboard() {
 
   return (
     <>
+      <Navbar />
       <div className="min-h-screen bg-gray-50">
         <div className="max-w-7xl mx-auto p-6">
           
@@ -285,7 +297,18 @@ export default function ChatterDashboard() {
               </div>
 
               <div className="space-y-2 max-h-[calc(100vh-300px)] overflow-y-auto">
-                {filteredChats.map((chat) => (
+                {filteredChats.length === 0 ? (
+                  <div className="text-center py-12">
+                    <div className="text-6xl mb-4">💬</div>
+                    <p className="text-gray-500 font-semibold">No active chats</p>
+                    <p className="text-gray-400 text-sm mt-2">
+                      {searchQuery 
+                        ? 'No fans match your search' 
+                        : 'Start a conversation with a fan from the Dashboard'}
+                    </p>
+                  </div>
+                ) : (
+                  filteredChats.map((chat) => (
                   <div
                     key={chat.fan_id}
                     onClick={() => setSelectedFan(chat)}
