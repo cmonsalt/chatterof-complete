@@ -7,7 +7,6 @@ import Dashboard from './pages/Dashboard'
 import ChatView from './pages/ChatView'
 import Settings from './pages/Settings'
 import ChatterDashboard from './pages/ChatterDashboard'
-import ChatViewEnhanced from './pages/ChatViewEnhanced'
 
 function App() {
   return (
@@ -35,16 +34,10 @@ function App() {
             </ProtectedRoute>
           } />
 
-          {/* NUEVAS RUTAS - Chatter System */}
+          {/* NUEVA RUTA - Chatter System */}
           <Route path="/chatter" element={
             <ProtectedRoute>
               <ChatterDashboard />
-            </ProtectedRoute>
-          } />
-
-          <Route path="/chat-enhanced/:fanId" element={
-            <ProtectedRoute>
-              <ChatViewEnhanced />
             </ProtectedRoute>
           } />
           
