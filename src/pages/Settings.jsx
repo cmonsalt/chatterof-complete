@@ -340,10 +340,10 @@ export default function Settings() {
           borderBottom: '2px solid #e5e7eb'
         }}>
           {[
-            { id: 'config', label: 'ðŸ¤– Model Config', emoji: 'ðŸ¤–' },
-            { id: 'tiers', label: 'ðŸ’Ž Tier Rules', emoji: 'ðŸ’Ž' },
-            { id: 'catalog', label: 'ðŸ“¦ Catalog', emoji: 'ðŸ“¦' },
-            { id: 'notes', label: 'ðŸ“œ Fan Notes', emoji: 'ðŸ“œ' } // ðŸ†• NEW TAB
+            { id: 'config', label: '🧠– Model Config', emoji: '🧠' },
+            { id: 'tiers', label: '💎 Tier Rules', emoji: '💎' },
+            { id: 'catalog', label: '📦 Catalog', emoji: '📦' },
+            { id: 'notes', label: '🗒️ Fan Notes', emoji: '🗒️' }
           ].map((tab) => (
             <button
               key={tab.id}
