@@ -466,14 +466,14 @@ export default function ChatViewEnhanced() {
 
       {/* Transaction Modal */}
       {showTransactionModal && (
-        <TransactionModal
-          fan={fan}
-          onClose={() => setShowTransactionModal(false)}
-          onSuccess={() => {
-            setShowTransactionModal(false)
-            loadFanData()
-          }}
-        />
+       <TransactionModal
+  isOpen={showTransactionModal}
+  onClose={() => setShowTransactionModal(false)}
+  fanId={fanId}
+  modelId={modelId}
+  fanTier={fan?.tier || 'FREE'}
+  onSuccess={loadFanData}
+/>
       )}
     </>
   )
