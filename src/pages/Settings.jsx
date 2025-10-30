@@ -428,50 +428,6 @@ export default function Settings() {
                   </div>
                 </div>
 
-                {/* Personality & Tone */}
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-                  <div>
-                    <label style={{ display: 'block', fontWeight: 600, marginBottom: '0.5rem', color: '#374151' }}>
-                      Personality
-                    </label>
-                    <input
-                      type="text"
-                      value={config.personality || ''}
-                      onChange={(e) => setConfig({...config, personality: e.target.value})}
-                      placeholder="Friendly, flirty"
-                      style={{
-                        width: '100%',
-                        padding: '0.75rem',
-                        border: '2px solid #e5e7eb',
-                        borderRadius: '0.5rem'
-                      }}
-                    />
-                  </div>
-                  
-                  <div>
-                    <label style={{ display: 'block', fontWeight: 600, marginBottom: '0.5rem', color: '#374151' }}>
-                      Tone
-                    </label>
-                    <select
-                      value={config.tone || 'casual'}
-                      onChange={(e) => setConfig({...config, tone: e.target.value})}
-                      style={{
-                        width: '100%',
-                        padding: '0.75rem',
-                        border: '2px solid #e5e7eb',
-                        borderRadius: '0.5rem'
-                      }}
-                    >
-                      <option value="casual">Casual</option>
-                      <option value="professional">Professional</option>
-                      <option value="flirty">Flirty</option>
-                    </select>
-                    <p style={{ fontSize: '0.875rem', color: '#6b7280', marginTop: '0.5rem' }}>
-                      The overall communication style
-                    </p>
-                  </div>
-                </div>
-
                 {/* Language & GPT Model */}
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                   <div>
@@ -609,50 +565,29 @@ export default function Settings() {
                   </p>
                 </div>
 
-                {/* Sales Approach & Max Emojis */}
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-                  <div>
-                    <label style={{ display: 'block', fontWeight: 600, marginBottom: '0.5rem', color: '#374151' }}>
-                      Sales Approach
-                    </label>
-                    <select
-                      value={config.sales_approach || 'conversational_organic'}
-                      onChange={(e) => setConfig({...config, sales_approach: e.target.value})}
-                      style={{
-                        width: '100%',
-                        padding: '0.75rem',
-                        border: '2px solid #e5e7eb',
-                        borderRadius: '0.5rem'
-                      }}
-                    >
-                      <option value="subtle">Subtle (Soft mentions)</option>
-                      <option value="conversational_organic">Conversational Organic (Natural flow)</option>
-                      <option value="direct">Direct (Clear offers)</option>
-                      <option value="aggressive">Aggressive (Push sales, create urgency)</option>
-                    </select>
-                    <p style={{ fontSize: '0.875rem', color: '#6b7280', marginTop: '0.5rem' }}>
-                      How the AI approaches selling content to fans
-                    </p>
-                  </div>
-                  
-                  <div>
-                    <label style={{ display: 'block', fontWeight: 600, marginBottom: '0.5rem', color: '#374151' }}>
-                      Max Emojis per Message
-                    </label>
-                    <input
-                      type="number"
-                      min="0"
-                      max="10"
-                      value={config.max_emojis_per_message || 2}
-                      onChange={(e) => setConfig({...config, max_emojis_per_message: parseInt(e.target.value)})}
-                      style={{
-                        width: '100%',
-                        padding: '0.75rem',
-                        border: '2px solid #e5e7eb',
-                        borderRadius: '0.5rem'
-                      }}
-                    />
-                  </div>
+                {/* Sales Approach */}
+                <div>
+                  <label style={{ display: 'block', fontWeight: 600, marginBottom: '0.5rem', color: '#374151' }}>
+                    Sales Approach
+                  </label>
+                  <select
+                    value={config.sales_approach || 'conversational_organic'}
+                    onChange={(e) => setConfig({...config, sales_approach: e.target.value})}
+                    style={{
+                      width: '100%',
+                      padding: '0.75rem',
+                      border: '2px solid #e5e7eb',
+                      borderRadius: '0.5rem'
+                    }}
+                  >
+                    <option value="subtle">Subtle (Soft mentions)</option>
+                    <option value="conversational_organic">Conversational Organic (Natural flow)</option>
+                    <option value="direct">Direct (Clear offers)</option>
+                    <option value="aggressive">Aggressive (Push sales, create urgency)</option>
+                  </select>
+                  <p style={{ fontSize: '0.875rem', color: '#6b7280', marginTop: '0.5rem' }}>
+                    How the AI approaches selling content to fans
+                  </p>
                 </div>
 
                 <button
