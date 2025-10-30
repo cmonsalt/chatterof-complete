@@ -210,7 +210,7 @@ ${lang === 'es'
       body: JSON.stringify({
         model: config.gpt_model || 'gpt-4o-mini',
         messages: messages,
-        temperature: config.temperature || 0.8,
+        temperature: 0.8,
         max_tokens: 300,
         response_format: { type: "json_object" }
       })
@@ -243,7 +243,7 @@ ${lang === 'es'
     console.log('💰 Offering:', offerId || 'nothing');
 
     // ═══════════════════════════════════════════════════════════════
-    // 🔔 CREAR NOTIFICACIONES
+    // 📤 PREPARAR RESPUESTA
     // ═══════════════════════════════════════════════════════════════
 
     let contentToOffer = null;
@@ -251,65 +251,8 @@ ${lang === 'es'
       contentToOffer = available.find(c => c.offer_id === offerId);
       if (contentToOffer) {
         console.log(`🎯 Matched content: ${contentToOffer.title} ($${contentToOffer.base_price})`);
-        
-        // Detectar si fan aceptó (mensaje contiene "sí", "si", "yes", "dale", "ok")
-        const fanAccepted = /\b(s[ií]|yes|yeah|ok|dale|claro|seguro|perfecto|obvio)\b/i.test(message);
-        
-        if (fanAccepted) {
-          // Crear notificación: OFERTA_ACEPTADA
-          await supabase.from('notifications').insert({
-            model_id: model_id,
-            fan_id: fan_id,
-            fan_name: fanData.name || 'Unknown',
-            type: 'OFERTA_ACEPTADA',
-            message: `${fanData.name} accepted offer: ${contentToOffer.title}`,
-            action_data: {
-              offer_id: contentToOffer.offer_id,
-              title: contentToOffer.title,
-              price: contentToOffer.base_price,
-              description: contentToOffer.description
-            }
-          });
-          console.log('🔔 Notification created: OFERTA_ACEPTADA');
-        }
       }
     }
-
-    // Detectar pago reciente
-    if (recentTip) {
-      await supabase.from('notifications').insert({
-        model_id: model_id,
-        fan_id: fan_id,
-        fan_name: fanData.name || 'Unknown',
-        type: 'PAGO_RECIBIDO',
-        message: `${fanData.name} sent $${recentTip.amount} tip`,
-        action_data: {
-          amount: recentTip.amount,
-          timestamp: recentTip.ts
-        }
-      });
-      console.log('🔔 Notification created: PAGO_RECIBIDO');
-    }
-
-    // Detectar custom request
-    const isCustomRequest = /\b(custom|personalizado|especial|para m[ií]|my name|mi nombre)\b/i.test(message);
-    if (isCustomRequest) {
-      await supabase.from('notifications').insert({
-        model_id: model_id,
-        fan_id: fan_id,
-        fan_name: fanData.name || 'Unknown',
-        type: 'CUSTOM_REQUEST',
-        message: `${fanData.name} is requesting custom content`,
-        action_data: {
-          fan_message: message
-        }
-      });
-      console.log('🔔 Notification created: CUSTOM_REQUEST');
-    }
-
-    // ═══════════════════════════════════════════════════════════════
-    // 📤 PREPARAR RESPUESTA
-    // ═══════════════════════════════════════════════════════════════
 
     return new Response(JSON.stringify({
       success: true,

@@ -511,33 +511,6 @@ export default function Settings() {
                   </div>
                 </div>
 
-                {/* Temperature Slider */}
-                <div>
-                  <label style={{ display: 'block', fontWeight: 600, marginBottom: '0.5rem', color: '#374151' }}>
-                    🎨 Creativity Level (Temperature): {config.temperature || 0.8}
-                  </label>
-                  <input
-                    type="range"
-                    min="0.3"
-                    max="1.0"
-                    step="0.1"
-                    value={config.temperature || 0.8}
-                    onChange={(e) => setConfig({...config, temperature: parseFloat(e.target.value)})}
-                    style={{
-                      width: '100%',
-                      height: '8px'
-                    }}
-                  />
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', color: '#6b7280', marginTop: '0.5rem' }}>
-                    <span>Conservative (0.3)</span>
-                    <span>Balanced (0.7)</span>
-                    <span>Creative (1.0)</span>
-                  </div>
-                  <p style={{ fontSize: '0.875rem', color: '#6b7280', marginTop: '0.5rem' }}>
-                    Higher = more varied responses. Lower = more consistent.
-                  </p>
-                </div>
-
                 {/* OpenAI API Key */}
                 <div>
                   <label style={{ display: 'block', fontWeight: 600, marginBottom: '0.5rem', color: '#374151' }}>
