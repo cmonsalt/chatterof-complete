@@ -62,6 +62,37 @@ export default function Navbar() {
         </h1>
         
         <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+          {/* Chatter Mode Button - NUEVO */}
+          <button
+            onClick={() => navigate('/chatter')}
+            style={{
+              padding: '0.5rem 1rem',
+              background: 'linear-gradient(to right, #8b5cf6, #ec4899)',
+              color: 'white',
+              borderRadius: '0.375rem',
+              fontSize: '0.875rem',
+              fontWeight: 600,
+              border: 'none',
+              cursor: 'pointer',
+              boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem',
+              transition: 'all 0.2s'
+            }}
+            onMouseEnter={(e) => {
+              e.target.style.transform = 'translateY(-1px)'
+              e.target.style.boxShadow = '0 4px 8px rgba(0,0,0,0.15)'
+            }}
+            onMouseLeave={(e) => {
+              e.target.style.transform = 'translateY(0)'
+              e.target.style.boxShadow = '0 2px 4px rgba(0,0,0,0.1)'
+            }}
+          >
+            <span>💬</span>
+            <span>Chatter Mode</span>
+          </button>
+
           {/* Model Selector */}
           {models.length > 0 && (
             <div ref={dropdownRef} style={{ position: 'relative' }}>

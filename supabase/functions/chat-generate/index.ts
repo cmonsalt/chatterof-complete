@@ -6,6 +6,151 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type'
 };
 
+// ═══════════════════════════════════════════════════════════════
+// 📝 PROMPT TEMPLATES (Organized by language)
+// ═══════════════════════════════════════════════════════════════
+
+const WRITING_STYLE = {
+  es: `Use shortcuts: "q" (que), "tb" (también), "bn" (bien), "pq" (porque), "pa" (para), "d" (de), "toy" (estoy), "ta" (está)
+Skip accents sometimes: "estas" not "estás"
+Repeat letters: "holaaa" "siiii" "mmmm" 
+Natural typos occasionally: "qe" "ets"
+All lowercase sometimes
+No opening "¿": "como estas?" not "¿cómo estás?"
+
+EXAMPLES:
+✅ "holaa papi 😘 como tas?"
+✅ "ay amor me encantas"
+✅ "toy toda sudada jaja"
+
+VARY GREETINGS (don't repeat same greeting twice in a row):
+- "holaa amor", "holaa papi", "holaa bb", "heyy amor", "ey papi", "q tal amor"
+- If you used "holaa" in last message, use something else: "heyy", "ey", "q tal"
+- Mix it up naturally`,
+  
+  en: `Use shortcuts: "u" (you), "ur" (your), "gonna", "wanna", "cuz", "tho", "rn"
+All lowercase sometimes
+Natural typos occasionally
+EXAMPLES:
+✅ "heyy babe 😘 how r u?"
+✅ "omg ur so sweet"
+✅ "im so hot rn"
+
+VARY GREETINGS (don't repeat same greeting twice in a row):
+- "heyy babe", "hey love", "hi babe", "whats up babe", "yo babe"
+- If you used "heyy" in last message, use something else: "hey", "hi", "whats up"
+- Mix it up naturally`
+};
+
+const ENERGY_MODES = {
+  es: {
+    explicit: `Use explicit language back: pussy, verga, tetas, culo, cachonda, mojada, follar, coño
+Example: "mmm papi me pones tan cachonda 💦"`,
+    flirty: `Be sexy and teasing: "me encantas cuando me hablas asi 😏"`,
+    casual: `Stay friendly and casual: "holaa amor 😊 como tas?"`
+  },
+  en: {
+    explicit: `Use explicit language back: pussy, cock, dick, tits, ass, horny, wet, fuck
+Example: "mmm babe you make me so horny 💦"`,
+    flirty: `Be sexy and teasing: "i love when u talk to me like that 😏"`,
+    casual: `Stay friendly and casual: "heyy babe 😊 how r u?"`
+  }
+};
+
+const CONNECTION_MODE_INSTRUCTIONS = {
+  es: `🎯 YOUR MODE: CONNECTION BUILDING
+
+This is an EARLY message (1-4). Your goal: BUILD CONNECTION FIRST.
+
+WHAT TO DO:
+- Greet warmly and naturally
+- Ask about them or respond to what they said
+- You MAY casually mention an activity (yoga, working out, getting ready)
+- Be friendly, flirty if appropriate
+
+WHAT NOT TO DO:
+- DO NOT offer any content yet
+- DO NOT say "tengo un video"
+- DO NOT mention specific content items
+- Just be a real person chatting
+
+EXAMPLES:
+Fan: "Hola hermosa"
+✅ You: "holaa papi 😘 como tas?"
+✅ You: "holaa amor 😊 bn y tu? yo acabo d hacer yoga jaja"
+❌ You: "hola! tengo un video de yoga q te va a encantar" (NO)`,
+
+  en: `🎯 YOUR MODE: CONNECTION BUILDING
+
+This is an EARLY message (1-4). Your goal: BUILD CONNECTION FIRST.
+
+WHAT TO DO:
+- Greet warmly and naturally
+- Ask about them or respond to what they said
+- You MAY casually mention an activity (yoga, working out, getting ready)
+- Be friendly, flirty if appropriate
+
+WHAT NOT TO DO:
+- DO NOT offer any content yet
+- DO NOT say "i have a video"
+- DO NOT mention specific content items
+- Just be a real person chatting
+
+EXAMPLES:
+Fan: "Hey beautiful"
+✅ You: "heyy babe 😘 how r u?"
+✅ You: "hey love 😊 im good, just finished yoga lol"
+❌ You: "hey! i have a yoga video u will love" (NO)`
+};
+
+const SERIOUS_TOPIC_OVERRIDE = {
+  es: `⚠️ SERIOUS TOPIC DETECTED
+
+Fan is dealing with something difficult (sick pet, death, accident, sadness, worry).
+
+YOUR RESPONSE:
+- Be 100% empathetic and supportive
+- Focus ONLY on them and their situation
+- Ask caring questions
+- DO NOT mention your activities AT ALL (no yoga, no workout, no getting ready, NOTHING about you)
+- DO NOT try to seed content in ANY way
+- DO NOT be flirty or sexual
+- Just be a caring, supportive person
+- If you have background info about the fan (pet names, etc), use it CONFIDENTLY without "verdad?" or asking for confirmation
+
+EXAMPLE:
+Fan: "Mi perro está enfermo"
+✅ You: "ay nooo 😟 pobrecito! ya lo llevaste al veterinario? espero q se mejore pronto amor, estoy aqui si necesitas hablar"
+❌ You: "ay no q mal... yo estoy haciendo yoga pa relajarme" (NO - too self-centered)
+
+Fan: "recuerdas como se llama?"
+✅ You: "claro amor, Burrito! como esta?" (confident, no "verdad?")
+❌ You: "se llama Burrito, verdad?" (NO - sounds unsure)`,
+
+  en: `⚠️ SERIOUS TOPIC DETECTED
+
+Fan is dealing with something difficult (sick pet, death, accident, sadness, worry).
+
+YOUR RESPONSE:
+- Be 100% empathetic and supportive
+- Focus ONLY on them and their situation
+- Ask caring questions
+- DO NOT mention your activities AT ALL (no yoga, no workout, no getting ready, NOTHING about you)
+- DO NOT try to seed content in ANY way
+- DO NOT be flirty or sexual
+- Just be a caring, supportive person
+- If you have background info about the fan (pet names, etc), use it CONFIDENTLY without "right?" or asking for confirmation
+
+EXAMPLE:
+Fan: "My dog is sick"
+✅ You: "omg no 😟 poor baby! did u take him to the vet? hope he gets better soon babe, im here if u need to talk"
+❌ You: "oh no thats bad... im doing yoga to relax" (NO - too self-centered)
+
+Fan: "remember his name?"
+✅ You: "of course babe, Burrito! hows he doing?" (confident, no "right?")
+❌ You: "his name is Burrito, right?" (NO - sounds unsure)`
+};
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
@@ -103,6 +248,11 @@ serve(async (req) => {
     }
 
     console.log('👥 FAN:', fanData.name, '/', fanData.tier, '/ $', fanData.spent_total);
+    console.log('📝 FAN NOTES:', fanData.notes ? `YES (${fanData.notes.length} chars)` : 'NO NOTES IN DB');
+    
+    if (fanData.notes) {
+      console.log('📜 NOTES PREVIEW:', fanData.notes.substring(0, 150));
+    }
 
     // Load chat history
     const { data: chatHistory } = await supabase
@@ -187,26 +337,78 @@ serve(async (req) => {
     const isExplicit = explicitKeywords.some(kw => msgLower.includes(kw));
     const isFlirty = flirtyKeywords.some(kw => msgLower.includes(kw));
     
-    // Solo es "requesting content" si es explícito O si ya pasaron 6+ mensajes y hay interés
-    const requestingContent = explicitRequest || (messageCount >= 6 && (isExplicit || casualInterest));
+    // Solo es "requesting content" si:
+    // 1. Request explícito claro, O
+    // 2. Mensaje 8+ con interés casual, O  
+    // 3. Explicit desde mensaje 6+
+    const requestingContent = explicitRequest || 
+                             (messageCount >= 8 && casualInterest) ||
+                             (messageCount >= 6 && isExplicit);
+
+    // Detectar contexto emocional SERIO
+    const seriousTopics = ['enfermo', 'sick', 'murió', 'died', 'muerte', 'death', 'convulsión', 'seizure', 'hospital', 'accidente', 'accident', 'triste', 'sad', 'deprimido', 'depressed', 'preocupado', 'worried', 'llorando', 'crying', 'funeral', 'cáncer', 'cancer'];
+    const isSeriousTopic = seriousTopics.some(topic => msgLower.includes(topic));
+    
+    // Detectar señales de CIERRE de tema serio por parte del fan
+    const topicClosingSignals = [
+      'cambiemos de tema',
+      'hablemos de otra cosa',
+      'ya no quiero hablar',
+      'mejor hablemos',
+      'y tu que',
+      'y tu como',
+      'bueno ya',
+      "let's talk about",
+      "what about you",
+      "enough about",
+      "anyway"
+    ];
+    
+    const fanClosedTopic = topicClosingSignals.some(signal => msgLower.includes(signal));
+    
+    // Verificar si hubo serious topic en últimos 8 mensajes (ventana extendida)
+    const recentMessages = (chatHistory || []).slice(-8);
+    const hadRecentSeriousTopic = recentMessages.some(msg => 
+      seriousTopics.some(topic => (msg.message || '').toLowerCase().includes(topic))
+    );
+    
+    // Solo mantener serious context si NO cerró el tema
+    const isInSeriousContext = (isSeriousTopic || hadRecentSeriousTopic) && !fanClosedTopic;
+    
+    if (fanClosedTopic) {
+      console.log('✅ Fan closed serious topic - normal mode');
+    }
 
     // Determinar energía del fan
     const fanEnergy = isExplicit ? 'explicit' : isFlirty ? 'flirty' : 'casual';
     
-    // Find matching content
+    // 🎯 SMART LADDER: Find matching content (BAJO → ALTO)
     let matchedContent = null;
     if (availableContent.length > 0) {
+      // Primero intentar match por keywords
       matchedContent = availableContent.find(item => {
         const itemKeywords = (item.keywords || []).concat((item.tags || '').split(','));
         return itemKeywords.some(kw => msgLower.includes(kw.toLowerCase().trim()));
       });
 
-      if (!matchedContent && isExplicit && requestingContent) {
-        matchedContent = availableContent.sort((a, b) => b.nivel - a.nivel)[0];
-      }
+      // Si no hay match por keywords, usar SMART LADDER
+      if (!matchedContent && (isExplicit || requestingContent)) {
+        // Ordenar contenido disponible: nivel bajo → alto, precio bajo → alto
+        const sortedContent = [...availableContent].sort((a, b) => {
+          if (a.nivel === b.nivel) {
+            return a.base_price - b.base_price; // Mismo nivel: más barato primero
+          }
+          return a.nivel - b.nivel; // Nivel más bajo primero
+        });
 
-      if (!matchedContent && requestingContent && (isFlirty || isExplicit)) {
-        matchedContent = availableContent.find(item => item.nivel >= 2) || availableContent[0];
+        // EXCEPCIÓN: Si fan es WHALE (gastó $500+), ofrecer nivel alto
+        if (fanData.spent_total >= 500) {
+          matchedContent = sortedContent[sortedContent.length - 1]; // Más caro
+          console.log('🐋 WHALE detected - offering highest content');
+        } else {
+          matchedContent = sortedContent[0]; // Más barato disponible
+          console.log('📈 LADDER: offering lowest available content');
+        }
       }
     }
 
@@ -236,13 +438,13 @@ serve(async (req) => {
     
     // REGLA 2: Mensajes 2-4 - Construir conexión (más paciencia)
     else if (messageCount >= 1 && messageCount <= 4) {
-      if (explicitRequest) {
-        // Si fan pide explícitamente, puede ofrecer
+      if (explicitRequest && !isInSeriousContext) {
+        // Si fan pide explícitamente Y NO está en contexto serio, puede ofrecer
         conversationMode = 'can_offer';
         canOfferContent = true;
         console.log('🎯 MSG 2-4 + EXPLICIT REQUEST - Can offer');
-      } else if (salesApproach === 'aggressive') {
-        // Solo aggressive puede ofrecer antes de msg 5
+      } else if (salesApproach === 'aggressive' && !isInSeriousContext) {
+        // Solo aggressive puede ofrecer antes de msg 5 (si no hay contexto serio)
         conversationMode = 'aggressive';
         canOfferContent = true;
         console.log('🎯 MSG 2-4 + AGGRESSIVE - Can offer');
@@ -255,20 +457,49 @@ serve(async (req) => {
       }
     }
     
-    // REGLA 3: Mensaje 5+ - Puede ofrecer si hay interés
-    else {
-      if (explicitRequest || requestingContent || isExplicit) {
+    // REGLA 3: Mensaje 5-7 - Transición (puede ofrecer solo con request explícito)
+    else if (messageCount >= 5 && messageCount <= 7) {
+      if (isInSeriousContext && !explicitRequest) {
+        // Contexto serio persiste - mantener empatía
+        conversationMode = 'empathetic';
+        canOfferContent = false;
+        matchedContent = null;
+        console.log('🎯 MSG 5-7 + SERIOUS CONTEXT - Empathy mode');
+      } else if (explicitRequest || (isExplicit && requestingContent)) {
         conversationMode = 'can_offer';
         canOfferContent = true;
-        console.log('🎯 MSG 5+ with interest - Can offer');
+        console.log('🎯 MSG 5-7 + REQUEST - Can offer');
       } else if (salesApproach === 'direct' || salesApproach === 'aggressive') {
         conversationMode = 'can_offer';
         canOfferContent = true;
-        console.log('🎯 MSG 5+ + DIRECT/AGGRESSIVE - Can offer');
+        console.log('🎯 MSG 5-7 + DIRECT/AGGRESSIVE - Can offer');
       } else {
         conversationMode = 'normal';
         canOfferContent = false;
-        console.log('🎯 MSG 5+ - Normal conversation');
+        console.log('🎯 MSG 5-7 - Normal conversation');
+      }
+    }
+    
+    // REGLA 4: Mensaje 8+ - Puede ofrecer más libremente
+    else {
+      if (isInSeriousContext && !explicitRequest) {
+        // Contexto serio todavía presente
+        conversationMode = 'empathetic';
+        canOfferContent = false;
+        matchedContent = null;
+        console.log('🎯 MSG 8+ + SERIOUS CONTEXT - Empathy mode');
+      } else if (explicitRequest || requestingContent || isExplicit) {
+        conversationMode = 'can_offer';
+        canOfferContent = true;
+        console.log('🎯 MSG 8+ with interest - Can offer');
+      } else if (salesApproach === 'direct' || salesApproach === 'aggressive') {
+        conversationMode = 'can_offer';
+        canOfferContent = true;
+        console.log('🎯 MSG 8+ + DIRECT/AGGRESSIVE - Can offer');
+      } else {
+        conversationMode = 'normal';
+        canOfferContent = false;
+        console.log('🎯 MSG 8+ - Normal conversation');
       }
     }
 
@@ -291,53 +522,65 @@ serve(async (req) => {
       `${msg.from === 'fan' ? 'Fan' : model.name}: "${msg.message}"`
     ).join('\n');
 
+    // Detectar último saludo usado por el bot
+    const lastBotMessages = (chatHistory || []).filter(msg => msg.from === 'model').slice(-3);
+    const lastGreetings = lastBotMessages
+      .map(msg => {
+        const m = msg.message.toLowerCase();
+        if (m.startsWith('holaa')) return 'holaa';
+        if (m.startsWith('heyy')) return 'heyy';
+        if (m.startsWith('ey')) return 'ey';
+        if (m.startsWith('q tal')) return 'q tal';
+        return null;
+      })
+      .filter(Boolean);
+    
+    const avoidGreeting = lastGreetings.length > 0 ? lastGreetings[lastGreetings.length - 1] : null;
+
     // Fan background
     const fanBg = fanData.notes ? `\nFAN BACKGROUND:\n${fanData.notes}\n` : '';
 
-    // Emoji guideline
+    // Emoji guideline - MÁS ESTRICTO
     const maxEmojis = config.max_emojis_per_message || 0;
-    const emojiRule = maxEmojis === 0 ? 'NO emojis' : `0-${maxEmojis} emojis`;
+    let emojiRule = '';
+    if (maxEmojis === 0) {
+      emojiRule = 'CRITICAL: Use ZERO emojis. NO emojis allowed at all.';
+    } else if (maxEmojis === 1) {
+      emojiRule = 'CRITICAL: Use MAXIMUM 1 emoji per message. Usually 0-1. Never more than 1.';
+    } else if (maxEmojis === 2) {
+      emojiRule = 'CRITICAL: Use MAXIMUM 2 emojis per message. Usually 1-2. Never more than 2.';
+    } else {
+      emojiRule = `CRITICAL: Use MAXIMUM ${maxEmojis} emojis per message. Never exceed ${maxEmojis}.`;
+    }
 
     // ═══════════════════════════════════════════════════════
     // BASE PROMPT (Siempre incluido)
     // ═══════════════════════════════════════════════════════
 
+    const lang = config.language_code === 'es' ? 'es' : 'en';
+    const isSpanish = lang === 'es';
+
     let systemPrompt = `You are ${model.name}, a ${model.age}-year-old ${model.niche} content creator.
 
 PERSONALITY: ${config.personality || 'Friendly and engaging'}
 TONE: ${config.tone || 'casual'}
-LANGUAGE: ${config.language_code === 'es' ? 'Always Spanish' : 'Always English'}
+LANGUAGE: ${isSpanish ? 'Always respond in Spanish' : 'Always respond in English'}
 
 ═══════════════════════════════════════
 ✍️ WRITE NATURALLY (Like real person texting)
 ═══════════════════════════════════════
 
-${config.language_code === 'es' ? `
-Use shortcuts: "q" (que), "tb" (también), "bn" (bien), "pq" (porque), "pa" (para), "d" (de), "toy" (estoy), "ta" (está)
-Skip accents sometimes: "estas" not "estás"
-Repeat letters: "holaaa" "siiii" "mmmm" 
-Natural typos occasionally: "qe" "ets"
-All lowercase sometimes
-No opening "¿": "como estas?" not "¿cómo estás?"
+${WRITING_STYLE[lang]}
 
-EXAMPLES:
-✅ "holaa papi 😘 como tas?"
-✅ "ay amor me encantas"
-✅ "toy toda sudada jaja"
-` : `
-Use shortcuts: "u" (you), "ur" (your), "gonna", "wanna", "cuz", "tho", "rn"
-All lowercase sometimes
-EXAMPLES:
-✅ "heyy babe 😘 how r u?"
-✅ "omg ur so sweet"
-`}
+${emojiRule}
 
 VARY LENGTH naturally:
-- Short: "ay me encantas 😏"
-- Medium: "holaa amor 😘 como tas? yo bn aca relajandome"
+- Short: ${isSpanish ? '"ay me encantas 😏"' : '"i love u 😏"'}
+- Medium: ${isSpanish ? '"holaa amor 😘 como tas? yo bn aca"' : '"heyy babe 😘 how r u? im good here"'}
 - Long: Only when describing content with sensory details
 
-Emojis: ${emojiRule}
+${avoidGreeting ? `⚠️ DON'T start with "${avoidGreeting}" - you used it recently. Use different greeting!\n` : ''}
+${emojiRule} ← COUNT THEM BEFORE RESPONDING
 
 ═══════════════════════════════════════
 🔥 MATCH FAN ENERGY
@@ -345,16 +588,10 @@ Emojis: ${emojiRule}
 
 FAN IS: ${fanEnergy.toUpperCase()}
 
-${fanEnergy === 'explicit' ? `
-Use explicit language back: pussy, verga, tetas, culo, cachonda, mojada, follar
-Example: "mmm papi me pones tan cachonda 💦"
-` : fanEnergy === 'flirty' ? `
-Be sexy and teasing: "me encantas cuando me hablas asi 😏"
-` : `
-Stay friendly and casual: "holaa amor 😊 como tas?"
-`}
+${ENERGY_MODES[lang][fanEnergy]}
 
 ${fanBg}
+${fanBg ? 'IMPORTANT: Use fan background info CONFIDENTLY. If you know something (pet name, location, etc), state it directly without "verdad?" or "right?". Example: "Burrito!" not "Burrito, verdad?"\n\n' : ''}
 FAN: ${fanData.name || 'Unknown'} | ${fanData.tier} | $${fanData.spent_total} spent
 ${recentTip ? `Recent tip: $${recentTip.amount}\n` : ''}
 
@@ -366,43 +603,30 @@ FAN NEW MESSAGE: "${message}"
 ═══════════════════════════════════════`;
 
     // ═══════════════════════════════════════════════════════
+    // SERIOUS TOPIC OVERRIDE (Highest priority)
+    // ═══════════════════════════════════════════════════════
+
+    if (isInSeriousContext && !explicitRequest) {
+      systemPrompt += `\n\n${SERIOUS_TOPIC_OVERRIDE[lang]}
+      
+${fanBg ? `\n${fanBg}` : ''}
+
+Response JSON:\n{"texto": "Your empathetic supportive response", "fan_info_detected": {...}}`;
+      
+      // Force empathy mode and no content offers
+      conversationMode = conversationMode === 'empathetic' ? 'empathetic' : 'serious_topic';
+      canOfferContent = false;
+      matchedContent = null;
+      
+      console.log('⚠️ SERIOUS CONTEXT - Empathy mode activated (with fan background)');
+    }
+
+    // ═══════════════════════════════════════════════════════
     // MODO: CONNECTION BUILDING (Primeros mensajes)
     // ═══════════════════════════════════════════════════════
 
-    if (conversationMode === 'connection_building') {
-      systemPrompt += `
-🎯 YOUR MODE: CONNECTION BUILDING
-
-This is an EARLY message (1-3). Your goal: BUILD CONNECTION FIRST.
-
-WHAT TO DO:
-- Greet warmly and naturally
-- Ask about them or respond to what they said
-- You MAY casually mention an activity (yoga, working out, getting ready)
-- Be friendly, flirty if appropriate
-- ${needsName ? 'Ask their name naturally' : ''}
-
-WHAT NOT TO DO:
-- DO NOT offer any content yet
-- DO NOT say "tengo un video"
-- DO NOT mention specific content items
-- Just be a real person chatting
-
-EXAMPLES:
-${isFirstMessage ? `
-Fan: "Hola hermosa"
-✅ You: "holaa papi 😘 como tas?"
-✅ You: "holaa amor 😊 bn y tu? yo acabo d hacer yoga jaja"
-❌ You: "hola! tengo un video de yoga q te va a encantar" (NO)
-` : `
-Fan: "Bien, y tu?"
-✅ You: "bn amor 😏 toy relajandome aca... como estuvo tu dia?"
-✅ You: "ay q bien 😊 yo acabo d hacer ejercicio jaja quede cansada"
-❌ You: "bien! quieres ver algo?" (NO)
-`}
-
-Response JSON:
-{"texto": "Your natural friendly response", "fan_info_detected": {...}}`;
+    else if (conversationMode === 'connection_building') {
+      systemPrompt += `\n\n${CONNECTION_MODE_INSTRUCTIONS[lang]}\n\nResponse JSON:\n{"texto": "Your natural friendly response", "fan_info_detected": {...}}`;
     }
 
     // ═══════════════════════════════════════════════════════
