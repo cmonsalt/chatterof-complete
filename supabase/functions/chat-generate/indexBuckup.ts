@@ -271,7 +271,12 @@ ${lang === 'es'
     const offerId = parsed.offer_id;
     const fanAccepted = parsed.fan_accepted === true; // GPT decide si aceptó
 
-    console.log('✅ Response:', responseText.substring(0, 80) + '...');
+    // 🔧 FILTRAR JSON de compra si GPT lo incluyó en el texto
+    let cleanText = responseText;
+    const jsonPattern = /\{"type":\s*"purchase"[^}]*\}/g;
+    cleanText = cleanText.replace(jsonPattern, '').trim();
+
+    console.log('✅ Response:', cleanText.substring(0, 80) + '...');
     console.log('💰 Offering:', offerId || 'nothing');
     console.log('🎯 Fan accepted:', fanAccepted);
 
@@ -290,7 +295,7 @@ ${lang === 'es'
     return new Response(JSON.stringify({
       success: true,
       response: {
-        texto: responseText,
+        texto: cleanText,
         content_to_offer: contentToOffer ? {
           offer_id: contentToOffer.offer_id,
           titulo: contentToOffer.title,
