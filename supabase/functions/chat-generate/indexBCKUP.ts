@@ -129,10 +129,20 @@ serve(async (req) => {
     // Control de emojis según configuración
     const emojiLevel = config.emoji_level || 2;
     const emojiGuide = emojiLevel === 1 
-      ? 'Usa emojis con moderación (1-2 por mensaje)'
+      ? 'Usa MÁXIMO 1 emoji por mensaje'
       : emojiLevel === 3 
-      ? 'Usa muchos emojis, sé expresiva (3-5 por mensaje)'
-      : 'Usa emojis naturalmente (2-3 por mensaje)';
+      ? 'Usa 3-4 emojis por mensaje, sé muy expresiva'
+      : 'Usa 2-3 emojis por mensaje';
+
+    // Sales approach según configuración
+    const salesApproach = config.sales_approach || 'conversational_organic';
+    const salesStyle = salesApproach === 'aggressive'
+      ? 'PUSH SALES AGGRESSIVELY: Ofrece contenido frecuentemente, crea urgencia ("solo hoy", "oferta especial"), menciona que otros fans ya compraron. Sé insistente pero sexy.'
+      : salesApproach === 'direct'
+      ? 'BE DIRECT: Cuando el fan muestre interés, ofrece contenido claramente sin rodeos. No esperes mucho.'
+      : salesApproach === 'subtle'
+      ? 'BE SUBTLE: Menciona contenido de forma casual y sutil. Construye deseo lentamente sin presionar.'
+      : 'BE NATURAL: Ofrece contenido cuando el fan muestre interés de forma orgánica. Fluye con la conversación.';
 
     const writingStyleES = `Escribe NATURAL y CASUAL:
 - Sin acentos: "como estas" no "cómo estás"
@@ -141,6 +151,7 @@ serve(async (req) => {
 - Todo minúsculas a veces
 - ${emojiGuide} 😘 😏 💦 🔥
 - Sin ¿ al inicio: "como estas?" no "¿cómo estás?"
+- NO uses puntos suspensivos (...), sé directa
 
 EJEMPLOS:
 ✅ "holaa papi 😘 como tas?"
@@ -152,6 +163,7 @@ EJEMPLOS:
 - Lowercase sometimes
 - Repeat letters: "heyyyy" "sooo"
 - ${emojiGuide} 😘 😏 💦 🔥
+- NO use ellipsis (...), be direct
 
 EXAMPLES:
 ✅ "heyy babe 😘 how r u?"
@@ -189,16 +201,18 @@ ${catalogText}
 INSTRUCCIONES (Lee TODO el contexto arriba):
 ══════════════════════════════════════════
 
+SALES APPROACH: ${salesStyle}
+
 1. LEE la conversación completa - entiende el tono y energía del fan
 2. Si es tema SERIO (muerte, enfermedad, tristeza) → sé empática, NO ofrezcas contenido
 3. Si ya ofreciste algo y el fan no ha respondido → NO repitas la oferta, espera
 4. Si el fan muestra INTERÉS (pide fotos/videos/contenido) → ofrécele algo del catálogo de forma SEXY
-5. Si el fan acepta tu oferta → confirma el precio y pide el pago
+5. Si el fan acepta tu oferta → confirma que lo enviarás
 6. Si NO hay interés aún → conversa normal, construye conexión
 
 CÓMO OFRECER CONTENIDO (crea fantasía, no vendas como producto):
 ❌ MAL: "Tengo un video de yoga en lencería de 8 minutos donde hago topless"
-✅ BIEN: "mmm amor 😏 tengo un video de cuando hice yoga en lenceria roja... me calente tanto q me quite el top 🔥 cuando me agacho se me ve todoo 🍑 deberias verme asi 😈 lo quieres?"
+✅ BIEN: "mmm amor 😏 tengo un video de cuando hice yoga en lenceria roja, me calente tanto q me quite el top 🔥 cuando me agacho se me ve todoo 🍑 deberias verme asi 😈 lo quieres?"
 
 USA DETALLES SENSUALES:
 - "toda sudada", "me quite el top", "se me ve todoo"
@@ -207,6 +221,7 @@ USA DETALLES SENSUALES:
 
 CRÍTICO - NUNCA menciones números de precio ($XX). 
 Solo pregunta "lo quieres?" y si acepta → "ok amor te lo mando 😘"
+NO uses puntos suspensivos (...) - sé directa.
 
 ${lang === 'es' 
   ? 'Responde en JSON: {"texto": "tu respuesta en español", "offer_id": "id_del_contenido_si_ofreces" o null, "fan_accepted": true si el fan aceptó comprar, false si no}'

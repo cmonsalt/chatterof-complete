@@ -328,26 +328,76 @@ export default function ChatViewEnhanced() {
                 {chatHistory.length === 0 ? (
                   <p className="text-gray-400 text-center py-8">No messages yet</p>
                 ) : (
-                  chatHistory.map((msg, idx) => (
-                    <div
-                      key={idx}
-                      className={`p-4 rounded-lg ${
-                        msg.from === 'fan'
-                          ? 'bg-gray-100 ml-8'
-                          : 'bg-blue-50 mr-8'
-                      }`}
-                    >
-                      <div className="flex items-center gap-2 mb-2">
-                        <span className="font-semibold text-sm">
-                          {msg.from === 'fan' ? '👤 Fan' : '💎 Model'}
-                        </span>
-                        <span className="text-xs text-gray-500">
-                          {new Date(msg.timestamp).toLocaleString()}
-                        </span>
+                  chatHistory.map((msg, idx) => {
+                    // Detectar si es un JSON de transacción
+                    let isTransaction = false;
+                    let transactionData = null;
+                    
+                    try {
+                      if (msg.message.trim().startsWith('{') && msg.message.includes('type')) {
+                        transactionData = JSON.parse(msg.message);
+                        isTransaction = true;
+                      }
+                    } catch (e) {
+                      // No es JSON válido
+                    }
+
+                    return (
+                      <div key={idx}>
+                        {isTransaction && transactionData ? (
+                          // Render transaction card
+                          <div className="p-4 rounded-lg bg-gradient-to-r from-green-50 to-emerald-50 border-2 border-green-300 mr-8">
+                            <div className="flex items-center gap-2 mb-2">
+                              <span className="font-semibold text-sm text-green-700">
+                                {transactionData.type === 'purchase' ? '🛍️ Purchase' : '💰 Tip'}
+                              </span>
+                              <span className="text-xs text-gray-500">
+                                {new Date(msg.timestamp).toLocaleString()}
+                              </span>
+                            </div>
+                            {transactionData.type === 'purchase' ? (
+                              <div className="bg-white/60 rounded-lg p-3 mt-2">
+                                <div className="font-semibold text-gray-800">
+                                  {transactionData.content_title}
+                                </div>
+                                <div className="text-2xl font-bold text-green-600 mt-1">
+                                  ${transactionData.amount}
+                                </div>
+                                <div className="text-xs text-gray-500 mt-1">
+                                  ID: {transactionData.offer_id}
+                                </div>
+                              </div>
+                            ) : (
+                              <div className="bg-white/60 rounded-lg p-3 mt-2">
+                                <div className="text-2xl font-bold text-green-600">
+                                  ${transactionData.amount}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        ) : (
+                          // Render normal message
+                          <div
+                            className={`p-4 rounded-lg ${
+                              msg.from === 'fan'
+                                ? 'bg-gray-100 ml-8'
+                                : 'bg-blue-50 mr-8'
+                            }`}
+                          >
+                            <div className="flex items-center gap-2 mb-2">
+                              <span className="font-semibold text-sm">
+                                {msg.from === 'fan' ? '👤 Fan' : '💎 Model'}
+                              </span>
+                              <span className="text-xs text-gray-500">
+                                {new Date(msg.timestamp).toLocaleString()}
+                              </span>
+                            </div>
+                            <p className="text-sm">{msg.message}</p>
+                          </div>
+                        )}
                       </div>
-                      <p className="text-sm">{msg.message}</p>
-                    </div>
-                  ))
+                    );
+                  })
                 )}
                 <div ref={chatEndRef} />
               </div>

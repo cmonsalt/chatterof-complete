@@ -203,6 +203,20 @@ INSTRUCCIONES (Lee TODO el contexto arriba):
 
 SALES APPROACH: ${salesStyle}
 
+FAN INFO - IMPORTANTE:
+${fan.name === 'Unknown' || !fan.name 
+  ? '⚠️ ESTE FAN ES NUEVO Y NO SABEMOS SU NOMBRE. En tu primera o segunda respuesta, pregúntale su nombre de forma natural y casual: "como te llamas amor?" o "y tu nombre es...?"'
+  : `✅ El fan se llama: ${fan.name}`
+}
+
+DETECTA INFO DEL FAN mientras conversas:
+- Nombre (si lo menciona)
+- Intereses/hobbies (yoga, cocina, deportes, etc)
+- Ocupación/trabajo
+- Ubicación/ciudad
+- Cumpleaños/edad
+- Estado relación (soltero, casado, etc)
+
 1. LEE la conversación completa - entiende el tono y energía del fan
 2. Si es tema SERIO (muerte, enfermedad, tristeza) → sé empática, NO ofrezcas contenido
 3. Si ya ofreciste algo y el fan no ha respondido → NO repitas la oferta, espera
@@ -224,8 +238,8 @@ Solo pregunta "lo quieres?" y si acepta → "ok amor te lo mando 😘"
 NO uses puntos suspensivos (...) - sé directa.
 
 ${lang === 'es' 
-  ? 'Responde en JSON: {"texto": "tu respuesta en español", "offer_id": "id_del_contenido_si_ofreces" o null, "fan_accepted": true si el fan aceptó comprar, false si no}'
-  : 'Respond in JSON: {"texto": "your response in english", "offer_id": "content_id_if_offering" or null, "fan_accepted": true if fan accepted to buy, false if not}'
+  ? 'Responde en JSON: {"texto": "tu respuesta en español", "offer_id": "id_del_contenido_si_ofreces" o null, "fan_accepted": true/false, "detected_info": {"name": "nombre si lo mencionó", "interests": "hobbies/intereses", "occupation": "trabajo", "location": "ciudad", "birthday": "fecha", "relationship_status": "estado"} - solo incluye campos que detectaste}'
+  : 'Respond in JSON: {"texto": "your response in english", "offer_id": "content_id_if_offering" or null, "fan_accepted": true/false, "detected_info": {"name": "if mentioned", "interests": "hobbies", "occupation": "job", "location": "city", "birthday": "date", "relationship_status": "status"} - only include detected fields}'
 }`;
 
     // ═══════════════════════════════════════════════════════════════
@@ -285,6 +299,7 @@ ${lang === 'es'
     const responseText = parsed.texto || aiResponseRaw;
     const offerId = parsed.offer_id;
     const fanAccepted = parsed.fan_accepted === true; // GPT decide si aceptó
+    const detectedInfo = parsed.detected_info || null; // Info detectada del fan
 
     // 🔧 FILTRAR JSON de compra si GPT lo incluyó en el texto
     let cleanText = responseText;
@@ -294,6 +309,7 @@ ${lang === 'es'
     console.log('✅ Response:', cleanText.substring(0, 80) + '...');
     console.log('💰 Offering:', offerId || 'nothing');
     console.log('🎯 Fan accepted:', fanAccepted);
+    console.log('📋 Detected info:', detectedInfo || 'none');
 
     // ═══════════════════════════════════════════════════════════════
     // 📤 PREPARAR RESPUESTA
@@ -318,6 +334,7 @@ ${lang === 'es'
           descripcion: contentToOffer.description,
           nivel: contentToOffer.nivel
         } : null,
+        detected_info: detectedInfo,
         contexto: {
           fan_tier: fan.tier,
           spent_total: fan.spent_total,
