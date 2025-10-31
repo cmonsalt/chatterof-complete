@@ -18,7 +18,7 @@ export default function Dashboard() {
   useEffect(() => {
     if (actualModelId) {
       cargarDatos()
-      const interval = setInterval(cargarDatos, 30000) // Cada 30 seg
+      const interval = setInterval(cargarDatos, 30000)
       return () => clearInterval(interval)
     }
   }, [actualModelId])
@@ -30,7 +30,7 @@ export default function Dashboard() {
     }
 
     try {
-      // Cargar TODOS los fans
+      // 🔥 OPTIMIZACIÓN: Un solo query para fans
       const { data: fansData, error: fansError } = await supabase
         .from('fans')
         .select('*')
@@ -39,40 +39,51 @@ export default function Dashboard() {
 
       if (fansError) throw fansError
 
-      // Para cada fan, obtener último mensaje
-      const fansWithLastMessage = await Promise.all(
-        (fansData || []).map(async (fan) => {
-          const { data: lastMsg } = await supabase
-            .from('chat')
-            .select('*')
-            .eq('fan_id', fan.fan_id)
-            .order('ts', { ascending: false })
-            .limit(1)
-            .single()
+      // 🔥 OPTIMIZACIÓN: Un solo query para TODOS los últimos mensajes
+      const fanIds = fansData?.map(f => f.fan_id) || []
+      
+      let lastMessagesMap = {}
+      if (fanIds.length > 0) {
+        // Obtener último mensaje de cada fan en una sola query
+        const { data: allMessages } = await supabase
+          .from('chat')
+          .select('fan_id, message, ts, from')
+          .in('fan_id', fanIds)
+          .order('ts', { ascending: false })
 
-          return {
-            ...fan,
-            lastMessage: lastMsg?.message || 'No messages yet',
-            lastMessageTime: lastMsg?.ts || null,
-            lastMessageFrom: lastMsg?.from || null
+        // Crear mapa con último mensaje de cada fan
+        allMessages?.forEach(msg => {
+          if (!lastMessagesMap[msg.fan_id]) {
+            lastMessagesMap[msg.fan_id] = msg
           }
         })
-      )
+      }
 
-      // Calcular mensajes activos (fans con mensajes en últimos 7 días)
+      // Combinar fans con sus últimos mensajes
+      const fansWithLastMessage = fansData.map(fan => {
+        const lastMsg = lastMessagesMap[fan.fan_id]
+        return {
+          ...fan,
+          lastMessage: lastMsg?.message || 'No messages yet',
+          lastMessageTime: lastMsg?.ts || null,
+          lastMessageFrom: lastMsg?.from || null
+        }
+      })
+
+      // Calcular chats activos (últimos 7 días)
       const sevenDaysAgo = new Date()
       sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7)
       const chatsActivos = fansWithLastMessage.filter(
         f => f.last_message_date && new Date(f.last_message_date) > sevenDaysAgo
       ).length
 
-      // Cargar mensajes totales
-      const { data: mensajesData } = await supabase
+      // Contar mensajes totales
+      const { count: totalMensajes } = await supabase
         .from('chat')
         .select('*', { count: 'exact', head: true })
         .eq('model_id', actualModelId)
 
-      // Cargar transacciones de hoy
+      // Transacciones de hoy
       const hoy = new Date()
       hoy.setHours(0, 0, 0, 0)
       
@@ -88,7 +99,7 @@ export default function Dashboard() {
       setStats({
         hoy: totalHoy,
         chats: chatsActivos,
-        mensajes: mensajesData?.length || 0,
+        mensajes: totalMensajes || 0,
         totalFans: fansWithLastMessage.length
       })
       setLoading(false)
@@ -154,13 +165,11 @@ export default function Dashboard() {
       <Navbar />
       <div className="min-h-screen bg-gradient-to-br from-purple-50 to-pink-50">
         <div className="max-w-7xl mx-auto p-6">
-          {/* Header */}
           <div className="mb-6">
             <h1 className="text-3xl font-bold text-gray-800">📊 Dashboard</h1>
             <p className="text-gray-600">Overview of all fans and activity</p>
           </div>
 
-          {/* Stats Cards */}
           <div className="grid grid-cols-4 gap-4 mb-8">
             <div className="bg-white rounded-xl shadow-lg p-6 border-l-4 border-green-500">
               <p className="text-sm text-gray-600 font-semibold">Today's Revenue</p>
@@ -183,7 +192,6 @@ export default function Dashboard() {
             </div>
           </div>
 
-          {/* Fans List */}
           <div className="bg-white rounded-xl shadow-lg p-6">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-xl font-bold">All Fans</h2>

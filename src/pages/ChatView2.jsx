@@ -14,8 +14,9 @@ export default function ChatView() {
   const [messages, setMessages] = useState([]);
   const [loading, setLoading] = useState(true);
   const [newMessage, setNewMessage] = useState('');
+  const [debugInfo, setDebugInfo] = useState(null);
   
-  // 🆕 Estado IA
+  // Estado IA
   const [iaAnalisis, setIaAnalisis] = useState(null);
   const [iaLoading, setIaLoading] = useState(false);
   const [showIaPanel, setShowIaPanel] = useState(true);
@@ -31,26 +32,55 @@ export default function ChatView() {
     
     const modelId = user.user_metadata.model_id;
 
+    console.log('🔍 Buscando fan:', fanId);
+    console.log('📊 Model ID:', modelId);
+
     try {
-      const { data: fanData, error: fanError } = await supabase
+      // Primero buscar por fan_id exacto
+      let { data: fanData, error: fanError } = await supabase
         .from('fans')
         .select('*')
         .eq('fan_id', fanId)
         .eq('model_id', modelId)
         .single();
 
-      if (fanError) {
-        console.error('❌ Fan error:', fanError);
+      // Si no lo encuentra, buscar por username que contenga el número
+      if (fanError || !fanData) {
+        console.log('⚠️ No encontrado por fan_id, buscando por username...');
+        const { data: allFans } = await supabase
+          .from('fans')
+          .select('*')
+          .eq('model_id', modelId);
+        
+        console.log('👥 Todos los fans:', allFans);
+        
+        // Buscar fan que contenga el número en el username
+        fanData = allFans?.find(f => 
+          f.of_username?.includes(fanId) || 
+          f.fan_id === fanId
+        );
+
+        setDebugInfo({
+          searchedFanId: fanId,
+          modelId: modelId,
+          allFans: allFans,
+          foundFan: fanData
+        });
+      }
+
+      if (!fanData) {
+        console.error('❌ Fan no encontrado');
         setLoading(false);
         return;
       }
 
+      console.log('✅ Fan encontrado:', fanData);
       setFan(fanData);
 
       const { data: messagesData, error: messagesError } = await supabase
         .from('chat')
         .select('*')
-        .eq('fan_id', fanId)
+        .eq('fan_id', fanData.fan_id)
         .eq('model_id', modelId)
         .order('ts', { ascending: true });
 
@@ -65,7 +95,6 @@ export default function ChatView() {
     }
   }
 
-  // 🆕 GENERAR ANÁLISIS IA
   async function generarAnalisisIA() {
     if (!user?.user_metadata?.model_id) return;
     
@@ -74,12 +103,11 @@ export default function ChatView() {
     try {
       const modelId = user.user_metadata.model_id;
       
-      // Llamar Edge Function
       const { data, error } = await supabase.functions.invoke('chat-generate', {
         body: {
           model_id: modelId,
-          fan_id: fanId,
-          historial: messages.slice(-20), // Últimos 20 mensajes
+          fan_id: fan.fan_id,
+          historial: messages.slice(-20),
           fan_info: fan
         }
       });
@@ -90,7 +118,7 @@ export default function ChatView() {
       } else {
         console.log('✅ Análisis IA:', data);
         setIaAnalisis(data);
-        setNewMessage(data.texto || ''); // Pre-llenar con sugerencia
+        setNewMessage(data.texto || '');
       }
     } catch (error) {
       console.error('💥 Error IA:', error);
@@ -109,7 +137,7 @@ export default function ChatView() {
       const { error } = await supabase
         .from('chat')
         .insert({
-          fan_id: fanId,
+          fan_id: fan.fan_id,
           model_id: modelId,
           message: newMessage,
           from: 'model',
@@ -151,6 +179,24 @@ export default function ChatView() {
             <p className="text-gray-600 mb-4">
               Este fan no existe o pertenece a otro modelo.
             </p>
+            
+            {/* Debug Info */}
+            {debugInfo && (
+              <div className="bg-gray-100 p-4 rounded-lg text-left max-w-md mx-auto mb-4">
+                <p className="text-xs font-mono">
+                  <strong>Buscado:</strong> {debugInfo.searchedFanId}<br/>
+                  <strong>Model ID:</strong> {debugInfo.modelId}<br/>
+                  <strong>Total fans:</strong> {debugInfo.allFans?.length || 0}<br/>
+                  <strong>Fans disponibles:</strong><br/>
+                  {debugInfo.allFans?.map(f => (
+                    <span key={f.id}>
+                      - {f.name} (@{f.of_username}) fan_id: {f.fan_id}<br/>
+                    </span>
+                  ))}
+                </p>
+              </div>
+            )}
+            
             <button 
               onClick={() => navigate('/dashboard')}
               className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
@@ -167,11 +213,7 @@ export default function ChatView() {
     <>
       <Navbar />
       <div className="flex h-screen max-w-full">
-        {/* ========================================
-            CONVERSACIÓN (IZQUIERDA)
-        ======================================== */}
         <div className={`flex flex-col ${showIaPanel ? 'w-2/3' : 'w-full'} border-r`}>
-          {/* Header */}
           <div className="bg-white border-b p-4 flex items-center justify-between">
             <div className="flex items-center gap-4">
               <button 
@@ -201,7 +243,6 @@ export default function ChatView() {
               </div>
             </div>
 
-            {/* Toggle Panel IA */}
             <button
               onClick={() => setShowIaPanel(!showIaPanel)}
               className="px-3 py-1 bg-gray-100 rounded hover:bg-gray-200 text-sm"
@@ -210,7 +251,6 @@ export default function ChatView() {
             </button>
           </div>
 
-          {/* Mensajes */}
           <div className="flex-1 overflow-y-auto p-4 bg-gray-50">
             {messages.length === 0 ? (
               <div className="text-center text-gray-500 mt-8">
@@ -239,7 +279,6 @@ export default function ChatView() {
             )}
           </div>
 
-          {/* Input de mensaje */}
           <div className="bg-white border-t p-4">
             <div className="flex gap-2">
               <textarea
@@ -259,14 +298,10 @@ export default function ChatView() {
           </div>
         </div>
 
-        {/* ========================================
-            PANEL IA (DERECHA)
-        ======================================== */}
         {showIaPanel && (
           <div className="w-1/3 bg-gray-50 p-6 overflow-y-auto">
             <h3 className="text-lg font-bold mb-4">🤖 Asistente IA</h3>
             
-            {/* Botón generar */}
             <button
               onClick={generarAnalisisIA}
               disabled={iaLoading}
@@ -275,7 +310,6 @@ export default function ChatView() {
               {iaLoading ? '🤖 Analizando...' : '🤖 Generar Respuesta IA'}
             </button>
 
-            {/* Resultado IA */}
             {iaAnalisis && (
               <>
                 <div className="bg-white rounded-lg p-4 mb-4 border-2 border-purple-300">

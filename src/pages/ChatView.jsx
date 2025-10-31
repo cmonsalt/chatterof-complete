@@ -1,4 +1,3 @@
-// src/pages/ChatView.jsx
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
@@ -14,16 +13,14 @@ export default function ChatView() {
   const [messages, setMessages] = useState([]);
   const [loading, setLoading] = useState(true);
   const [newMessage, setNewMessage] = useState('');
-  const [debugInfo, setDebugInfo] = useState(null);
   
-  // Estado IA
   const [iaAnalisis, setIaAnalisis] = useState(null);
   const [iaLoading, setIaLoading] = useState(false);
   const [showIaPanel, setShowIaPanel] = useState(true);
 
   useEffect(() => {
     loadFanAndMessages();
-    const interval = setInterval(loadFanAndMessages, 3000);
+    const interval = setInterval(loadFanAndMessages, 5000);
     return () => clearInterval(interval);
   }, [fanId, user]);
 
@@ -32,57 +29,30 @@ export default function ChatView() {
     
     const modelId = user.user_metadata.model_id;
 
-    console.log('🔍 Buscando fan:', fanId);
-    console.log('📊 Model ID:', modelId);
-
     try {
-      // Primero buscar por fan_id exacto
-      let { data: fanData, error: fanError } = await supabase
+      const { data: fanData, error: fanError } = await supabase
         .from('fans')
         .select('*')
         .eq('fan_id', fanId)
         .eq('model_id', modelId)
         .single();
 
-      // Si no lo encuentra, buscar por username que contenga el número
-      if (fanError || !fanData) {
-        console.log('⚠️ No encontrado por fan_id, buscando por username...');
-        const { data: allFans } = await supabase
-          .from('fans')
-          .select('*')
-          .eq('model_id', modelId);
-        
-        console.log('👥 Todos los fans:', allFans);
-        
-        // Buscar fan que contenga el número en el username
-        fanData = allFans?.find(f => 
-          f.of_username?.includes(fanId) || 
-          f.fan_id === fanId
-        );
-
-        setDebugInfo({
-          searchedFanId: fanId,
-          modelId: modelId,
-          allFans: allFans,
-          foundFan: fanData
-        });
-      }
-
-      if (!fanData) {
-        console.error('❌ Fan no encontrado');
+      if (fanError) {
+        console.error('❌ Fan error:', fanError);
         setLoading(false);
         return;
       }
 
-      console.log('✅ Fan encontrado:', fanData);
       setFan(fanData);
 
+      // 🔥 AUMENTADO: 200 mensajes en vez de 50
       const { data: messagesData, error: messagesError } = await supabase
         .from('chat')
         .select('*')
-        .eq('fan_id', fanData.fan_id)
+        .eq('fan_id', fanId)
         .eq('model_id', modelId)
-        .order('ts', { ascending: true });
+        .order('ts', { ascending: true })
+        .limit(200);
 
       if (!messagesError) {
         setMessages(messagesData || []);
@@ -96,33 +66,61 @@ export default function ChatView() {
   }
 
   async function generarAnalisisIA() {
-    if (!user?.user_metadata?.model_id) return;
+    if (!user?.user_metadata?.model_id || !fan) return;
     
     setIaLoading(true);
     
     try {
       const modelId = user.user_metadata.model_id;
       
-      const { data, error } = await supabase.functions.invoke('chat-generate', {
-        body: {
-          model_id: modelId,
-          fan_id: fan.fan_id,
-          historial: messages.slice(-20),
-          fan_info: fan
-        }
+      // Obtener últimos 20 mensajes para contexto
+      const contextMessages = messages.slice(-20);
+      
+      // Llamar a API de Claude directamente (sin Edge Function)
+      const response = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': import.meta.env.VITE_ANTHROPIC_API_KEY,
+          'anthropic-version': '2023-06-01'
+        },
+        body: JSON.stringify({
+          model: 'claude-3-5-sonnet-20241022',
+          max_tokens: 1024,
+          messages: [{
+            role: 'user',
+            content: `Eres un asistente de chat para OnlyFans. Analiza esta conversación y genera una respuesta apropiada.
+
+Fan: ${fan.name || fan.of_username}
+Tier: ${fan.tier || 0}
+Total gastado: $${fan.spent_total || 0}
+
+Últimos mensajes:
+${contextMessages.map(m => `${m.from === 'fan' ? 'Fan' : 'Tú'}: ${m.message}`).join('\n')}
+
+Genera una respuesta coqueta, amigable y que incentive engagement. Si es apropiado, sugiere contenido premium.
+
+Responde SOLO con el mensaje, sin explicaciones adicionales.`
+          }]
+        })
       });
 
-      if (error) {
-        console.error('❌ IA error:', error);
-        alert('Error generando análisis IA');
-      } else {
-        console.log('✅ Análisis IA:', data);
-        setIaAnalisis(data);
-        setNewMessage(data.texto || '');
+      if (!response.ok) {
+        throw new Error('Error en API de Claude');
       }
+
+      const data = await response.json();
+      const textoGenerado = data.content[0].text;
+
+      setIaAnalisis({
+        texto: textoGenerado,
+        content_to_offer: null // Por ahora sin sugerencia de contenido
+      });
+      setNewMessage(textoGenerado);
+      
     } catch (error) {
       console.error('💥 Error IA:', error);
-      alert('Error generando análisis IA');
+      alert('Error generando respuesta IA. Verifica tu API key de Anthropic en .env');
     } finally {
       setIaLoading(false);
     }
@@ -137,7 +135,7 @@ export default function ChatView() {
       const { error } = await supabase
         .from('chat')
         .insert({
-          fan_id: fan.fan_id,
+          fan_id: fanId,
           model_id: modelId,
           message: newMessage,
           from: 'model',
@@ -179,24 +177,6 @@ export default function ChatView() {
             <p className="text-gray-600 mb-4">
               Este fan no existe o pertenece a otro modelo.
             </p>
-            
-            {/* Debug Info */}
-            {debugInfo && (
-              <div className="bg-gray-100 p-4 rounded-lg text-left max-w-md mx-auto mb-4">
-                <p className="text-xs font-mono">
-                  <strong>Buscado:</strong> {debugInfo.searchedFanId}<br/>
-                  <strong>Model ID:</strong> {debugInfo.modelId}<br/>
-                  <strong>Total fans:</strong> {debugInfo.allFans?.length || 0}<br/>
-                  <strong>Fans disponibles:</strong><br/>
-                  {debugInfo.allFans?.map(f => (
-                    <span key={f.id}>
-                      - {f.name} (@{f.of_username}) fan_id: {f.fan_id}<br/>
-                    </span>
-                  ))}
-                </p>
-              </div>
-            )}
-            
             <button 
               onClick={() => navigate('/dashboard')}
               className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
@@ -314,16 +294,8 @@ export default function ChatView() {
               <>
                 <div className="bg-white rounded-lg p-4 mb-4 border-2 border-purple-300">
                   <p className="text-sm font-semibold text-purple-700 mb-2">Respuesta Sugerida:</p>
-                  <p className="text-sm">{iaAnalisis.texto}</p>
+                  <p className="text-sm whitespace-pre-wrap">{iaAnalisis.texto}</p>
                 </div>
-
-                {iaAnalisis.content_to_offer && (
-                  <div className="bg-yellow-50 rounded-lg p-3 mb-4 border border-yellow-300">
-                    <p className="text-xs font-semibold text-yellow-800 mb-1">💰 Contenido Sugerido:</p>
-                    <p className="text-sm">{iaAnalisis.content_to_offer.titulo}</p>
-                    <p className="text-sm font-bold">${iaAnalisis.content_to_offer.precio}</p>
-                  </div>
-                )}
 
                 <button
                   onClick={() => {

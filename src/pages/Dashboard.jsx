@@ -30,7 +30,6 @@ export default function Dashboard() {
     }
 
     try {
-      // 🔥 OPTIMIZACIÓN: Un solo query para fans
       const { data: fansData, error: fansError } = await supabase
         .from('fans')
         .select('*')
@@ -39,19 +38,16 @@ export default function Dashboard() {
 
       if (fansError) throw fansError
 
-      // 🔥 OPTIMIZACIÓN: Un solo query para TODOS los últimos mensajes
       const fanIds = fansData?.map(f => f.fan_id) || []
       
       let lastMessagesMap = {}
       if (fanIds.length > 0) {
-        // Obtener último mensaje de cada fan en una sola query
         const { data: allMessages } = await supabase
           .from('chat')
           .select('fan_id, message, ts, from')
           .in('fan_id', fanIds)
           .order('ts', { ascending: false })
 
-        // Crear mapa con último mensaje de cada fan
         allMessages?.forEach(msg => {
           if (!lastMessagesMap[msg.fan_id]) {
             lastMessagesMap[msg.fan_id] = msg
@@ -59,7 +55,6 @@ export default function Dashboard() {
         })
       }
 
-      // Combinar fans con sus últimos mensajes
       const fansWithLastMessage = fansData.map(fan => {
         const lastMsg = lastMessagesMap[fan.fan_id]
         return {
@@ -70,20 +65,17 @@ export default function Dashboard() {
         }
       })
 
-      // Calcular chats activos (últimos 7 días)
       const sevenDaysAgo = new Date()
       sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7)
       const chatsActivos = fansWithLastMessage.filter(
         f => f.last_message_date && new Date(f.last_message_date) > sevenDaysAgo
       ).length
 
-      // Contar mensajes totales
       const { count: totalMensajes } = await supabase
         .from('chat')
         .select('*', { count: 'exact', head: true })
         .eq('model_id', actualModelId)
 
-      // Transacciones de hoy
       const hoy = new Date()
       hoy.setHours(0, 0, 0, 0)
       
