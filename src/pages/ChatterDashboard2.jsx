@@ -47,81 +47,80 @@ export default function ChatterDashboard() {
       chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight
     }
   }, [selectedFan?.history])
+const loadActiveChats = async () => {
+  try {
+    // Get all fans with recent activity (last 7 days)
+    const sevenDaysAgo = new Date()
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7)
 
-  const loadActiveChats = async () => {
-    try {
-      // Get all fans with recent activity (last 7 days) AND that have messages
-      const sevenDaysAgo = new Date()
-      sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7)
+    const { data: fans } = await supabase
+      .from('fans')
+      .select('*')
+      .eq('model_id', modelId)
+      .not('last_message_date', 'is', null)
+      .gte('last_message_date', sevenDaysAgo.toISOString())
+      .order('last_message_date', { ascending: false })
 
-      const { data: fans } = await supabase
-        .from('fans')
-        .select('*')
-        .eq('model_id', modelId)
-        .not('last_message_date', 'is', null)  // ✅ Solo fans con mensajes
-        .gte('last_message_date', sevenDaysAgo.toISOString())
-        .order('last_message_date', { ascending: false })
-
-      if (!fans || fans.length === 0) {
-        setActiveChats([])
-        return
-      }
-
-      // Get last message for each fan
-      const chatsWithMessages = await Promise.all(
-        fans.map(async (fan) => {
-          const { data: lastMessage } = await supabase
-            .from('chat')
-            .select('*')
-            .eq('fan_id', fan.fan_id)
-            .order('timestamp', { ascending: false })
-            .limit(1)
-            .single()
-
-          const { data: history } = await supabase
-            .from('chat')
-            .select('*')
-            .eq('fan_id', fan.fan_id)
-            .order('timestamp', { ascending: true })
-            .limit(50)
-
-          // Calculate time since last message
-          const lastMsgTime = lastMessage?.timestamp ? new Date(lastMessage.timestamp) : null
-          const minutesAgo = lastMsgTime ? Math.floor((Date.now() - lastMsgTime.getTime()) / 60000) : null
-
-          return {
-            ...fan,
-            lastMessage: lastMessage?.message || 'No messages yet',
-            lastMessageFrom: lastMessage?.from || null,
-            lastMessageTime: lastMsgTime,
-            minutesAgo,
-            history: history || [],
-            needsResponse: lastMessage?.from === 'fan'
-          }
-        })
-      )
-
-      // Filter out fans with no actual messages
-      const fansWithMessages = chatsWithMessages.filter(chat => chat.history.length > 0)
-
-      // Sort by priority: needs response first, then by time
-      const sorted = fansWithMessages.sort((a, b) => {
-        if (a.needsResponse && !b.needsResponse) return -1
-        if (!a.needsResponse && b.needsResponse) return 1
-        return (b.lastMessageTime?.getTime() || 0) - (a.lastMessageTime?.getTime() || 0)
-      })
-
-      setActiveChats(sorted)
-
-      // Update selected fan if exists
-      if (selectedFan) {
-        const updated = sorted.find(f => f.fan_id === selectedFan.fan_id)
-        if (updated) setSelectedFan(updated)
-      }
-    } catch (error) {
-      console.error('Error loading chats:', error)
+    if (!fans || fans.length === 0) {
+      setActiveChats([])
+      return
     }
+
+    // Get last message for each fan
+    const chatsWithMessages = await Promise.all(
+      fans.map(async (fan) => {
+        const { data: lastMessage } = await supabase
+          .from('chat')
+          .select('*')
+          .eq('fan_id', fan.fan_id)
+          .order('ts', { ascending: false })  // 🔥 CAMBIADO A ts
+          .limit(1)
+          .single()
+
+        const { data: history } = await supabase
+          .from('chat')
+          .select('*')
+          .eq('fan_id', fan.fan_id)
+          .order('ts', { ascending: true })  // 🔥 CAMBIADO A ts
+          .limit(50)
+
+        // Calculate time since last message
+        const lastMsgTime = lastMessage?.ts ? new Date(lastMessage.ts) : null  // 🔥 CAMBIADO A ts
+        const minutesAgo = lastMsgTime ? Math.floor((Date.now() - lastMsgTime.getTime()) / 60000) : null
+
+        return {
+          ...fan,
+          lastMessage: lastMessage?.message || 'No messages yet',
+          lastMessageFrom: lastMessage?.from || null,
+          lastMessageTime: lastMsgTime,
+          minutesAgo,
+          history: history || [],
+          needsResponse: lastMessage?.from === 'fan'
+        }
+      })
+    )
+
+    // Filter out fans with no actual messages
+    const fansWithMessages = chatsWithMessages.filter(chat => chat.history.length > 0)
+
+    // Sort by priority: needs response first, then by time
+    const sorted = fansWithMessages.sort((a, b) => {
+      if (a.needsResponse && !b.needsResponse) return -1
+      if (!a.needsResponse && b.needsResponse) return 1
+      return (b.lastMessageTime?.getTime() || 0) - (a.lastMessageTime?.getTime() || 0)
+    })
+
+    setActiveChats(sorted)
+
+    // Update selected fan if exists
+    if (selectedFan) {
+      const updated = sorted.find(f => f.fan_id === selectedFan.fan_id)
+      if (updated) setSelectedFan(updated)
+    }
+  } catch (error) {
+    console.error('Error loading chats:', error)
   }
+}
 
   const loadTodayStats = async () => {
     try {
