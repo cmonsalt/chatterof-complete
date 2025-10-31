@@ -96,8 +96,8 @@ export default function ChatView() {
         alert('Error generando análisis IA');
       } else {
         console.log('✅ Análisis IA:', data);
-        setIaAnalisis(data);
-        setNewMessage(data.texto || '');
+        setIaAnalisis(data.response);
+        setNewMessage(data.response.texto || '');
       }
       
     } catch (error) {
