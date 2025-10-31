@@ -244,6 +244,16 @@ export default function ChatViewEnhanced() {
                       ⭐ {fan.interests}
                     </span>
                   )}
+                  {fan.birthday && (
+                    <span className="bg-pink-50 text-pink-700 px-3 py-1 rounded-full">
+                      🎂 {fan.birthday}
+                    </span>
+                  )}
+                  {fan.relationship_status && (
+                    <span className="bg-rose-50 text-rose-700 px-3 py-1 rounded-full">
+                      💑 {fan.relationship_status}
+                    </span>
+                  )}
                 </div>
               </div>
               <div className="flex items-center gap-4">
