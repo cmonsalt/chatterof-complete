@@ -45,7 +45,6 @@ export default function ChatView() {
 
       setFan(fanData);
 
-      // 🔥 AUMENTADO: 200 mensajes en vez de 50
       const { data: messagesData, error: messagesError } = await supabase
         .from('chat')
         .select('*')
@@ -65,6 +64,7 @@ export default function ChatView() {
     }
   }
 
+  // 🔥 USANDO EDGE FUNCTION IGUAL QUE ChatterDashboard
   async function generarAnalisisIA() {
     if (!user?.user_metadata?.model_id || !fan) return;
     
@@ -73,54 +73,36 @@ export default function ChatView() {
     try {
       const modelId = user.user_metadata.model_id;
       
-      // Obtener últimos 20 mensajes para contexto
-      const contextMessages = messages.slice(-20);
+      // Obtener último mensaje del fan
+      const lastFanMessage = messages.filter(m => m.from === 'fan').slice(-1)[0];
       
-      // Llamar a API de Claude directamente (sin Edge Function)
-      const response = await fetch('https://api.anthropic.com/v1/messages', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-api-key': import.meta.env.VITE_ANTHROPIC_API_KEY,
-          'anthropic-version': '2023-06-01'
-        },
-        body: JSON.stringify({
-          model: 'claude-3-5-sonnet-20241022',
-          max_tokens: 1024,
-          messages: [{
-            role: 'user',
-            content: `Eres un asistente de chat para OnlyFans. Analiza esta conversación y genera una respuesta apropiada.
-
-Fan: ${fan.name || fan.of_username}
-Tier: ${fan.tier || 0}
-Total gastado: $${fan.spent_total || 0}
-
-Últimos mensajes:
-${contextMessages.map(m => `${m.from === 'fan' ? 'Fan' : 'Tú'}: ${m.message}`).join('\n')}
-
-Genera una respuesta coqueta, amigable y que incentive engagement. Si es apropiado, sugiere contenido premium.
-
-Responde SOLO con el mensaje, sin explicaciones adicionales.`
-          }]
-        })
-      });
-
-      if (!response.ok) {
-        throw new Error('Error en API de Claude');
+      if (!lastFanMessage) {
+        alert('No hay mensajes del fan para analizar');
+        setIaLoading(false);
+        return;
       }
 
-      const data = await response.json();
-      const textoGenerado = data.content[0].text;
-
-      setIaAnalisis({
-        texto: textoGenerado,
-        content_to_offer: null // Por ahora sin sugerencia de contenido
+      // 🔥 LLAMAR EDGE FUNCTION (igual que ChatterDashboard)
+      const { data, error } = await supabase.functions.invoke('chat-generate', {
+        body: {
+          model_id: modelId,
+          fan_id: fanId,
+          message: lastFanMessage.message
+        }
       });
-      setNewMessage(textoGenerado);
+
+      if (error) {
+        console.error('❌ IA error:', error);
+        alert('Error generando análisis IA');
+      } else {
+        console.log('✅ Análisis IA:', data);
+        setIaAnalisis(data);
+        setNewMessage(data.texto || '');
+      }
       
     } catch (error) {
       console.error('💥 Error IA:', error);
-      alert('Error generando respuesta IA. Verifica tu API key de Anthropic en .env');
+      alert('Error generando respuesta IA');
     } finally {
       setIaLoading(false);
     }
@@ -296,6 +278,14 @@ Responde SOLO con el mensaje, sin explicaciones adicionales.`
                   <p className="text-sm font-semibold text-purple-700 mb-2">Respuesta Sugerida:</p>
                   <p className="text-sm whitespace-pre-wrap">{iaAnalisis.texto}</p>
                 </div>
+
+                {iaAnalisis.content_to_offer && (
+                  <div className="bg-yellow-50 rounded-lg p-3 mb-4 border border-yellow-300">
+                    <p className="text-xs font-semibold text-yellow-800 mb-1">💰 Contenido Sugerido:</p>
+                    <p className="text-sm">{iaAnalisis.content_to_offer.titulo}</p>
+                    <p className="text-sm font-bold">${iaAnalisis.content_to_offer.precio}</p>
+                  </div>
+                )}
 
                 <button
                   onClick={() => {
