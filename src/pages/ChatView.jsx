@@ -4,7 +4,6 @@ import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
 import Navbar from '../components/Navbar'
 import TransactionModal from '../components/TransactionModal'
-import ChatterNotes from '../components/ChatterNotes' // YA ESTÁ IMPORTADO ✅
 
 export default function ChatViewEnhanced() {
   const { fanId } = useParams()
@@ -21,7 +20,6 @@ export default function ChatViewEnhanced() {
   const [showTransactionModal, setShowTransactionModal] = useState(false)
   const [detectedInfo, setDetectedInfo] = useState(null)
   const [showUpdateBanner, setShowUpdateBanner] = useState(false)
-  
 
   const chatEndRef = useRef(null)
 
@@ -281,13 +279,7 @@ export default function ChatViewEnhanced() {
             </div>
           </div>
 
-          {/* 📝 CHATTER NOTES - AQUÍ VA ✅ */}
-          <ChatterNotes 
-            fan={fan} 
-            onUpdate={(updatedFan) => setFan(updatedFan)}
-          />
-
-          {/* Chat Grid */}
+          {/* Update Banner */}
           <div className="grid grid-cols-2 gap-6">
             
             {/* Left: Chat History */}
