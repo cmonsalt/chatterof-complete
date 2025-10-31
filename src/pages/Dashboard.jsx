@@ -1,7 +1,7 @@
 // src/pages/Dashboard.jsx
 import { useState, useEffect } from 'react';
-import { supabase } from '../lib/supabase';  // ✅ CORRECTO
-import { useAuth } from '../contexts/AuthContext';  // ✅ CAMBIA ESTO
+import { supabase } from '../lib/supabase';
+import { useAuth } from '../contexts/AuthContext';
 import { ordenarFansPorPrioridad } from '../utils/fanPriority';
 import FanCard from '../components/FanCard';
 
@@ -19,31 +19,61 @@ export default function Dashboard() {
   }, [user]);
 
   async function cargarDatos() {
-    if (!user?.user_metadata?.model_id) return;
+    console.log('🔍 Cargando datos...');
+    console.log('👤 User:', user);
+    
+    if (!user?.user_metadata?.model_id) {
+      console.log('❌ No model_id encontrado');
+      setLoading(false);
+      return;
+    }
     
     const modelId = user.user_metadata.model_id;
+    console.log('✅ Model ID:', modelId);
 
     try {
-      const { data: fansData } = await supabase
+      // Cargar fans
+      console.log('📊 Cargando fans...');
+      const { data: fansData, error: fansError } = await supabase
         .from('fans')
         .select('*')
         .eq('model_id', modelId);
 
-      const { data: mensajesData } = await supabase
+      console.log('👥 Fans:', fansData);
+      if (fansError) console.log('❌ Fans error:', fansError);
+
+      // Cargar mensajes
+      console.log('💬 Cargando mensajes...');
+      const { data: mensajesData, error: mensajesError } = await supabase
         .from('chat')
         .select('*')
         .eq('model_id', modelId)
         .order('ts', { ascending: false })
         .limit(100);
 
+      console.log('📨 Mensajes:', mensajesData);
+      if (mensajesError) console.log('❌ Mensajes error:', mensajesError);
+
+      // Cargar transacciones de hoy
       const hoy = new Date().toISOString().split('T')[0];
-      const { data: transaccionesHoy } = await supabase
+      console.log('💰 Cargando transacciones desde:', hoy);
+      
+      const { data: transaccionesHoy, error: transaccionesError } = await supabase
         .from('transactions')
         .select('amount')
         .eq('model_id', modelId)
         .gte('created_at', hoy);
 
+      console.log('💵 Transacciones hoy:', transaccionesHoy);
+      if (transaccionesError) console.log('❌ Transacciones error:', transaccionesError);
+
       const totalHoy = transaccionesHoy?.reduce((sum, t) => sum + (t.amount || 0), 0) || 0;
+
+      console.log('📊 Stats calculadas:', {
+        totalHoy,
+        fansCount: fansData?.length || 0,
+        mensajesCount: mensajesData?.length || 0
+      });
 
       setFans(fansData || []);
       setMensajes(mensajesData || []);
@@ -53,13 +83,15 @@ export default function Dashboard() {
         mensajes: mensajesData?.length || 0
       });
       setLoading(false);
+      console.log('✅ Datos cargados exitosamente');
     } catch (error) {
-      console.error('Error cargando datos:', error);
+      console.error('💥 Error general cargando datos:', error);
       setLoading(false);
     }
   }
 
   const fansConPrioridad = ordenarFansPorPrioridad(fans, mensajes);
+  console.log('🎯 Fans con prioridad:', fansConPrioridad);
 
   if (loading) {
     return (
