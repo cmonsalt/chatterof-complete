@@ -1,7 +1,7 @@
 // src/pages/Dashboard.jsx
 import { useState, useEffect } from 'react';
-import { supabase } from '../lib/supabase'; 
-import { useAuth } from '../AuthContext';
+import { supabase } from '../lib/supabase';  // ✅ CORRECTO
+import { useAuth } from '../contexts/AuthContext';  // ✅ CAMBIA ESTO
 import { ordenarFansPorPrioridad } from '../utils/fanPriority';
 import FanCard from '../components/FanCard';
 
@@ -14,7 +14,7 @@ export default function Dashboard() {
 
   useEffect(() => {
     cargarDatos();
-    const interval = setInterval(cargarDatos, 5000); // Refresh cada 5s
+    const interval = setInterval(cargarDatos, 5000);
     return () => clearInterval(interval);
   }, [user]);
 
@@ -24,13 +24,11 @@ export default function Dashboard() {
     const modelId = user.user_metadata.model_id;
 
     try {
-      // Cargar fans
       const { data: fansData } = await supabase
         .from('fans')
         .select('*')
         .eq('model_id', modelId);
 
-      // Cargar mensajes (últimos 100)
       const { data: mensajesData } = await supabase
         .from('chat')
         .select('*')
@@ -38,7 +36,6 @@ export default function Dashboard() {
         .order('ts', { ascending: false })
         .limit(100);
 
-      // Cargar transacciones de hoy
       const hoy = new Date().toISOString().split('T')[0];
       const { data: transaccionesHoy } = await supabase
         .from('transactions')
@@ -74,7 +71,6 @@ export default function Dashboard() {
 
   return (
     <div className="max-w-7xl mx-auto p-6">
-      {/* Header con stats */}
       <div className="mb-8">
         <h1 className="text-3xl font-bold mb-4">Dashboard</h1>
         
@@ -96,7 +92,6 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* Lista de fans con semáforos */}
       <div>
         <h2 className="text-xl font-bold mb-4">Fans Activos</h2>
         
