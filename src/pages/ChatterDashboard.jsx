@@ -5,8 +5,10 @@ import { supabase } from '../lib/supabase'
 import Navbar from '../components/Navbar'
 
 export default function ChatterDashboard() {
-  const { modelId } = useAuth()
+  const { user, modelId, loading } = useAuth()
   const navigate = useNavigate()
+  
+  const actualModelId = modelId || user?.user_metadata?.model_id
   
   const [activeChats, setActiveChats] = useState([])
   const [selectedFan, setSelectedFan] = useState(null)
@@ -27,8 +29,39 @@ export default function ChatterDashboard() {
 
   const chatContainerRef = useRef(null)
 
+  // Loading state
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <div className="text-xl">Loading...</div>
+      </div>
+    )
+  }
+
+  // No model ID
+  if (!actualModelId) {
+    return (
+      <>
+        <Navbar />
+        <div className="flex items-center justify-center h-screen">
+          <div className="text-center">
+            <h2 className="text-2xl font-bold mb-4">⚠️ No Model ID Found</h2>
+            <p className="text-gray-600 mb-4">Please configure your account first</p>
+            <button 
+              onClick={() => navigate('/settings')}
+              className="px-4 py-2 bg-blue-500 text-white rounded"
+            >
+              Go to Settings
+            </button>
+          </div>
+        </div>
+      </>
+    )
+  }
+
   useEffect(() => {
-    if (modelId) {
+    if (actualModelId) {
+      console.log('🔥 ChatterDashboard loaded with modelId:', actualModelId)
       loadActiveChats()
       loadTodayStats()
       
@@ -39,7 +72,7 @@ export default function ChatterDashboard() {
       
       return () => clearInterval(interval)
     }
-  }, [modelId])
+  }, [actualModelId])
 
   useEffect(() => {
     // Auto-scroll to bottom when chat updates
@@ -57,7 +90,7 @@ export default function ChatterDashboard() {
       const { data: fans } = await supabase
         .from('fans')
         .select('*')
-        .eq('model_id', modelId)
+        .eq('model_id', actualModelId)
         .not('last_message_date', 'is', null)  // ✅ Solo fans con mensajes
         .gte('last_message_date', sevenDaysAgo.toISOString())
         .order('last_message_date', { ascending: false })
@@ -139,7 +172,7 @@ export default function ChatterDashboard() {
       const { data: transactions } = await supabase
         .from('transactions')
         .select('*')
-        .eq('model_id', modelId)
+        .eq('model_id', actualModelId)
         .gte('ts', today.toISOString())
 
       const sales = transactions?.filter(t => t.type === 'compra') || []
@@ -164,7 +197,7 @@ export default function ChatterDashboard() {
     try {
       const { data, error } = await supabase.functions.invoke('chat-generate', {
         body: {
-          model_id: modelId,
+          model_id: actualModelId,
           fan_id: selectedFan.fan_id,
           message: message.trim()
         }
@@ -191,7 +224,7 @@ export default function ChatterDashboard() {
       // Save fan message
       await supabase.from('chat').insert({
         fan_id: selectedFan.fan_id,
-        model_id: modelId,
+        model_id: actualModelId,
         from: 'fan',
         message: message.trim(),
         ts: new Date().toISOString()  // 🔥 CAMBIADO A ts
@@ -200,7 +233,7 @@ export default function ChatterDashboard() {
       // Save AI response
       await supabase.from('chat').insert({
         fan_id: selectedFan.fan_id,
-        model_id: modelId,
+        model_id: actualModelId,
         from: 'model',
         message: text.trim(),
         ts: new Date().toISOString()  // 🔥 CAMBIADO A ts
