@@ -11,40 +11,66 @@ export default function Dashboard() {
 
   useEffect(() => {
     cargarDatos();
-    // Refresh cada 5 segundos
     const interval = setInterval(cargarDatos, 5000);
     return () => clearInterval(interval);
   }, [user]);
 
   async function cargarDatos() {
-    if (!user?.user_metadata?.model_id) return;
+    console.log('🔍 Cargando datos...');
+    console.log('👤 User:', user);
+    
+    if (!user?.user_metadata?.model_id) {
+      console.log('❌ No model_id encontrado');
+      setLoading(false);
+      return;
+    }
     
     const modelId = user.user_metadata.model_id;
+    console.log('✅ Model ID:', modelId);
 
     try {
       // Cargar fans
-      const { data: fansData } = await supabase
+      console.log('📊 Cargando fans...');
+      const { data: fansData, error: fansError } = await supabase
         .from('fans')
         .select('*')
         .eq('model_id', modelId);
 
+      console.log('👥 Fans:', fansData);
+      if (fansError) console.log('❌ Fans error:', fansError);
+
       // Cargar mensajes
-      const { data: mensajesData } = await supabase
+      console.log('💬 Cargando mensajes...');
+      const { data: mensajesData, error: mensajesError } = await supabase
         .from('chat')
         .select('*')
         .eq('model_id', modelId)
         .order('ts', { ascending: false })
         .limit(100);
 
+      console.log('📨 Mensajes:', mensajesData);
+      if (mensajesError) console.log('❌ Mensajes error:', mensajesError);
+
       // Cargar transacciones de hoy
       const hoy = new Date().toISOString().split('T')[0];
-      const { data: transaccionesHoy } = await supabase
+      console.log('💰 Cargando transacciones desde:', hoy);
+      
+      const { data: transaccionesHoy, error: transaccionesError } = await supabase
         .from('transactions')
         .select('amount')
         .eq('model_id', modelId)
         .gte('created_at', hoy);
 
+      console.log('💵 Transacciones hoy:', transaccionesHoy);
+      if (transaccionesError) console.log('❌ Transacciones error:', transaccionesError);
+
       const totalHoy = transaccionesHoy?.reduce((sum, t) => sum + (t.amount || 0), 0) || 0;
+
+      console.log('📊 Stats calculadas:', {
+        totalHoy,
+        fansCount: fansData?.length || 0,
+        mensajesCount: mensajesData?.length || 0
+      });
 
       setFans(fansData || []);
       setStats({
@@ -53,19 +79,23 @@ export default function Dashboard() {
         mensajes: mensajesData?.length || 0
       });
       setLoading(false);
+      console.log('✅ Datos cargados exitosamente');
     } catch (error) {
-      console.error('Error cargando datos:', error);
+      console.error('💥 Error general cargando datos:', error);
       setLoading(false);
     }
   }
 
   if (loading) {
-    return <div className="flex items-center justify-center h-screen">Cargando...</div>;
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <div className="text-xl">Cargando...</div>
+      </div>
+    );
   }
 
   return (
     <div className="max-w-7xl mx-auto p-6">
-      {/* Stats */}
       <h1 className="text-3xl font-bold mb-4">Dashboard</h1>
       
       <div className="grid grid-cols-3 gap-4 mb-8">
@@ -85,7 +115,6 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* Lista de fans */}
       <h2 className="text-xl font-bold mb-4">Fans Activos</h2>
       
       {fans.length === 0 ? (
