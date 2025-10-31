@@ -1,6 +1,6 @@
 // src/pages/Dashboard.jsx
 import { useState, useEffect } from 'react';
-import { supabase } from '../supabase';
+import { supabase } from '../lib/supabase'; 
 import { useAuth } from '../AuthContext';
 import { ordenarFansPorPrioridad } from '../utils/fanPriority';
 import FanCard from '../components/FanCard';
