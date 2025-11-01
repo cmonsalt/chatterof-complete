@@ -153,7 +153,7 @@ export default function Settings() {
         .select('last_sync, is_active')
         .eq('model_id', modelId)
         .eq('is_active', true)
-        .single()
+        .maybeSingle()
       
       if (data) {
         setIsConnected(true)

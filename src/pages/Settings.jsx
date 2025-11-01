@@ -148,19 +148,15 @@ export default function Settings() {
   // ✨ Check OnlyFans Connection
   const checkConnection = async () => {
     try {
-      const { data } = await supabase
-        .from('of_sessions')
-        .select('last_sync, is_active')
-        .eq('model_id', modelId)
-        .eq('is_active', true)
-        .maybeSingle()
+      const response = await fetch(`/api/check-connection?modelId=${modelId}`);
+      const data = await response.json();
       
-      if (data) {
-        setIsConnected(true)
-        setLastSync(new Date(data.last_sync).toLocaleString())
+      if (data.connected) {
+        setIsConnected(true);
+        setLastSync(new Date(data.lastSync).toLocaleString());
       }
     } catch (error) {
-      console.log('No OF connection')
+      console.log('No OF connection');
     }
   }
 
