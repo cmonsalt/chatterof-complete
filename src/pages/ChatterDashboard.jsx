@@ -464,8 +464,8 @@ export default function ChatterDashboard() {
                       </div>
                       
                       <div className="bg-white rounded p-3 mb-3">
-                        <p className="text-sm">
-                          {aiSuggestion.texto || aiSuggestion.response || aiSuggestion.message || JSON.stringify(aiSuggestion)}
+                        <p className="text-sm whitespace-pre-wrap">
+                          {aiSuggestion.texto || 'No response generated'}
                         </p>
                       </div>
 
@@ -477,10 +477,16 @@ export default function ChatterDashboard() {
                         </div>
                       )}
 
+                      {aiSuggestion.detected_info && (
+                        <div className="bg-blue-50 border border-blue-300 rounded p-2 mb-3 text-xs">
+                          <strong>ℹ️ Detected Info:</strong> {JSON.stringify(aiSuggestion.detected_info)}
+                        </div>
+                      )}
+
                       <div className="flex gap-2">
                         <button
-                          onClick={() => handleSendMessage(aiSuggestion.texto || aiSuggestion.response || aiSuggestion.message)}
-                          disabled={sending}
+                          onClick={() => handleSendMessage(aiSuggestion.texto)}
+                          disabled={sending || !aiSuggestion.texto}
                           className="flex-1 bg-green-500 hover:bg-green-600 text-white py-2 rounded-lg font-semibold disabled:opacity-50"
                         >
                           ✅ Send As-Is
@@ -494,9 +500,10 @@ export default function ChatterDashboard() {
                         </button>
                         <button
                           onClick={() => {
-                            const textToCopy = aiSuggestion.texto || aiSuggestion.response || aiSuggestion.message
-                            navigator.clipboard.writeText(textToCopy)
-                            alert('✅ Copied to clipboard!')
+                            if (aiSuggestion.texto) {
+                              navigator.clipboard.writeText(aiSuggestion.texto)
+                              alert('✅ Copied to clipboard!')
+                            }
                           }}
                           className="px-4 bg-gray-500 hover:bg-gray-600 text-white py-2 rounded-lg font-semibold"
                         >
