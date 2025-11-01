@@ -391,8 +391,8 @@ export default function ChatView() {
                   >
                     <p className="text-sm whitespace-pre-wrap">{msg.message}</p>
                     
-                    {/* 🔥 MOSTRAR TIP/PPV/PPV LOCKED */}
-                    {msg.amount && (
+                    {/* 🔥 MOSTRAR TIP/PPV/PPV LOCKED SOLO SI TIENE AMOUNT */}
+                    {msg.amount && msg.amount > 0 && (
                       <div className={`mt-2 px-2 py-1 rounded text-xs font-bold ${
                         msg.message_type === 'tip' ? 'bg-green-100 text-green-700' :
                         msg.message_type === 'ppv_unlocked' ? 'bg-blue-100 text-blue-700' :
@@ -405,12 +405,25 @@ export default function ChatView() {
                       </div>
                     )}
                     
-                    {/* 🔥 MOSTRAR IMÁGENES REALES */}
+                    {/* 🔥 MOSTRAR SOLO IMÁGENES (NO VIDEOS) */}
                     {msg.media_urls && (() => {
                       try {
                         const urls = JSON.parse(msg.media_urls);
+                        
+                        // 🔥 Filtrar solo imágenes (no videos)
+                        const imageUrls = urls.filter(url => {
+                          const lower = url.toLowerCase();
+                          return lower.includes('.jpg') || 
+                                 lower.includes('.jpeg') || 
+                                 lower.includes('.png') || 
+                                 lower.includes('.gif') || 
+                                 lower.includes('.webp') ||
+                                 lower.includes('/thumb/') ||
+                                 lower.includes('/image/');
+                        });
+                        
                         // 🔥 Eliminar duplicados
-                        const uniqueUrls = [...new Set(urls)];
+                        const uniqueUrls = [...new Set(imageUrls)];
                         
                         if (uniqueUrls.length === 0) return null;
                         
@@ -438,7 +451,7 @@ export default function ChatView() {
                               ))}
                             </div>
                             
-                            {/* Contador */}
+                            {/* Contador solo si hay imágenes */}
                             <span className="text-xs bg-purple-100 text-purple-700 px-2 py-1 rounded inline-block">
                               📷 {uniqueUrls.length} imagen(es)
                             </span>
