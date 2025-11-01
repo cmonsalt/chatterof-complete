@@ -12,6 +12,7 @@ export default function ChatterDashboard() {
   
   const [activeChats, setActiveChats] = useState([])
   const [selectedFan, setSelectedFan] = useState(null)
+  const [message, setMessage] = useState('')
   const [aiSuggestion, setAiSuggestion] = useState(null)
   const [generating, setGenerating] = useState(false)
   const [sending, setSending] = useState(false)
@@ -27,17 +28,6 @@ export default function ChatterDashboard() {
   })
 
   const chatContainerRef = useRef(null)
-
-  // 🎨 Helper: Get Tier Badge with emoji + color
-  const getTierBadge = (tier) => {
-    const tiers = {
-      0: { emoji: '⚪', label: 'New Fan', color: 'bg-gray-100 text-gray-700' },
-      1: { emoji: '🟡', label: 'Regular', color: 'bg-yellow-100 text-yellow-700' },
-      2: { emoji: '🟢', label: 'VIP', color: 'bg-green-100 text-green-700' },
-      3: { emoji: '🟣', label: 'Whale', color: 'bg-purple-100 text-purple-700' }
-    }
-    return tiers[tier] || tiers[0]
-  }
 
   // Loading state
   if (loading) {
@@ -101,7 +91,7 @@ export default function ChatterDashboard() {
         .from('fans')
         .select('*')
         .eq('model_id', actualModelId)
-        .not('last_message_date', 'is', null)
+        .not('last_message_date', 'is', null)  // ✅ Solo fans con mensajes
         .gte('last_message_date', sevenDaysAgo.toISOString())
         .order('last_message_date', { ascending: false })
 
@@ -117,7 +107,7 @@ export default function ChatterDashboard() {
             .from('chat')
             .select('*')
             .eq('fan_id', fan.fan_id)
-            .order('ts', { ascending: false })
+            .order('ts', { ascending: false })  // 🔥 CAMBIADO A ts
             .limit(1)
             .single()
 
@@ -125,11 +115,11 @@ export default function ChatterDashboard() {
             .from('chat')
             .select('*')
             .eq('fan_id', fan.fan_id)
-            .order('ts', { ascending: true })
+            .order('ts', { ascending: true })  // 🔥 CAMBIADO A ts
             .limit(50)
 
           // Calculate time since last message
-          const lastMsgTime = lastMessage?.ts ? new Date(lastMessage.ts) : null
+          const lastMsgTime = lastMessage?.ts ? new Date(lastMessage.ts) : null  // 🔥 CAMBIADO A ts
           const minutesAgo = lastMsgTime ? Math.floor((Date.now() - lastMsgTime.getTime()) / 60000) : null
 
           return {
@@ -176,7 +166,7 @@ export default function ChatterDashboard() {
         .from('chat')
         .select('*')
         .eq('from', 'model')
-        .gte('ts', today.toISOString())
+        .gte('ts', today.toISOString())  // 🔥 CAMBIADO A ts
 
       // Sales today
       const { data: transactions } = await supabase
@@ -201,60 +191,69 @@ export default function ChatterDashboard() {
   }
 
   const handleGenerateAI = async () => {
-    if (!selectedFan) return
+    if (!message.trim() || !selectedFan) return
 
     setGenerating(true)
     try {
-      // Get the last fan message for context
-      const lastFanMessage = selectedFan.history
-        ?.filter(m => m.from === 'fan')
-        ?.slice(-1)[0]?.message || ''
-
       const { data, error } = await supabase.functions.invoke('chat-generate', {
         body: {
           model_id: actualModelId,
           fan_id: selectedFan.fan_id,
-          message: lastFanMessage
+          message: message.trim()
         }
       })
 
       if (error) throw error
 
-      setAiSuggestion(data)
+      if (data.success) {
+        setAiSuggestion(data.response)
+      }
     } catch (error) {
-      console.error('Error generating AI:', error)
-      alert('Error generating AI response')
+      console.error('Error generating:', error)
+      alert('Error generating response')
     } finally {
       setGenerating(false)
     }
   }
 
-  const handleSendMessage = async (messageText) => {
-    if (!messageText.trim() || !selectedFan) return
+  const handleSendMessage = async (text) => {
+    if (!text?.trim() || !selectedFan) return
 
     setSending(true)
     try {
-      const { error } = await supabase
-        .from('chat')
-        .insert({
-          fan_id: selectedFan.fan_id,
-          model_id: actualModelId,
-          from: 'model',
-          message: messageText,
-          message_type: 'text',
-          ts: new Date().toISOString(),
-          source: 'manual'
-        })
+      // Save fan message
+      await supabase.from('chat').insert({
+        fan_id: selectedFan.fan_id,
+        model_id: actualModelId,
+        from: 'fan',
+        message: message.trim(),
+        ts: new Date().toISOString()  // 🔥 CAMBIADO A ts
+      })
 
-      if (error) throw error
+      // Save AI response
+      await supabase.from('chat').insert({
+        fan_id: selectedFan.fan_id,
+        model_id: actualModelId,
+        from: 'model',
+        message: text.trim(),
+        ts: new Date().toISOString()  // 🔥 CAMBIADO A ts
+      })
 
-      // Clear AI suggestion
+      // Update fan's last message date
+      await supabase
+        .from('fans')
+        .update({ last_message_date: new Date().toISOString() })
+        .eq('fan_id', selectedFan.fan_id)
+
+      // Clear form
+      setMessage('')
       setAiSuggestion(null)
-
-      // Reload chats
-      await loadActiveChats()
+      
+      // Reload
+      loadActiveChats()
+      loadTodayStats()
     } catch (error) {
-      console.error('Error sending message:', error)
+      console.error('Error sending:', error)
       alert('Error sending message')
     } finally {
       setSending(false)
@@ -263,12 +262,14 @@ export default function ChatterDashboard() {
 
   const getStatusColor = (chat) => {
     if (chat.needsResponse) return 'bg-red-500'
-    if (chat.minutesAgo < 60) return 'bg-green-500'
+    if (chat.minutesAgo < 5) return 'bg-green-500'
+    if (chat.minutesAgo < 30) return 'bg-yellow-500'
     return 'bg-gray-400'
   }
 
   const getTimeText = (chat) => {
-    if (!chat.minutesAgo) return 'Unknown'
+    if (!chat.minutesAgo) return 'Never'
+    if (chat.minutesAgo < 1) return 'Just now'
     if (chat.minutesAgo < 60) return `${chat.minutesAgo}m ago`
     const hours = Math.floor(chat.minutesAgo / 60)
     if (hours < 24) return `${hours}h ago`
@@ -276,50 +277,53 @@ export default function ChatterDashboard() {
     return `${days}d ago`
   }
 
-  const filteredChats = activeChats.filter(chat =>
-    chat.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    chat.of_username?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    chat.fan_id?.toLowerCase().includes(searchQuery.toLowerCase())
-  )
+  const filteredChats = searchQuery
+    ? activeChats.filter(c =>
+        c.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        c.fan_id?.toLowerCase().includes(searchQuery.toLowerCase())
+      )
+    : activeChats
 
   return (
     <>
       <Navbar />
-      <div className="min-h-screen bg-gradient-to-br from-purple-50 to-pink-50">
+      <div className="min-h-screen bg-gray-50">
         <div className="max-w-7xl mx-auto p-6">
-          {/* Stats Row */}
+          
+          {/* Stats Bar */}
           <div className="grid grid-cols-5 gap-4 mb-6">
-            <div className="bg-white rounded-xl shadow-lg p-4">
-              <p className="text-sm text-gray-600 font-semibold">Messages Today</p>
-              <p className="text-3xl font-bold text-blue-600">{todayStats.messagesSent}</p>
+            <div className="bg-white rounded-lg shadow p-4">
+              <div className="text-sm text-gray-600">Messages Today</div>
+              <div className="text-2xl font-bold text-blue-600">{todayStats.messagesSent}</div>
             </div>
-            <div className="bg-white rounded-xl shadow-lg p-4">
-              <p className="text-sm text-gray-600 font-semibold">Sales Today</p>
-              <p className="text-3xl font-bold text-green-600">{todayStats.sales}</p>
+            <div className="bg-white rounded-lg shadow p-4">
+              <div className="text-sm text-gray-600">Sales Today</div>
+              <div className="text-2xl font-bold text-green-600">{todayStats.sales}</div>
             </div>
-            <div className="bg-white rounded-xl shadow-lg p-4">
-              <p className="text-sm text-gray-600 font-semibold">Revenue Today</p>
-              <p className="text-3xl font-bold text-green-600">${todayStats.revenue}</p>
+            <div className="bg-white rounded-lg shadow p-4">
+              <div className="text-sm text-gray-600">Revenue Today</div>
+              <div className="text-2xl font-bold text-green-600">${todayStats.revenue}</div>
             </div>
-            <div className="bg-white rounded-xl shadow-lg p-4">
-              <p className="text-sm text-gray-600 font-semibold">Active Chats</p>
-              <p className="text-3xl font-bold text-orange-600">{todayStats.activeFans}</p>
+            <div className="bg-white rounded-lg shadow p-4">
+              <div className="text-sm text-gray-600">Active Chats</div>
+              <div className="text-2xl font-bold text-orange-600">{filteredChats.filter(c => c.needsResponse).length}</div>
             </div>
-            <div className="bg-white rounded-xl shadow-lg p-4">
-              <p className="text-sm text-gray-600 font-semibold">Avg Response</p>
-              <p className="text-3xl font-bold text-purple-600">{todayStats.avgResponseTime}m</p>
+            <div className="bg-white rounded-lg shadow p-4">
+              <div className="text-sm text-gray-600">Avg Response</div>
+              <div className="text-2xl font-bold text-purple-600">{todayStats.avgResponseTime}m</div>
             </div>
           </div>
 
           <div className="grid grid-cols-3 gap-6">
-            {/* Left: Fan List */}
-            <div className="bg-white rounded-xl shadow-lg p-6">
+            
+            {/* Left: Chat List */}
+            <div className="bg-white rounded-xl shadow-lg p-4">
               <div className="mb-4">
                 <input
                   type="text"
+                  placeholder="🔍 Search fans..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="🔍 Search fans..."
                   className="w-full px-4 py-2 border rounded-lg"
                 />
               </div>
@@ -336,41 +340,42 @@ export default function ChatterDashboard() {
                     </p>
                   </div>
                 ) : (
-                  filteredChats.map((chat) => {
-                    const tierBadge = getTierBadge(chat.tier || 0)
-                    return (
-                      <div
-                        key={chat.fan_id}
-                        onClick={() => setSelectedFan(chat)}
-                        className={`p-3 rounded-lg cursor-pointer transition-all ${
-                          selectedFan?.fan_id === chat.fan_id
-                            ? 'bg-blue-50 border-2 border-blue-500'
-                            : 'bg-gray-50 hover:bg-gray-100'
-                        }`}
-                      >
-                        <div className="flex items-center justify-between mb-1">
-                          <div className="flex items-center gap-2">
-                            <div className={`w-3 h-3 rounded-full ${getStatusColor(chat)}`}></div>
-                            <span className="font-semibold text-sm">{chat.name}</span>
-                          </div>
-                          <span className="text-xs text-gray-500">{getTimeText(chat)}</span>
-                        </div>
-                        
-                        <div className="flex items-center justify-between text-xs mb-2">
-                          <span className={`px-2 py-0.5 rounded-full font-semibold ${tierBadge.color}`}>
-                            {tierBadge.emoji} {tierBadge.label}
-                          </span>
-                          <span className="font-semibold text-green-600">${chat.spent_total || 0}</span>
-                        </div>
-
-                        <div className="text-xs text-gray-600 truncate">
-                          {chat.lastMessageFrom === 'fan' && '👤 '}
-                          {chat.lastMessageFrom === 'model' && '💎 '}
-                          {chat.lastMessage}
-                        </div>
+                  filteredChats.map((chat) => (
+                  <div
+                    key={chat.fan_id}
+                    onClick={() => setSelectedFan(chat)}
+                    className={`p-3 rounded-lg cursor-pointer transition-all ${
+                      selectedFan?.fan_id === chat.fan_id
+                        ? 'bg-blue-50 border-2 border-blue-500'
+                        : 'bg-gray-50 hover:bg-gray-100'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between mb-1">
+                      <div className="flex items-center gap-2">
+                        <div className={`w-3 h-3 rounded-full ${getStatusColor(chat)}`}></div>
+                        <span className="font-semibold text-sm">{chat.name}</span>
                       </div>
-                    )
-                  })
+                      <span className="text-xs text-gray-500">{getTimeText(chat)}</span>
+                    </div>
+                    
+                    <div className="flex items-center justify-between text-xs">
+                      <span className={`px-2 py-0.5 rounded-full ${
+                        chat.tier === 'WHALE' ? 'bg-purple-100 text-purple-800' :
+                        chat.tier === 'VIP' ? 'bg-blue-100 text-blue-800' :
+                        'bg-gray-100 text-gray-600'
+                      }`}>
+                        {chat.tier}
+                      </span>
+                      <span className="font-semibold text-green-600">${chat.spent_total}</span>
+                    </div>
+
+                    <div className="mt-2 text-xs text-gray-600 truncate">
+                      {chat.lastMessageFrom === 'fan' && '👤 '}
+                      {chat.lastMessageFrom === 'model' && '💎 '}
+                      {chat.lastMessage}
+                    </div>
+                  </div>
+                  ))
                 )}
               </div>
             </div>
@@ -384,22 +389,21 @@ export default function ChatterDashboard() {
                     <div className="flex items-center justify-between">
                       <div>
                         <h2 className="text-xl font-bold">{selectedFan.name}</h2>
-                        <div className="flex items-center gap-3 text-sm text-gray-600 mt-1">
+                        <div className="flex items-center gap-3 text-sm text-gray-600">
                           <span>{selectedFan.fan_id}</span>
-                          {(() => {
-                            const tierBadge = getTierBadge(selectedFan.tier || 0)
-                            return (
-                              <span className={`px-2 py-0.5 rounded-full font-semibold ${tierBadge.color}`}>
-                                {tierBadge.emoji} {tierBadge.label}
-                              </span>
-                            )
-                          })()}
-                          <span className="font-semibold text-green-600">${selectedFan.spent_total || 0}</span>
+                          <span className={`px-2 py-0.5 rounded-full ${
+                            selectedFan.tier === 'WHALE' ? 'bg-purple-100 text-purple-800' :
+                            selectedFan.tier === 'VIP' ? 'bg-blue-100 text-blue-800' :
+                            'bg-gray-100 text-gray-600'
+                          }`}>
+                            {selectedFan.tier}
+                          </span>
+                          <span className="font-semibold text-green-600">${selectedFan.spent_total}</span>
                         </div>
                       </div>
                       <button
                         onClick={() => navigate(`/chat/${selectedFan.fan_id}`)}
-                        className="text-blue-600 hover:text-blue-800 text-sm font-semibold"
+                        className="text-blue-600 hover:text-blue-800 text-sm"
                       >
                         Open Full View →
                       </button>
@@ -433,16 +437,28 @@ export default function ChatterDashboard() {
                     ))}
                   </div>
 
-                  {/* Generate AI Button - NO INPUT */}
-                  {!aiSuggestion && (
-                    <button
-                      onClick={handleGenerateAI}
-                      disabled={generating}
-                      className="w-full bg-gradient-to-r from-purple-500 to-pink-500 text-white py-3 rounded-lg font-semibold disabled:opacity-50 mb-4 hover:shadow-lg transition"
-                    >
-                      {generating ? '🤖 Generating...' : '🤖 Generate AI Response'}
-                    </button>
-                  )}
+                  {/* Fan Message Input */}
+                  <div className="mb-4">
+                    <label className="block text-sm font-semibold mb-2">
+                      👤 Fan's New Message
+                    </label>
+                    <textarea
+                      value={message}
+                      onChange={(e) => setMessage(e.target.value)}
+                      placeholder="Type what the fan said..."
+                      className="w-full px-4 py-2 border rounded-lg resize-none"
+                      rows="2"
+                    />
+                  </div>
+
+                  {/* Generate Button */}
+                  <button
+                    onClick={handleGenerateAI}
+                    disabled={!message.trim() || generating}
+                    className="w-full bg-gradient-to-r from-purple-500 to-pink-500 text-white py-3 rounded-lg font-semibold disabled:opacity-50 mb-4"
+                  >
+                    {generating ? '🤖 Generating...' : '🤖 Generate AI Response'}
+                  </button>
 
                   {/* AI Suggestion */}
                   {aiSuggestion && (
@@ -486,6 +502,7 @@ export default function ChatterDashboard() {
                         </button>
                         <button
                           onClick={() => {
+                            // Copy to clipboard for manual edit
                             navigator.clipboard.writeText(aiSuggestion.texto)
                             alert('Copied to clipboard! You can edit and send manually.')
                           }}
