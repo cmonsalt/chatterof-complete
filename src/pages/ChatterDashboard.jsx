@@ -210,6 +210,9 @@ export default function ChatterDashboard() {
         ?.filter(m => m.from === 'fan')
         ?.slice(-1)[0]?.message || ''
 
+      console.log('🤖 Generating AI for fan:', selectedFan.fan_id)
+      console.log('📩 Last fan message:', lastFanMessage)
+
       const { data, error } = await supabase.functions.invoke('chat-generate', {
         body: {
           model_id: actualModelId,
@@ -218,12 +221,15 @@ export default function ChatterDashboard() {
         }
       })
 
+      console.log('✅ AI Response:', data)
+      console.log('❌ AI Error:', error)
+
       if (error) throw error
 
       setAiSuggestion(data)
     } catch (error) {
-      console.error('Error generating AI:', error)
-      alert('Error generating AI response')
+      console.error('❌ Error generating AI:', error)
+      alert('Error generating AI response: ' + error.message)
     } finally {
       setGenerating(false)
     }
@@ -458,7 +464,9 @@ export default function ChatterDashboard() {
                       </div>
                       
                       <div className="bg-white rounded p-3 mb-3">
-                        <p className="text-sm">{aiSuggestion.texto}</p>
+                        <p className="text-sm">
+                          {aiSuggestion.texto || aiSuggestion.response || aiSuggestion.message || JSON.stringify(aiSuggestion)}
+                        </p>
                       </div>
 
                       {aiSuggestion.content_to_offer && (
@@ -471,23 +479,24 @@ export default function ChatterDashboard() {
 
                       <div className="flex gap-2">
                         <button
-                          onClick={() => handleSendMessage(aiSuggestion.texto)}
+                          onClick={() => handleSendMessage(aiSuggestion.texto || aiSuggestion.response || aiSuggestion.message)}
                           disabled={sending}
-                          className="flex-1 bg-green-500 hover:bg-green-600 text-white py-2 rounded-lg font-semibold"
+                          className="flex-1 bg-green-500 hover:bg-green-600 text-white py-2 rounded-lg font-semibold disabled:opacity-50"
                         >
                           ✅ Send As-Is
                         </button>
                         <button
                           onClick={handleGenerateAI}
                           disabled={generating}
-                          className="px-4 bg-blue-500 hover:bg-blue-600 text-white py-2 rounded-lg font-semibold"
+                          className="px-4 bg-blue-500 hover:bg-blue-600 text-white py-2 rounded-lg font-semibold disabled:opacity-50"
                         >
                           🔄 Regenerate
                         </button>
                         <button
                           onClick={() => {
-                            navigator.clipboard.writeText(aiSuggestion.texto)
-                            alert('Copied to clipboard! You can edit and send manually.')
+                            const textToCopy = aiSuggestion.texto || aiSuggestion.response || aiSuggestion.message
+                            navigator.clipboard.writeText(textToCopy)
+                            alert('✅ Copied to clipboard!')
                           }}
                           className="px-4 bg-gray-500 hover:bg-gray-600 text-white py-2 rounded-lg font-semibold"
                         >
