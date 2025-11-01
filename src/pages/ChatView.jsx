@@ -428,10 +428,10 @@ export default function ChatView() {
                         if (uniqueUrls.length === 0) return null;
                         
                         return (
-                          <div className="mt-2 space-y-2">
-                            {/* Grid de imágenes */}
+                          <div className="mt-2">
+                            {/* Grid de imágenes - Sin contador */}
                             <div className="grid grid-cols-2 gap-2">
-                              {uniqueUrls.slice(0, 4).map((url, i) => (
+                              {uniqueUrls.map((url, i) => (
                                 <a 
                                   key={i} 
                                   href={url} 
@@ -450,11 +450,6 @@ export default function ChatView() {
                                 </a>
                               ))}
                             </div>
-                            
-                            {/* Contador solo si hay imágenes */}
-                            <span className="text-xs bg-purple-100 text-purple-700 px-2 py-1 rounded inline-block">
-                              📷 {uniqueUrls.length} imagen(es)
-                            </span>
                           </div>
                         );
                       } catch (e) {
