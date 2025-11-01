@@ -57,7 +57,7 @@ export default async function handler(req, res) {
 
     // 1. Sincronizar fans/subscribers usando endpoint correcto
     console.log('👥 Fetching subscribers...');
-    const fansResponse = await fetch(`${OF_API_URL}/fans/active`, {
+    const fansResponse = await fetch(`${OF_API_URL}/${accountId}/fans/all`, {
       method: 'GET',
       headers
     });
@@ -90,7 +90,7 @@ export default async function handler(req, res) {
 
     // 2. Sincronizar chats/mensajes recientes usando endpoint correcto
     console.log('💬 Fetching recent chats...');
-    const chatsResponse = await fetch(`${OF_API_URL}/chats`, {
+    const chatsResponse = await fetch(`${OF_API_URL}/${accountId}/chats`, {
       method: 'GET',
       headers
     });
