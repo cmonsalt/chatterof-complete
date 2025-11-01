@@ -22,11 +22,12 @@ function encrypt(text) {
 }
 
 export default async function handler(req, res) {
-  // ✨ CORS headers
+  // ✅ CORS headers - CRÍTICO
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
+  // Handle preflight
   if (req.method === 'OPTIONS') {
     return res.status(200).end();
   }
@@ -36,7 +37,6 @@ export default async function handler(req, res) {
   }
 
   try {
-    // ✨ Aceptar ambos formatos de campos
     const { 
       model_id, modelId,
       sess_cookie, sess,
