@@ -32,10 +32,27 @@ export default async function handler(req, res) {
 
     console.log(`🔄 Starting sync for model: ${modelId}`);
 
+    // Obtener account_id de la BD
+    const { data: modelData } = await supabase
+      .from('models')
+      .select('of_account_id')
+      .eq('model_id', modelId)
+      .single();
+
+    if (!modelData?.of_account_id) {
+      return res.status(404).json({ 
+        error: 'OnlyFans account not connected. Please connect account first.' 
+      });
+    }
+
+    const accountId = modelData.of_account_id;
+    console.log(`📋 Using account ID: ${accountId}`);
+
     // Headers para OF API oficial
     const headers = {
       'Authorization': `Bearer ${OF_API_KEY}`,
-      'Content-Type': 'application/json'
+      'Content-Type': 'application/json',
+      'X-Account-Id': accountId // Usar el account_id correcto
     };
 
     // 1. Sincronizar fans/subscribers usando endpoint correcto
