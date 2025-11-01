@@ -185,7 +185,7 @@ export default function Dashboard() {
             </div>
             
             <div className="bg-white rounded-xl shadow-lg p-6 border-l-4 border-blue-500">
-              <p className="text-sm text-gray-600 font-semibold">Active Chats (7d)</p>
+              <p className="text-sm text-gray-600 font-semibold">Active Fans</p>
               <p className="text-3xl font-bold text-blue-600">{stats.chats}</p>
             </div>
             

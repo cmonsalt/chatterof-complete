@@ -14,6 +14,7 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true)
   const [stats, setStats] = useState({ hoy: 0, chats: 0, mensajes: 0, totalFans: 0 })
   const [searchQuery, setSearchQuery] = useState('')
+  const [showActiveOnly, setShowActiveOnly] = useState(true) // 🔥 NUEVO: Toggle activos/todos
 
   useEffect(() => {
     if (actualModelId) {
@@ -41,6 +42,8 @@ export default function Dashboard() {
       const fanIds = fansData?.map(f => f.fan_id) || []
       
       let lastMessagesMap = {}
+      let messageCountMap = {} // 🔥 NUEVO: Contar mensajes por fan
+      
       if (fanIds.length > 0) {
         const { data: allMessages } = await supabase
           .from('chat')
@@ -49,24 +52,35 @@ export default function Dashboard() {
           .order('ts', { ascending: false })
 
         allMessages?.forEach(msg => {
+          // Último mensaje
           if (!lastMessagesMap[msg.fan_id]) {
             lastMessagesMap[msg.fan_id] = msg
           }
+          // Conteo de mensajes
+          messageCountMap[msg.fan_id] = (messageCountMap[msg.fan_id] || 0) + 1
         })
       }
 
       const fansWithLastMessage = fansData.map(fan => {
         const lastMsg = lastMessagesMap[fan.fan_id]
+        const messageCount = messageCountMap[fan.fan_id] || 0
+        
         return {
           ...fan,
           lastMessage: lastMsg?.message || 'No messages yet',
           lastMessageTime: lastMsg?.ts || null,
-          lastMessageFrom: lastMsg?.from || null
+          lastMessageFrom: lastMsg?.from || null,
+          messageCount: messageCount, // 🔥 NUEVO: Cantidad de mensajes
+          isActive: messageCount > 1 // 🔥 NUEVO: Activo si tiene >1 mensaje
         }
       })
 
       const sevenDaysAgo = new Date()
       sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7)
+      
+      // 🔥 NUEVO: Contar solo fans activos (con >1 mensaje)
+      const fansActivos = fansWithLastMessage.filter(f => f.isActive).length
+      
       const chatsActivos = fansWithLastMessage.filter(
         f => f.last_message_date && new Date(f.last_message_date) > sevenDaysAgo
       ).length
@@ -90,7 +104,7 @@ export default function Dashboard() {
       setFans(fansWithLastMessage)
       setStats({
         hoy: totalHoy,
-        chats: chatsActivos,
+        chats: fansActivos, // 🔥 CAMBIADO: Ahora es fans activos (>1 mensaje)
         mensajes: totalMensajes || 0,
         totalFans: fansWithLastMessage.length
       })
@@ -101,11 +115,13 @@ export default function Dashboard() {
     }
   }
 
-  const filteredFans = fans.filter(fan => 
-    fan.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    fan.of_username?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    fan.fan_id?.toLowerCase().includes(searchQuery.toLowerCase())
-  )
+  const filteredFans = fans
+    .filter(fan => showActiveOnly ? fan.isActive : true) // 🔥 NUEVO: Filtrar por activos
+    .filter(fan => 
+      fan.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      fan.of_username?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      fan.fan_id?.toLowerCase().includes(searchQuery.toLowerCase())
+    )
 
   const getTimeText = (fan) => {
     if (!fan.lastMessageTime) return 'No messages'
@@ -186,7 +202,34 @@ export default function Dashboard() {
 
           <div className="bg-white rounded-xl shadow-lg p-6">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-xl font-bold">All Fans</h2>
+              <div className="flex items-center gap-4">
+                <h2 className="text-xl font-bold">All Fans</h2>
+                
+                {/* 🔥 NUEVO: Toggle Activos/Todos */}
+                <div className="flex gap-2 bg-gray-100 rounded-lg p-1">
+                  <button
+                    onClick={() => setShowActiveOnly(true)}
+                    className={`px-4 py-1.5 rounded-md text-sm font-medium transition ${
+                      showActiveOnly 
+                        ? 'bg-white shadow text-blue-600' 
+                        : 'text-gray-600 hover:text-gray-900'
+                    }`}
+                  >
+                    🔥 Active ({stats.chats})
+                  </button>
+                  <button
+                    onClick={() => setShowActiveOnly(false)}
+                    className={`px-4 py-1.5 rounded-md text-sm font-medium transition ${
+                      !showActiveOnly 
+                        ? 'bg-white shadow text-blue-600' 
+                        : 'text-gray-600 hover:text-gray-900'
+                    }`}
+                  >
+                    👥 All ({stats.totalFans})
+                  </button>
+                </div>
+              </div>
+              
               <input
                 type="text"
                 placeholder="🔍 Search fans..."
@@ -200,10 +243,16 @@ export default function Dashboard() {
               <div className="text-center py-12 bg-gray-50 rounded-lg">
                 <div className="text-6xl mb-4">👥</div>
                 <p className="text-gray-600 font-semibold">
-                  {searchQuery ? 'No fans match your search' : 'No fans yet'}
+                  {searchQuery 
+                    ? 'No fans match your search' 
+                    : showActiveOnly 
+                      ? 'No active fans yet' 
+                      : 'No fans yet'}
                 </p>
                 <p className="text-sm text-gray-500 mt-2">
-                  Fans will appear automatically when the extension detects messages
+                  {showActiveOnly 
+                    ? 'Fans appear here after they respond to your welcome message'
+                    : 'Fans will appear automatically when the extension detects messages'}
                 </p>
               </div>
             ) : (
