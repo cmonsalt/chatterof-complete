@@ -383,7 +383,7 @@ export default function ChatView() {
                   className={`mb-4 flex ${msg.from === 'model' ? 'justify-end' : 'justify-start'}`}
                 >
                   <div
-                    className={`max-w-xs px-4 py-2 rounded-lg ${
+                    className={`max-w-md px-4 py-2 rounded-lg ${
                       msg.from === 'model'
                         ? 'bg-blue-500 text-white'
                         : 'bg-white border'
@@ -405,18 +405,47 @@ export default function ChatView() {
                       </div>
                     )}
                     
-                    {/* 🔥 MOSTRAR IMÁGENES */}
+                    {/* 🔥 MOSTRAR IMÁGENES REALES */}
                     {msg.media_urls && (() => {
                       try {
                         const urls = JSON.parse(msg.media_urls);
+                        // 🔥 Eliminar duplicados
+                        const uniqueUrls = [...new Set(urls)];
+                        
+                        if (uniqueUrls.length === 0) return null;
+                        
                         return (
-                          <div className="mt-2">
-                            <span className="text-xs bg-purple-100 text-purple-700 px-2 py-1 rounded">
-                              📷 {urls.length} imagen(es)
+                          <div className="mt-2 space-y-2">
+                            {/* Grid de imágenes */}
+                            <div className="grid grid-cols-2 gap-2">
+                              {uniqueUrls.slice(0, 4).map((url, i) => (
+                                <a 
+                                  key={i} 
+                                  href={url} 
+                                  target="_blank" 
+                                  rel="noopener noreferrer"
+                                  className="block"
+                                >
+                                  <img 
+                                    src={url} 
+                                    alt={`Media ${i+1}`}
+                                    className="w-full h-24 object-cover rounded border hover:opacity-80 cursor-pointer"
+                                    onError={(e) => {
+                                      e.target.style.display = 'none';
+                                    }}
+                                  />
+                                </a>
+                              ))}
+                            </div>
+                            
+                            {/* Contador */}
+                            <span className="text-xs bg-purple-100 text-purple-700 px-2 py-1 rounded inline-block">
+                              📷 {uniqueUrls.length} imagen(es)
                             </span>
                           </div>
                         );
                       } catch (e) {
+                        console.error('Error parsing media_urls:', e);
                         return null;
                       }
                     })()}
