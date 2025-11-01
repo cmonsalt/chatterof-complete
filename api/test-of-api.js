@@ -53,9 +53,9 @@ export default async function handler(req, res) {
       'Accept': 'application/json'
     };
 
-    // Test API call
-    console.log('🔍 Testing OF API...');
-    const response = await fetch('https://onlyfans.com/api2/v2/subscriptions/subscribers?limit=10', {
+    // Test API call - probar endpoint más simple
+    console.log('🔍 Testing OF API - /api2/v2/init...');
+    const response = await fetch('https://onlyfans.com/api2/v2/init', {
       headers
     });
 
