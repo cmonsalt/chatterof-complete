@@ -4,12 +4,11 @@ import { createClient } from '@supabase/supabase-js';
 
 const supabase = createClient(
   process.env.VITE_SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_KEY // Service key para bypassear RLS
+  process.env.SUPABASE_SERVICE_KEY
 );
 
-const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY || 'your-32-byte-encryption-key-here!!'; // 32 caracteres
+const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY || 'your-32-byte-encryption-key-here!!';
 
-// Función para encriptar
 function encrypt(text) {
   const iv = crypto.randomBytes(16);
   const cipher = crypto.createCipheriv(
@@ -23,37 +22,53 @@ function encrypt(text) {
 }
 
 export default async function handler(req, res) {
-  // Solo POST
+  // ✨ CORS headers
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end();
+  }
+
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
   try {
-    const { model_id, sess_cookie, auth_id, user_agent } = req.body;
+    // ✨ Aceptar ambos formatos de campos
+    const { 
+      model_id, modelId,
+      sess_cookie, sess,
+      auth_id, authId,
+      user_agent, userAgent
+    } = req.body;
 
-    // Validar datos
-    if (!model_id || !sess_cookie || !auth_id) {
+    const finalModelId = model_id || modelId;
+    const finalSess = sess_cookie || sess;
+    const finalAuthId = auth_id || authId;
+    const finalUserAgent = user_agent || userAgent;
+
+    if (!finalModelId || !finalSess || !finalAuthId) {
       return res.status(400).json({ 
-        error: 'Missing required fields: model_id, sess_cookie, auth_id' 
+        error: 'Missing required fields: modelId, sess, authId' 
       });
     }
 
-    console.log('🔐 Connecting model:', model_id);
+    console.log('🔐 Connecting model:', finalModelId);
 
-    // Encriptar cookies
-    const sessEncrypted = encrypt(sess_cookie);
-    const authIdEncrypted = encrypt(auth_id);
+    const sessEncrypted = encrypt(finalSess);
+    const authIdEncrypted = encrypt(finalAuthId);
 
-    // Guardar en BD
-    const { data, error } = await supabase
+    const { error } = await supabase
       .from('of_sessions')
       .upsert({
-        model_id: model_id,
+        model_id: finalModelId,
         sess_encrypted: sessEncrypted,
         auth_id_encrypted: authIdEncrypted,
-        user_agent: user_agent || 'Unknown',
+        user_agent: finalUserAgent || 'Unknown',
         last_sync: new Date().toISOString(),
-        expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(), // 30 días
+        expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
         is_active: true
       }, {
         onConflict: 'model_id'
@@ -64,14 +79,14 @@ export default async function handler(req, res) {
       throw error;
     }
 
-    console.log('✅ Session saved for:', model_id);
+    console.log('✅ Session saved for:', finalModelId);
 
-    // 🔥 IMPORTANTE: Iniciar sincronización inicial
-    await syncInitialData(model_id, sess_cookie, auth_id, user_agent);
+    const syncResult = await syncInitialData(finalModelId, finalSess, finalAuthId, finalUserAgent);
 
     res.json({ 
       success: true,
-      message: 'Connected successfully. Syncing data...'
+      message: 'Connected successfully',
+      syncedFans: syncResult.fansCount || 0
     });
 
   } catch (error) {
@@ -82,19 +97,19 @@ export default async function handler(req, res) {
   }
 }
 
-// 🔥 Sincronización inicial
 async function syncInitialData(modelId, sessCookie, authId, userAgent) {
   console.log('🔄 Starting initial sync for:', modelId);
 
+  let fansCount = 0;
+
   try {
-    // Headers para requests a OF
     const headers = {
       'Cookie': `sess=${sessCookie}; auth_id=${authId}`,
       'User-Agent': userAgent,
       'Accept': 'application/json'
     };
 
-    // 1. Sincronizar fans (suscriptores)
+    // 1. Sync fans
     console.log('👥 Syncing fans...');
     const fansResponse = await fetch('https://onlyfans.com/api2/v2/subscriptions/subscribers?limit=100', {
       headers
@@ -103,10 +118,10 @@ async function syncInitialData(modelId, sessCookie, authId, userAgent) {
     if (fansResponse.ok) {
       const fansData = await fansResponse.json();
       const fans = fansData.list || [];
+      fansCount = fans.length;
 
       console.log(`✅ Found ${fans.length} fans`);
 
-      // Insertar fans en BD
       for (const fan of fans) {
         await supabase.from('fans').upsert({
           fan_id: fan.id?.toString(),
@@ -114,7 +129,7 @@ async function syncInitialData(modelId, sessCookie, authId, userAgent) {
           name: fan.name || `Fan ${fan.id}`,
           of_username: fan.username || `u${fan.id}`,
           of_avatar_url: fan.avatar || null,
-          tier: 0, // Se calculará automáticamente
+          tier: 0,
           spent_total: 0,
           last_message_date: new Date().toISOString()
         }, {
@@ -125,7 +140,7 @@ async function syncInitialData(modelId, sessCookie, authId, userAgent) {
       console.log('✅ Fans synced');
     }
 
-    // 2. Sincronizar vault (catálogo)
+    // 2. Sync vault
     console.log('📦 Syncing vault...');
     const vaultResponse = await fetch('https://onlyfans.com/api2/v2/vault/lists?limit=100', {
       headers
@@ -137,8 +152,7 @@ async function syncInitialData(modelId, sessCookie, authId, userAgent) {
 
       console.log(`✅ Found ${media.length} vault items`);
 
-      // Insertar en catálogo
-      for (const item of media.slice(0, 20)) { // Limitar a 20 primeros
+      for (const item of media.slice(0, 20)) {
         await supabase.from('catalog').upsert({
           offer_id: item.id?.toString(),
           model_id: modelId,
@@ -156,9 +170,10 @@ async function syncInitialData(modelId, sessCookie, authId, userAgent) {
     }
 
     console.log('🎉 Initial sync completed for:', modelId);
+    return { fansCount };
 
   } catch (error) {
     console.error('❌ Error in initial sync:', error);
-    // No hacer throw para no fallar el connect
+    return { fansCount };
   }
 }

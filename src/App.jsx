@@ -6,7 +6,7 @@ import Signup from './pages/Signup'
 import Dashboard from './pages/Dashboard'
 import ChatView from './pages/ChatView'
 import Settings from './pages/Settings'
-import ChatterDashboard from './pages/ChatterDashboard2'
+import ChatterDashboard from './pages/ChatterDashboard'
 
 function App() {
   return (
@@ -34,13 +34,14 @@ function App() {
             </ProtectedRoute>
           } />
 
+          {/* NUEVA RUTA - Chatter System */}
           <Route path="/chatter" element={
             <ProtectedRoute>
               <ChatterDashboard />
             </ProtectedRoute>
           } />
-
-          <Route path="/" element={<Navigate to="/dashboard" replace />} />
+          
+          <Route path="/" element={<Navigate to="/dashboard" />} />
         </Routes>
       </AuthProvider>
     </BrowserRouter>
