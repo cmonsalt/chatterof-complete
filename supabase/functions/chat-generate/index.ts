@@ -198,7 +198,7 @@ RESPONDE SOLO EL JSON, SIN TEXTO ADICIONAL.`;
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        model: 'claude-3-5-sonnet-20241022',
+        model: config.claude_model || 'claude-sonnet-4-5-20250929',
         max_tokens: 1024,
         temperature: 0.8,
         messages: [{

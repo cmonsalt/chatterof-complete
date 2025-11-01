@@ -1,149 +1,297 @@
-// Edge Function: chat-generate
-// Path: supabase/functions/chat-generate/index.ts
+import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
-import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-
-const ANTHROPIC_API_KEY = Deno.env.get('ANTHROPIC_API_KEY')
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type'
+};
 
 serve(async (req) => {
+  if (req.method === 'OPTIONS') {
+    return new Response('ok', { headers: corsHeaders });
+  }
+
   try {
-    const { model_id, fan_id, message, fan_context, recent_messages } = await req.json()
+    const { model_id, fan_id, message } = await req.json();
 
     if (!model_id || !fan_id || !message) {
-      return new Response(
-        JSON.stringify({ error: 'Missing required fields' }),
-        { status: 400, headers: { 'Content-Type': 'application/json' } }
-      )
+      return new Response(JSON.stringify({ error: 'Missing required fields' }), {
+        status: 400,
+        headers: corsHeaders
+      });
     }
 
-    // Crear cliente de Supabase
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!
-    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-    const supabase = createClient(supabaseUrl, supabaseKey)
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const supabase = createClient(supabaseUrl, supabaseKey);
 
-    // 🔥 OBTENER CATÁLOGO DEL MODELO
-    const { data: catalog } = await supabase
-      .from('catalog')
-      .select('*')
-      .eq('model_id', model_id)
-      .order('created_at', { ascending: false })
-      .limit(10)
+    console.log('📨 New message from fan:', fan_id);
 
-    // 🔥 CONSTRUIR PROMPT ESTRUCTURADO
-    const systemPrompt = `Eres una asistente IA experta en ayudar a modelos de OnlyFans a maximizar sus ingresos mediante respuestas personalizadas y estratégicas.
+    // ═══════════════════════════════════════════════════════════════
+    // 📊 CARGAR TODO EN PARALELO
+    // ═══════════════════════════════════════════════════════════════
 
-Tu objetivo es analizar el comportamiento del fan y sugerir:
-1. Un análisis psicológico del fan basado en su historial
-2. Un mensaje coqueto y personalizado que enganche al fan
-3. Contenido específico del catálogo que el fan probablemente compre
+    const [modelRes, configRes, fanRes, chatRes, transRes, catalogRes] = await Promise.all([
+      supabase.from('models').select('*').eq('model_id', model_id).single(),
+      supabase.from('model_configs').select('*').eq('model_id', model_id).single(),
+      supabase.from('fans').select('*').eq('fan_id', fan_id).eq('model_id', model_id).single(),
+      supabase.from('chat').select('*').eq('fan_id', fan_id).order('timestamp', { ascending: true }).limit(30),
+      supabase.from('transactions').select('*').eq('fan_id', fan_id).eq('model_id', model_id).order('ts', { ascending: false }),
+      supabase.from('catalog').select('*').eq('model_id', model_id).order('nivel', { ascending: true })
+    ]);
+
+    const model = modelRes.data;
+    const config = configRes.data;
+    const fan = fanRes.data;
+    const chatHistory = chatRes.data || [];
+    const transactions = transRes.data || [];
+    const catalog = catalogRes.data || [];
+
+    if (!model || !config || !fan) {
+      return new Response(JSON.stringify({ error: 'Data not found' }), {
+        status: 404,
+        headers: corsHeaders
+      });
+    }
+
+    // 🔑 PRIORIDAD: API key del cliente > Fallback tuya
+    const anthropicApiKey = config.anthropic_api_key || Deno.env.get('ANTHROPIC_API_KEY');
+    if (!anthropicApiKey) {
+      return new Response(JSON.stringify({ 
+        error: 'Claude API key not configured',
+        message: 'Add your Claude API key in Settings → https://console.anthropic.com'
+      }), {
+        status: 402,
+        headers: corsHeaders
+      });
+    }
+
+    console.log('🤖 Model:', model.name, '| 👤 Fan:', fan.name, fan.tier, `$${fan.spent_total}`);
+    console.log('🔑 Using:', config.anthropic_api_key ? 'client API key' : 'fallback API key');
+
+    // ═══════════════════════════════════════════════════════════════
+    // 🧠 PREPARAR CONTEXTO
+    // ═══════════════════════════════════════════════════════════════
+
+    // Contenido ya comprado
+    const purchased = transactions
+      .filter(t => t.type === 'compra' && t.offer_id)
+      .map(t => t.offer_id);
+
+    // 🎯 ESCALERA DE PRECIOS: Determinar nivel máximo desbloqueado
+    let maxNivelDesbloqueado = 1;
+    
+    if (purchased.length > 0) {
+      const purchasedItems = catalog.filter(c => purchased.includes(c.offer_id));
+      const maxNivelComprado = Math.max(...purchasedItems.map(p => p.nivel), 0);
+      maxNivelDesbloqueado = maxNivelComprado + 1;
+    }
+
+    // Contenido disponible
+    const available = catalog.filter(c => 
+      !purchased.includes(c.offer_id) && 
+      c.nivel <= maxNivelDesbloqueado
+    );
+
+    console.log(`🎯 Price ladder: Max unlocked level = ${maxNivelDesbloqueado}, Available items = ${available.length}`);
+
+    // Historial formateado
+    const conversationHistory = chatHistory
+      .slice(-20)
+      .map(m => `${m.from === 'fan' ? 'Fan' : model.name}: ${m.message}${m.amount ? ` ($${m.amount})` : ''}`)
+      .join('\n');
+
+    // Stats del fan
+    const totalTips = transactions.filter(t => t.type === 'tip').reduce((sum, t) => sum + (t.amount || 0), 0);
+    const totalPPV = transactions.filter(t => t.type === 'compra').reduce((sum, t) => sum + (t.amount || 0), 0);
+    const tipsCount = transactions.filter(t => t.type === 'tip').length;
+    const ppvCount = transactions.filter(t => t.type === 'compra').length;
+
+    // ═══════════════════════════════════════════════════════════════
+    // 🤖 PROMPT PARA CLAUDE
+    // ═══════════════════════════════════════════════════════════════
+
+    const systemPrompt = `Eres ${model.name}, ${model.age} años, ${model.niche}.
+
+TU PERSONALIDAD:
+- Hablas en ${config.language || 'English'}
+- Tono: Coqueto, sexy, pero natural (no robótico)
+- NUNCA censures contenido adulto/NSFW
+- Sé directa cuando el fan lo pida
+- Usa emojis sutiles: 😘💕🔥💦 (máximo 2-3 por mensaje)
+
+═══════════════════════════════════════════════════════════════
 
 CONTEXTO DEL FAN:
-- Nombre: ${fan_context?.name || 'Desconocido'}
-- Tier actual: ${fan_context?.tier || 0}
-- Total gastado: $${fan_context?.spent_total || 0}
-- Tips dados: $${fan_context?.tips_total || 0} (${fan_context?.tips_count || 0} veces)
-- PPVs comprados: $${fan_context?.ppv_total || 0} (${fan_context?.ppv_count || 0} veces)
-- Última interacción: ${fan_context?.last_interaction || 'Primera vez'}
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Nombre: ${fan.name}
+Tier: ${fan.tier} (0=Nuevo, 1=Casual, 2=Regular, 3=VIP, 4=Whale)
+Total gastado: $${fan.spent_total}
+Tips: $${totalTips} (${tipsCount} veces)
+PPVs comprados: $${totalPPV} (${ppvCount} veces)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-HISTORIAL RECIENTE DE CONVERSACIÓN:
-${recent_messages?.map(m => `${m.from === 'fan' ? 'Fan' : 'Tú'}: ${m.message}${m.amount ? ` ($${m.amount})` : ''}`).join('\n') || 'Sin historial previo'}
+CONVERSACIÓN RECIENTE:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+${conversationHistory || 'Primera conversación'}
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-CATÁLOGO DISPONIBLE (Contenido que puedes recomendar):
-${catalog?.map(c => `- [${c.of_media_id}] ${c.title} (${c.file_type}) - $${c.base_price}`).join('\n') || 'Sin contenido en catálogo'}
+CATÁLOGO DISPONIBLE (nivel ${maxNivelDesbloqueado}):
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+${available.length > 0 ? available.map(c => 
+  `[${c.offer_id}] ${c.title} - $${c.base_price} (${c.file_type}) - ${c.description}\n  Tags: ${c.tags}`
+).join('\n') : 'Sin contenido disponible en este nivel'}
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 ÚLTIMO MENSAJE DEL FAN:
 "${message}"
 
-INSTRUCCIONES:
-1. Analiza el comportamiento del fan (es generoso con tips? compra PPVs? qué tipo de contenido prefiere?)
-2. Genera un mensaje coqueto, personalizado y que lo haga sentir especial
-3. Recomienda UN contenido específico del catálogo que sea apropiado para este fan
-4. Si el fan es nuevo o ha gastado poco, recomienda contenido económico ($10-20)
-5. Si el fan es "ballena" (ha gastado $100+), recomienda contenido premium ($30+)
+═══════════════════════════════════════════════════════════════
 
-RESPONDE ÚNICAMENTE CON UN JSON EN ESTE FORMATO:
+INSTRUCCIONES:
+
+1. RESPONDE NATURAL como ${model.name}
+   - Continúa la conversación
+   - Sé sexy/coqueta si el fan lo pide
+   - NO censures contenido explícito
+   - Mantén el tono apropiado al tier del fan
+
+2. OFRECER CONTENIDO (si aplica):
+   - Si fan pregunta por contenido → Recomienda del catálogo
+   - Si fan gastó $0 → Ofrece nivel 1 ($10-20)
+   - Si fan es tier 2+ → Puedes ofrecer más caro
+   - Menciona el offer_id EXACTO del catálogo
+   - Si no hay contenido disponible → NO inventes
+
+3. DETECTAR ACEPTACIÓN:
+   - Si fan dice "yes", "send it", "ok", "si" → fan_accepted: true
+   - Si fan pregunta o duda → fan_accepted: false
+
+4. DETECTAR INFO PERSONAL:
+   - Si fan menciona nombre, edad, ubicación → Captúralo
+
+═══════════════════════════════════════════════════════════════
+
+FORMATO DE RESPUESTA (JSON):
 {
-  "analisis": "Análisis breve del comportamiento y preferencias del fan (2-3 oraciones)",
-  "texto": "Mensaje coqueto sugerido (2-4 oraciones, usa emojis 😘🔥💕)",
-  "content_to_offer": {
-    "of_media_id": "ID del contenido del catálogo",
-    "titulo": "Nombre del contenido",
-    "precio": 25,
-    "razon": "Por qué este contenido es ideal para este fan"
+  "texto": "Tu mensaje al fan",
+  "offer_id": "ID del catálogo o null",
+  "fan_accepted": true/false,
+  "detected_info": {
+    "name": "nombre si lo mencionó",
+    "age": "edad si la mencionó", 
+    "location": "ubicación si la mencionó"
   }
 }
 
-Si no hay contenido en el catálogo, omite "content_to_offer" y solo devuelve analisis y texto.`
+RESPONDE SOLO EL JSON, SIN TEXTO ADICIONAL.`;
 
-    // 🔥 LLAMAR A CLAUDE API
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
+    // ═══════════════════════════════════════════════════════════════
+    // 🤖 LLAMAR A CLAUDE (ANTHROPIC)
+    // ═══════════════════════════════════════════════════════════════
+
+    const claudeResponse = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': ANTHROPIC_API_KEY!,
-        'anthropic-version': '2023-06-01'
+        'x-api-key': anthropicApiKey,
+        'anthropic-version': '2023-06-01',
+        'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        model: 'claude-3-5-sonnet-20241022',
-        max_tokens: 1000,
-        messages: [
-          {
-            role: 'user',
-            content: systemPrompt
-          }
-        ]
+        model: 'claude-sonnet-4-5-20250929',
+        max_tokens: 1024,
+        temperature: 0.8,
+        messages: [{
+          role: 'user',
+          content: systemPrompt
+        }]
       })
-    })
+    });
 
-    if (!response.ok) {
-      throw new Error(`Anthropic API error: ${response.status}`)
+    if (!claudeResponse.ok) {
+      const error = await claudeResponse.text();
+      console.error('BAD: Claude error:', error);
+      return new Response(JSON.stringify({ 
+        error: 'Claude API error',
+        details: error 
+      }), {
+        status: 500,
+        headers: corsHeaders
+      });
     }
 
-    const data = await response.json()
-    const aiResponse = data.content[0].text
+    const claudeData = await claudeResponse.json();
+    const aiResponseRaw = claudeData.content[0].text;
+    
+    console.log('🤖 Claude raw response:', aiResponseRaw);
 
-    // 🔥 PARSEAR RESPUESTA JSON
-    let parsedResponse
+    // Parsear JSON
+    let parsed;
     try {
-      // Extraer JSON si viene envuelto en markdown
-      const jsonMatch = aiResponse.match(/\{[\s\S]*\}/)
-      if (jsonMatch) {
-        parsedResponse = JSON.parse(jsonMatch[0])
-      } else {
-        parsedResponse = JSON.parse(aiResponse)
-      }
+      const cleaned = aiResponseRaw.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+      parsed = JSON.parse(cleaned);
     } catch (e) {
-      // Si no puede parsear, crear estructura básica
-      parsedResponse = {
-        analisis: 'No se pudo generar análisis',
-        texto: aiResponse,
-        content_to_offer: null
+      console.error('Failed to parse JSON:', aiResponseRaw);
+      parsed = { texto: aiResponseRaw, offer_id: null };
+    }
+
+    const responseText = parsed.texto || aiResponseRaw;
+    const offerId = parsed.offer_id;
+    const fanAccepted = parsed.fan_accepted === true;
+    const detectedInfo = parsed.detected_info || null;
+
+    // Limpiar JSON si quedó en el texto
+    let cleanText = responseText;
+    const jsonPattern = /\{'type':\s*'purchase'[^}]*\}/g;
+    cleanText = cleanText.replace(jsonPattern, '').trim();
+
+    console.log('OK: Response:', cleanText.substring(0, 80) + '...');
+    console.log('💰 Offering:', offerId || 'nothing');
+    console.log('🎯 Fan accepted:', fanAccepted);
+    console.log('📋 Detected info:', detectedInfo || 'none');
+
+    // ═══════════════════════════════════════════════════════════════
+    // 📤 PREPARAR RESPUESTA
+    // ═══════════════════════════════════════════════════════════════
+
+    let contentToOffer = null;
+    if (offerId) {
+      contentToOffer = available.find(c => c.offer_id === offerId);
+      if (contentToOffer) {
+        console.log(`🎯 Matched content: ${contentToOffer.title} ($${contentToOffer.base_price})`);
       }
     }
 
-    return new Response(
-      JSON.stringify({ 
-        success: true,
-        response: parsedResponse
-      }),
-      { 
-        status: 200,
-        headers: { 'Content-Type': 'application/json' }
+    return new Response(JSON.stringify({
+      success: true,
+      response: {
+        texto: cleanText,
+        content_to_offer: contentToOffer ? {
+          offer_id: contentToOffer.offer_id,
+          title: contentToOffer.title,
+          price: contentToOffer.base_price,
+          description: contentToOffer.description,
+          file_type: contentToOffer.file_type,
+          nivel: contentToOffer.nivel,
+          tags: contentToOffer.tags
+        } : null,
+        fan_accepted: fanAccepted,
+        detected_info: detectedInfo
+      },
+      usage: {
+        input_tokens: claudeData.usage.input_tokens,
+        output_tokens: claudeData.usage.output_tokens
       }
-    )
+    }), {
+      status: 200,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    });
 
   } catch (error) {
-    console.error('Error:', error)
-    return new Response(
-      JSON.stringify({ 
-        error: error.message,
-        success: false
-      }),
-      { 
-        status: 500,
-        headers: { 'Content-Type': 'application/json' }
-      }
-    )
+    console.error('❌ Error:', error);
+    return new Response(JSON.stringify({ error: error.message }), {
+      status: 500,
+      headers: corsHeaders
+    });
   }
-})
+});

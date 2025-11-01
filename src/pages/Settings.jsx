@@ -453,18 +453,30 @@ export default function Settings() {
                     <label style={{ display: 'block', fontWeight: 600, marginBottom: '0.5rem', color: '#374151' }}>
                       AI Model
                     </label>
-                    <div style={{ 
-                      padding: '0.75rem',
-                      border: '2px solid #10b981',
-                      borderRadius: '0.5rem',
-                      background: '#d1fae5',
-                      color: '#065f46',
-                      fontWeight: 600
-                    }}>
-                      🤖 Claude 3.5 Sonnet (Best for NSFW)
-                    </div>
+                    <select
+                      value={config.claude_model || 'claude-sonnet-4-5-20250929'}
+                      onChange={(e) => setConfig({...config, claude_model: e.target.value})}
+                      style={{
+                        width: '100%',
+                        padding: '0.75rem',
+                        border: '2px solid #e5e7eb',
+                        borderRadius: '0.5rem'
+                      }}
+                    >
+                      <option value="claude-haiku-4-5-20251001">
+                        💚 Haiku 4.5 - Cheapest (~$7/month)
+                      </option>
+                      <option value="claude-sonnet-4-5-20250929">
+                        💙 Sonnet 4.5 - Balanced (~$30/month) ⭐
+                      </option>
+                      <option value="claude-opus-4-1-20250805">
+                        💜 Opus 4.1 - Smartest (~$45/month)
+                      </option>
+                    </select>
                     <p style={{ fontSize: '0.75rem', color: '#6b7280', marginTop: '0.25rem' }}>
-                      Better for adult content, no censorship
+                      {config.claude_model === 'claude-haiku-4-5-20251001' && '⚡ Fastest, most affordable. Good for quick responses.'}
+                      {(config.claude_model === 'claude-sonnet-4-5-20250929' || !config.claude_model) && '🎯 Best balance of quality and cost. No censorship.'}
+                      {config.claude_model === 'claude-opus-4-1-20250805' && '🧠 Most intelligent, best analysis. Highest cost.'}
                     </p>
                   </div>
                 </div>
