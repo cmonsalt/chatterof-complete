@@ -5,7 +5,7 @@ import Navbar from '../components/Navbar'
 
 export default function Settings() {
   const { modelId, currentModel } = useAuth()
-  const [activeTab, setActiveTab] = useState('config')
+  const [activeTab, setActiveTab] = useState('connect') // ✨ Changed default to connect
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState(null)
@@ -28,7 +28,11 @@ export default function Settings() {
     description: ''
   })
 
-  // ðŸ†• NEW: Fan Notes
+  // 🔗 OnlyFans Connection  
+  const [isConnected, setIsConnected] = useState(false)
+  const [lastSync, setLastSync] = useState(null)
+
+  // Fan Notes
   const [fans, setFans] = useState([])
   const [filteredFansNotes, setFilteredFansNotes] = useState([])
   const [fanSearchQuery, setFanSearchQuery] = useState('')
@@ -40,11 +44,12 @@ export default function Settings() {
       loadConfig()
       loadTierRules()
       loadCatalog()
-      loadFans() // ðŸ†• NEW
+      loadFans()
+      checkConnection() // ✨ NEW
     }
   }, [modelId])
 
-  // ðŸ†• NEW: Filter fans based on search query
+  // Filter fans based on search query
   useEffect(() => {
     if (fanSearchQuery.trim() === '') {
       setFilteredFansNotes(fans)
@@ -123,7 +128,7 @@ export default function Settings() {
     }
   }
 
-  // ðŸ†• NEW: Load fans for notes management
+  // Load fans for notes management
   const loadFans = async () => {
     try {
       const { data, error } = await supabase
@@ -137,6 +142,41 @@ export default function Settings() {
       setFilteredFansNotes(data || [])
     } catch (error) {
       console.error('Error loading fans:', error)
+    }
+  }
+
+  // ✨ Check OnlyFans Connection
+  const checkConnection = async () => {
+    try {
+      const { data } = await supabase
+        .from('of_sessions')
+        .select('last_sync, is_active')
+        .eq('model_id', modelId)
+        .eq('is_active', true)
+        .single()
+      
+      if (data) {
+        setIsConnected(true)
+        setLastSync(new Date(data.last_sync).toLocaleString())
+      }
+    } catch (error) {
+      console.log('No OF connection')
+    }
+  }
+
+  const handleDisconnect = async () => {
+    if (!confirm('Disconnect OnlyFans? You will need to reconnect.')) return
+    
+    try {
+      await supabase
+        .from('of_sessions')
+        .update({ is_active: false })
+        .eq('model_id', modelId)
+      
+      setIsConnected(false)
+      setMessage({ type: 'success', text: '✅ Disconnected from OnlyFans' })
+    } catch (error) {
+      setMessage({ type: 'error', text: '❌ Error: ' + error.message })
     }
   }
 
@@ -162,7 +202,7 @@ export default function Settings() {
 
       if (modelError) throw modelError
 
-      // Actualizar model_configs (todo lo demÃ¡s)
+      // Actualizar model_configs (todo lo demás)
       const { error: configError } = await supabase
         .from('model_configs')
         .update(configData)
@@ -170,14 +210,14 @@ export default function Settings() {
 
       if (configError) throw configError
 
-      setMessage({ type: 'success', text: 'âœ… Config saved successfully!' })
+      setMessage({ type: 'success', text: '✅ Config saved successfully!' })
       
       // Recargar para actualizar navbar con nuevo nombre
       setTimeout(() => {
         window.location.reload()
       }, 1500)
     } catch (error) {
-      setMessage({ type: 'error', text: 'âŒ Error: ' + error.message })
+      setMessage({ type: 'error', text: '❌ Error: ' + error.message })
     } finally {
       setSaving(false)
     }
@@ -200,9 +240,9 @@ export default function Settings() {
           .eq('id', rule.id)
       }
 
-      setMessage({ type: 'success', text: 'âœ… Tier rules saved!' })
+      setMessage({ type: 'success', text: '✅ Tier rules saved!' })
     } catch (error) {
-      setMessage({ type: 'error', text: 'âŒ Error: ' + error.message })
+      setMessage({ type: 'error', text: '❌ Error: ' + error.message })
     } finally {
       setSaving(false)
     }
@@ -215,15 +255,19 @@ export default function Settings() {
     try {
       const { error } = await supabase
         .from('catalog')
-        .insert({
-          ...newItem,
+        .insert([{
           model_id: modelId,
-          base_price: parseFloat(newItem.base_price)
-        })
+          offer_id: newItem.offer_id,
+          title: newItem.title,
+          base_price: parseFloat(newItem.base_price),
+          nivel: parseInt(newItem.nivel),
+          tags: newItem.tags,
+          description: newItem.description
+        }])
 
       if (error) throw error
 
-      setMessage({ type: 'success', text: 'âœ… Item added to catalog!' })
+      setMessage({ type: 'success', text: '✅ Catalog item added!' })
       setShowAddCatalog(false)
       setNewItem({
         offer_id: '',
@@ -235,32 +279,35 @@ export default function Settings() {
       })
       loadCatalog()
     } catch (error) {
-      setMessage({ type: 'error', text: 'âŒ Error: ' + error.message })
+      setMessage({ type: 'error', text: '❌ Error: ' + error.message })
     } finally {
       setSaving(false)
     }
   }
 
-  const handleDeleteCatalogItem = async (offerId) => {
-    if (!confirm('Delete this item from catalog?')) return
+  const handleDeleteCatalogItem = async (itemId) => {
+    if (!confirm('Delete this catalog item?')) return
 
     try {
       const { error } = await supabase
         .from('catalog')
         .delete()
-        .eq('offer_id', offerId)
-        .eq('model_id', modelId)
+        .eq('id', itemId)
 
       if (error) throw error
 
-      setMessage({ type: 'success', text: 'âœ… Item deleted!' })
+      setMessage({ type: 'success', text: '✅ Item deleted!' })
       loadCatalog()
     } catch (error) {
-      setMessage({ type: 'error', text: 'âŒ Error: ' + error.message })
+      setMessage({ type: 'error', text: '❌ Error: ' + error.message })
     }
   }
 
-  // ðŸ†• NEW: Handle fan notes save
+  const handleSelectFan = (fan) => {
+    setSelectedFan(fan)
+    setFanNotes(fan.notes || '')
+  }
+
   const handleSaveFanNotes = async () => {
     if (!selectedFan) return
 
@@ -270,33 +317,26 @@ export default function Settings() {
     try {
       const { error } = await supabase
         .from('fans')
-        .update({ notes: fanNotes.trim() || null })
+        .update({ notes: fanNotes })
         .eq('fan_id', selectedFan.fan_id)
         .eq('model_id', modelId)
 
       if (error) throw error
 
-      setMessage({ type: 'success', text: 'âœ… Fan notes saved!' })
+      setMessage({ type: 'success', text: `✅ Notes saved for ${selectedFan.name}` })
       
       // Update local state
       setFans(fans.map(f => 
         f.fan_id === selectedFan.fan_id 
-          ? { ...f, notes: fanNotes.trim() || null }
+          ? { ...f, notes: fanNotes }
           : f
       ))
-      
-      setSelectedFan({ ...selectedFan, notes: fanNotes.trim() || null })
+      setSelectedFan({ ...selectedFan, notes: fanNotes })
     } catch (error) {
-      setMessage({ type: 'error', text: 'âŒ Error: ' + error.message })
+      setMessage({ type: 'error', text: '❌ Error: ' + error.message })
     } finally {
       setSaving(false)
     }
-  }
-
-  // ðŸ†• NEW: Handle fan selection
-  const handleSelectFan = (fan) => {
-    setSelectedFan(fan)
-    setFanNotes(fan.notes || '')
   }
 
   if (loading) {
@@ -315,7 +355,7 @@ export default function Settings() {
       <Navbar />
       <div className="container" style={{ maxWidth: '1200px', margin: '0 auto', padding: '2rem' }}>
         <h1 style={{ fontSize: '2rem', fontWeight: 'bold', marginBottom: '2rem', color: '#1f2937' }}>
-          âš™ï¸ Settings
+          ⚙️ Settings
         </h1>
 
         {/* Message Banner */}
@@ -340,7 +380,8 @@ export default function Settings() {
           borderBottom: '2px solid #e5e7eb'
         }}>
           {[
-            { id: 'config', label: '🧠– Model Config', emoji: '🧠' },
+            { id: 'connect', label: '🔗 OnlyFans', emoji: '🔗' },
+            { id: 'config', label: '🧠 Model Config', emoji: '🧠' },
             { id: 'tiers', label: '💎 Tier Rules', emoji: '💎' },
             { id: 'catalog', label: '📦 Catalog', emoji: '📦' },
             { id: 'notes', label: '🗒️ Fan Notes', emoji: '🗒️' }
@@ -350,10 +391,13 @@ export default function Settings() {
               onClick={() => setActiveTab(tab.id)}
               style={{
                 padding: '1rem 1.5rem',
-                fontWeight: activeTab === tab.id ? 600 : 400,
+                fontSize: '1rem',
+                fontWeight: 600,
+                border: 'none',
+                borderBottom: activeTab === tab.id ? '3px solid #7c3aed' : '3px solid transparent',
+                background: activeTab === tab.id ? '#f5f3ff' : 'transparent',
                 color: activeTab === tab.id ? '#7c3aed' : '#6b7280',
-                background: activeTab === tab.id ? '#f3f4f6' : 'transparent',
-                borderBottom: activeTab === tab.id ? '3px solid #7c3aed' : 'none',
+                cursor: 'pointer',
                 transition: 'all 0.2s'
               }}
             >
@@ -363,554 +407,226 @@ export default function Settings() {
         </div>
 
         {/* Tab Content */}
-        <div className="card">
-          <div style={{ padding: '1.5rem' }}>
-            
-            {/* TAB 1: MODEL CONFIG */}
-            {activeTab === 'config' && config && (
-              <form onSubmit={handleSaveConfig} style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-                {/* Model Name */}
-                <div>
-                  <label style={{ display: 'block', fontWeight: 600, marginBottom: '0.5rem', color: '#374151' }}>
-                    Model Name
-                  </label>
-                  <input
-                    type="text"
-                    value={config.name || ''}
-                    onChange={(e) => setConfig({...config, name: e.target.value})}
-                    placeholder="Sofia"
-                    style={{
-                      width: '100%',
-                      padding: '0.75rem',
-                      border: '2px solid #e5e7eb',
-                      borderRadius: '0.5rem',
-                      fontSize: '1rem'
-                    }}
-                  />
-                </div>
+        <div style={{ 
+          background: 'white', 
+          borderRadius: '0.75rem', 
+          padding: '2rem',
+          boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
+        }}>
+          <div>
 
-                {/* Age & Niche */}
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-                  <div>
-                    <label style={{ display: 'block', fontWeight: 600, marginBottom: '0.5rem', color: '#374151' }}>
-                      Age
-                    </label>
-                    <input
-                      type="number"
-                      value={config.age || ''}
-                      onChange={(e) => setConfig({...config, age: parseInt(e.target.value)})}
-                      placeholder="25"
-                      style={{
-                        width: '100%',
-                        padding: '0.75rem',
-                        border: '2px solid #e5e7eb',
-                        borderRadius: '0.5rem'
-                      }}
-                    />
-                  </div>
-                  
-                  <div>
-                    <label style={{ display: 'block', fontWeight: 600, marginBottom: '0.5rem', color: '#374151' }}>
-                      Niche
-                    </label>
-                    <input
-                      type="text"
-                      value={config.niche || ''}
-                      onChange={(e) => setConfig({...config, niche: e.target.value})}
-                      placeholder="fitness, lifestyle"
-                      style={{
-                        width: '100%',
-                        padding: '0.75rem',
-                        border: '2px solid #e5e7eb',
-                        borderRadius: '0.5rem'
-                      }}
-                    />
-                  </div>
-                </div>
-
-                {/* Language & AI Model */}
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-                  <div>
-                    <label style={{ display: 'block', fontWeight: 600, marginBottom: '0.5rem', color: '#374151' }}>
-                      Language
-                    </label>
-                    <select
-                      value={config.language_code || 'en'}
-                      onChange={(e) => setConfig({...config, language_code: e.target.value})}
-                      style={{
-                        width: '100%',
-                        padding: '0.75rem',
-                        border: '2px solid #e5e7eb',
-                        borderRadius: '0.5rem'
-                      }}
-                    >
-                      <option value="en">English</option>
-                      <option value="es">Spanish</option>
-                    </select>
-                  </div>
-                  
-                  <div>
-                    <label style={{ display: 'block', fontWeight: 600, marginBottom: '0.5rem', color: '#374151' }}>
-                      AI Model
-                    </label>
-                    <select
-                      value={config.claude_model || 'claude-sonnet-4-5-20250929'}
-                      onChange={(e) => setConfig({...config, claude_model: e.target.value})}
-                      style={{
-                        width: '100%',
-                        padding: '0.75rem',
-                        border: '2px solid #e5e7eb',
-                        borderRadius: '0.5rem'
-                      }}
-                    >
-                      <option value="claude-haiku-4-5-20251001">
-                        💚 Haiku 4.5 - Cheapest (~$7/month)
-                      </option>
-                      <option value="claude-sonnet-4-5-20250929">
-                        💙 Sonnet 4.5 - Balanced (~$30/month) ⭐
-                      </option>
-                      <option value="claude-opus-4-1-20250805">
-                        💜 Opus 4.1 - Smartest (~$45/month)
-                      </option>
-                    </select>
-                    <p style={{ fontSize: '0.75rem', color: '#6b7280', marginTop: '0.25rem' }}>
-                      {config.claude_model === 'claude-haiku-4-5-20251001' && '⚡ Fastest, most affordable. Good for quick responses.'}
-                      {(config.claude_model === 'claude-sonnet-4-5-20250929' || !config.claude_model) && '🎯 Best balance of quality and cost. No censorship.'}
-                      {config.claude_model === 'claude-opus-4-1-20250805' && '🧠 Most intelligent, best analysis. Highest cost.'}
-                    </p>
-                  </div>
-                </div>
-
-                {/* Claude API Key */}
-                <div>
-                  <label style={{ display: 'block', fontWeight: 600, marginBottom: '0.5rem', color: '#374151' }}>
-                    🔑 Claude API Key
-                  </label>
-                  <input
-                    type="password"
-                    value={config.anthropic_api_key || ''}
-                    onChange={(e) => setConfig({...config, anthropic_api_key: e.target.value})}
-                    placeholder="sk-ant-api03-..."
-                    style={{
-                      width: '100%',
-                      padding: '0.75rem',
-                      border: '2px solid #e5e7eb',
-                      borderRadius: '0.5rem',
-                      fontFamily: 'monospace'
-                    }}
-                  />
-                  <div style={{ 
-                    marginTop: '0.5rem',
-                    padding: '0.75rem',
-                    background: '#eff6ff',
-                    borderRadius: '0.5rem',
-                    border: '1px solid #bfdbfe'
-                  }}>
-                    <p style={{ fontSize: '0.875rem', color: '#1e40af', marginBottom: '0.5rem', fontWeight: 600 }}>
-                      📌 How to get your API key:
-                    </p>
-                    <ol style={{ fontSize: '0.875rem', color: '#374151', marginLeft: '1.25rem', lineHeight: '1.5' }}>
-                      <li>Go to: <a 
-                        href="https://console.anthropic.com" 
-                        target="_blank" 
-                        rel="noopener noreferrer"
-                        style={{ color: '#3b82f6', textDecoration: 'underline', fontWeight: 600 }}
-                      >
-                        console.anthropic.com
-                      </a></li>
-                      <li>Click "Get API Key" → Create Key</li>
-                      <li>Add $10-20 credits (Billing → Add Credits)</li>
-                      <li>Copy key (starts with sk-ant-api03-...)</li>
-                      <li>Paste here and Save</li>
-                    </ol>
-                    <p style={{ fontSize: '0.75rem', color: '#6b7280', marginTop: '0.5rem' }}>
-                      💰 Cost: ~$0.018 per response (~$20-30/month for 50 fans/day)
-                    </p>
-                  </div>
-                </div>
-
-                {/* Temperature & Emoji Level */}
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-                  <div>
-                    <label style={{ display: 'block', fontWeight: 600, marginBottom: '0.5rem', color: '#374151' }}>
-                      Temperature (Creativity)
-                    </label>
-                    <input
-                      type="range"
-                      min="0"
-                      max="1"
-                      step="0.1"
-                      value={config.temperature || 0.8}
-                      onChange={(e) => setConfig({...config, temperature: parseFloat(e.target.value)})}
-                      style={{ width: '100%' }}
-                    />
-                    <p style={{ fontSize: '0.875rem', color: '#6b7280', marginTop: '0.25rem' }}>
-                      {config.temperature || 0.8} - {(config.temperature || 0.8) < 0.5 ? 'More focused' : (config.temperature || 0.8) > 0.7 ? 'More creative' : 'Balanced'}
-                    </p>
-                  </div>
-
-                  <div>
-                    <label style={{ display: 'block', fontWeight: 600, marginBottom: '0.5rem', color: '#374151' }}>
-                      Emoji Level
-                    </label>
-                    <select
-                      value={config.emoji_level || 2}
-                      onChange={(e) => setConfig({...config, emoji_level: parseInt(e.target.value)})}
-                      style={{
-                        width: '100%',
-                        padding: '0.75rem',
-                        border: '2px solid #e5e7eb',
-                        borderRadius: '0.5rem'
-                      }}
-                    >
-                      <option value="1">Low (1-2 emojis)</option>
-                      <option value="2">Medium (2-3 emojis)</option>
-                      <option value="3">High (3-5 emojis)</option>
-                    </select>
-                  </div>
-                </div>
-
-                {/* Model Notes */}
-                <div>
-                  <label style={{ display: 'block', fontWeight: 600, marginBottom: '0.5rem', color: '#374151' }}>
-                    Model Notes (Personality, Backstory, Interests)
-                  </label>
-                  <textarea
-                    value={config.model_notes || ''}
-                    onChange={(e) => setConfig({...config, model_notes: e.target.value})}
-                    placeholder="e.g., I'm April, 25 years old, love yoga and fitness. I'm playful and flirty but also caring..."
-                    rows={4}
-                    style={{
-                      width: '100%',
-                      padding: '0.75rem',
-                      border: '2px solid #e5e7eb',
-                      borderRadius: '0.5rem',
-                      fontFamily: 'inherit',
-                      resize: 'vertical'
-                    }}
-                  />
-                  <p style={{ fontSize: '0.875rem', color: '#6b7280', marginTop: '0.5rem' }}>
-                    This context helps AI respond more authentically as your character.
-                  </p>
-                </div>
-
-                {/* Sales Approach */}
-                <div>
-                  <label style={{ display: 'block', fontWeight: 600, marginBottom: '0.5rem', color: '#374151' }}>
-                    Sales Approach
-                  </label>
-                  <select
-                    value={config.sales_approach || 'conversational_organic'}
-                    onChange={(e) => setConfig({...config, sales_approach: e.target.value})}
-                    style={{
-                      width: '100%',
-                      padding: '0.75rem',
-                      border: '2px solid #e5e7eb',
-                      borderRadius: '0.5rem'
-                    }}
-                  >
-                    <option value="subtle">Subtle (Soft mentions)</option>
-                    <option value="conversational_organic">Conversational Organic (Natural flow)</option>
-                    <option value="direct">Direct (Clear offers)</option>
-                    <option value="aggressive">Aggressive (Push sales, create urgency)</option>
-                  </select>
-                  <p style={{ fontSize: '0.875rem', color: '#6b7280', marginTop: '0.5rem' }}>
-                    How the AI approaches selling content to fans
-                  </p>
-                </div>
-
-                <button
-                  type="submit"
-                  disabled={saving}
-                  style={{
-                    width: '100%',
-                    padding: '1rem',
-                    background: saving ? '#9ca3af' : '#7c3aed',
-                    color: 'white',
-                    borderRadius: '0.5rem',
-                    fontWeight: 600,
-                    fontSize: '1.125rem',
-                    cursor: saving ? 'not-allowed' : 'pointer'
-                  }}
-                >
-                  {saving ? 'ðŸ’¾ Saving...' : 'ðŸ’¾ Save Config'}
-                </button>
-              </form>
-            )}
-
-            {/* TAB 2: TIER RULES */}
-            {activeTab === 'tiers' && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-                {tierRules.map((rule, idx) => (
-                  <div key={rule.id} style={{
-                    padding: '1.5rem',
-                    background: '#f9fafb',
-                    borderRadius: '0.5rem',
-                    border: '2px solid #e5e7eb'
-                  }}>
-                    <h3 style={{
-                      fontSize: '1.25rem',
-                      fontWeight: 'bold',
-                      marginBottom: '1rem',
-                      color: rule.tier_name === 'FREE' ? '#6b7280' : 
-                             rule.tier_name === 'VIP' ? '#7c3aed' : '#eab308'
+            {/* ✨ TAB 0: ONLYFANS CONNECTION */}
+            {activeTab === 'connect' && (
+              <div>
+                <h2 style={{ fontSize: '1.5rem', fontWeight: 600, marginBottom: '1.5rem', color: '#1f2937' }}>
+                  🔗 OnlyFans Connection
+                </h2>
+                
+                {isConnected ? (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                    <div style={{ 
+                      flex: 1, 
+                      background: '#d1fae5', 
+                      border: '2px solid #10b981', 
+                      borderRadius: '0.75rem', 
+                      padding: '1.5rem' 
                     }}>
-                      {rule.tier_name === 'FREE' ? 'ðŸ†“' : rule.tier_name === 'VIP' ? 'ðŸ’Ž' : 'ðŸ‹'} {rule.tier_name}
-                    </h3>
-
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem' }}>
-                      <div>
-                        <label style={{ display: 'block', fontWeight: 600, marginBottom: '0.5rem', fontSize: '0.875rem', color: '#374151' }}>
-                          Min Spent ($)
-                        </label>
-                        <input
-                          type="number"
-                          step="0.01"
-                          value={rule.min_spent}
-                          onChange={(e) => {
-                            const newRules = [...tierRules]
-                            newRules[idx].min_spent = parseFloat(e.target.value)
-                            setTierRules(newRules)
-                          }}
-                          style={{
-                            width: '100%',
-                            padding: '0.75rem',
-                            border: '2px solid #e5e7eb',
-                            borderRadius: '0.5rem'
-                          }}
-                        />
-                      </div>
-
-                      <div>
-                        <label style={{ display: 'block', fontWeight: 600, marginBottom: '0.5rem', fontSize: '0.875rem', color: '#374151' }}>
-                          Max Spent ($)
-                        </label>
-                        <input
-                          type="number"
-                          step="0.01"
-                          value={rule.max_spent}
-                          onChange={(e) => {
-                            const newRules = [...tierRules]
-                            newRules[idx].max_spent = parseFloat(e.target.value)
-                            setTierRules(newRules)
-                          }}
-                          style={{
-                            width: '100%',
-                            padding: '0.75rem',
-                            border: '2px solid #e5e7eb',
-                            borderRadius: '0.5rem'
-                          }}
-                        />
-                      </div>
-
-                      <div>
-                        <label style={{ display: 'block', fontWeight: 600, marginBottom: '0.5rem', fontSize: '0.875rem', color: '#374151' }}>
-                          Price Multiplier
-                        </label>
-                        <input
-                          type="number"
-                          step="0.01"
-                          value={rule.price_multiplier}
-                          onChange={(e) => {
-                            const newRules = [...tierRules]
-                            newRules[idx].price_multiplier = parseFloat(e.target.value)
-                            setTierRules(newRules)
-                          }}
-                          style={{
-                            width: '100%',
-                            padding: '0.75rem',
-                            border: '2px solid #e5e7eb',
-                            borderRadius: '0.5rem'
-                          }}
-                        />
-                        <p style={{ fontSize: '0.75rem', color: '#6b7280', marginTop: '0.25rem' }}>
-                          {rule.price_multiplier > 1 ? `+${((rule.price_multiplier - 1) * 100).toFixed(0)}% more` : 
-                           rule.price_multiplier < 1 ? `${((1 - rule.price_multiplier) * 100).toFixed(0)}% discount` : 
-                           'Base price'}
-                        </p>
-                      </div>
-                    </div>
-
-                    <div style={{ marginTop: '1rem', padding: '0.75rem', background: '#ede9fe', borderRadius: '0.5rem' }}>
-                      <p style={{ fontSize: '0.875rem', color: '#374151' }}>
-                        <strong>Example:</strong> A fan who spent ${rule.min_spent} will pay{' '}
-                        <span style={{ fontWeight: 'bold', color: '#7c3aed' }}>
-                          ${(50 * rule.price_multiplier).toFixed(2)}
-                        </span>{' '}
-                        for a $50 item.
+                      <p style={{ fontSize: '1.125rem', fontWeight: 600, color: '#065f46', marginBottom: '0.5rem' }}>
+                        ✅ Connected to OnlyFans
+                      </p>
+                      <p style={{ fontSize: '0.875rem', color: '#047857' }}>
+                        Last sync: {lastSync || 'Never'}
                       </p>
                     </div>
+                    <button 
+                      onClick={handleDisconnect}
+                      style={{
+                        padding: '0.75rem 1.5rem',
+                        border: '2px solid #ef4444',
+                        color: '#ef4444',
+                        background: 'white',
+                        borderRadius: '0.5rem',
+                        fontWeight: 600,
+                        cursor: 'pointer'
+                      }}
+                    >
+                      Disconnect
+                    </button>
                   </div>
-                ))}
-
-                <button
-                  onClick={handleSaveTierRules}
-                  disabled={saving}
-                  style={{
-                    width: '100%',
-                    padding: '1rem',
-                    background: saving ? '#9ca3af' : '#7c3aed',
-                    color: 'white',
-                    borderRadius: '0.5rem',
-                    fontWeight: 600,
-                    fontSize: '1.125rem',
-                    cursor: saving ? 'not-allowed' : 'pointer'
-                  }}
-                >
-                  {saving ? 'ðŸ’¾ Saving...' : 'ðŸ’¾ Save Tier Rules'}
-                </button>
+                ) : (
+                  <div style={{ 
+                    background: '#fef3c7', 
+                    border: '2px solid #fbbf24', 
+                    borderRadius: '0.75rem', 
+                    padding: '1.5rem' 
+                  }}>
+                    <p style={{ fontSize: '1.125rem', fontWeight: 600, color: '#92400e', marginBottom: '0.75rem' }}>
+                      ⚠️ Not connected to OnlyFans
+                    </p>
+                    <p style={{ fontSize: '0.875rem', color: '#78350f', marginBottom: '1.5rem' }}>
+                      Install the ChatterOF extension and connect your account to start syncing data automatically.
+                    </p>
+                    <div style={{ display: 'flex', gap: '1rem' }}>
+                      <a 
+                        href="/extension/chatterof-extension.zip"
+                        download
+                        style={{
+                          display: 'inline-block',
+                          padding: '0.75rem 1.5rem',
+                          background: '#7c3aed',
+                          color: 'white',
+                          borderRadius: '0.5rem',
+                          fontWeight: 600,
+                          textDecoration: 'none'
+                        }}
+                      >
+                        📥 Download Extension
+                      </a>
+                      <a
+                        href="https://docs.google.com/document/d/YOUR_DOCS_LINK"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        style={{
+                          display: 'inline-block',
+                          padding: '0.75rem 1.5rem',
+                          border: '2px solid #7c3aed',
+                          color: '#7c3aed',
+                          background: 'white',
+                          borderRadius: '0.5rem',
+                          fontWeight: 600,
+                          textDecoration: 'none'
+                        }}
+                      >
+                        📖 Instructions
+                      </a>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 
-            {/* TAB 3: CATALOG */}
-            {activeTab === 'catalog' && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+            {/* TAB 1: MODEL CONFIG */}
+            {activeTab === 'config' && (
+              <div>
+                <h2 style={{ fontSize: '1.5rem', fontWeight: 600, marginBottom: '1.5rem', color: '#1f2937' }}>
+                  🧠 Model Configuration
+                </h2>
                 
-                {/* Add New Button */}
-                <button
-                  onClick={() => setShowAddCatalog(!showAddCatalog)}
-                  style={{
-                    width: '100%',
-                    padding: '0.75rem',
-                    background: showAddCatalog ? '#f3f4f6' : '#10b981',
-                    color: showAddCatalog ? '#374151' : 'white',
-                    borderRadius: '0.5rem',
-                    fontWeight: 600,
-                    cursor: 'pointer'
-                  }}
-                >
-                  {showAddCatalog ? 'âœ• Cancel' : 'âž• Add New Content'}
-                </button>
-
-                {/* Add Form */}
-                {showAddCatalog && (
-                  <form onSubmit={handleAddCatalogItem} style={{
-                    padding: '1.5rem',
-                    background: '#f9fafb',
-                    borderRadius: '0.5rem',
-                    border: '2px solid #e5e7eb',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: '1rem'
-                  }}>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                {config && (
+                  <form onSubmit={handleSaveConfig} style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
                       <div>
-                        <label style={{ display: 'block', fontWeight: 600, marginBottom: '0.5rem', fontSize: '0.875rem', color: '#374151' }}>
-                          Offer ID
+                        <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600, color: '#374151' }}>
+                          Model Name
                         </label>
                         <input
                           type="text"
-                          required
-                          value={newItem.offer_id}
-                          onChange={(e) => setNewItem({...newItem, offer_id: e.target.value})}
-                          placeholder="offer_001"
+                          value={config.name || ''}
+                          onChange={(e) => setConfig({ ...config, name: e.target.value })}
                           style={{
                             width: '100%',
                             padding: '0.75rem',
                             border: '2px solid #e5e7eb',
-                            borderRadius: '0.5rem'
+                            borderRadius: '0.375rem',
+                            fontSize: '1rem'
                           }}
                         />
                       </div>
 
                       <div>
-                        <label style={{ display: 'block', fontWeight: 600, marginBottom: '0.5rem', fontSize: '0.875rem', color: '#374151' }}>
-                          Base Price ($)
+                        <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600, color: '#374151' }}>
+                          Age
                         </label>
                         <input
                           type="number"
-                          step="0.01"
-                          required
-                          value={newItem.base_price}
-                          onChange={(e) => setNewItem({...newItem, base_price: e.target.value})}
-                          placeholder="25.00"
+                          value={config.age || ''}
+                          onChange={(e) => setConfig({ ...config, age: e.target.value })}
                           style={{
                             width: '100%',
                             padding: '0.75rem',
                             border: '2px solid #e5e7eb',
-                            borderRadius: '0.5rem'
+                            borderRadius: '0.375rem',
+                            fontSize: '1rem'
                           }}
                         />
                       </div>
                     </div>
 
                     <div>
-                      <label style={{ display: 'block', fontWeight: 600, marginBottom: '0.5rem', fontSize: '0.875rem', color: '#374151' }}>
-                        Title
+                      <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600, color: '#374151' }}>
+                        Niche
                       </label>
                       <input
                         type="text"
-                        required
-                        value={newItem.title}
-                        onChange={(e) => setNewItem({...newItem, title: e.target.value})}
-                        placeholder="Exclusive Photo Pack"
+                        value={config.niche || ''}
+                        onChange={(e) => setConfig({ ...config, niche: e.target.value })}
+                        placeholder="e.g., Fitness, Gaming, Lifestyle"
                         style={{
                           width: '100%',
                           padding: '0.75rem',
                           border: '2px solid #e5e7eb',
-                          borderRadius: '0.5rem'
+                          borderRadius: '0.375rem',
+                          fontSize: '1rem'
                         }}
                       />
                     </div>
 
                     <div>
-                      <label style={{ display: 'block', fontWeight: 600, marginBottom: '0.5rem', fontSize: '0.875rem', color: '#374151' }}>
-                        Description
+                      <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600, color: '#374151' }}>
+                        Model Notes (for AI)
                       </label>
                       <textarea
-                        required
-                        value={newItem.description}
-                        onChange={(e) => setNewItem({...newItem, description: e.target.value})}
-                        placeholder="10 exclusive behind-the-scenes photos"
-                        rows={3}
+                        value={config.model_notes || ''}
+                        onChange={(e) => setConfig({ ...config, model_notes: e.target.value })}
+                        rows={5}
+                        placeholder="e.g., Personality traits, content style, what makes you unique..."
                         style={{
                           width: '100%',
                           padding: '0.75rem',
                           border: '2px solid #e5e7eb',
-                          borderRadius: '0.5rem',
-                          resize: 'none',
-                          fontFamily: 'inherit'
+                          borderRadius: '0.375rem',
+                          fontSize: '1rem',
+                          fontFamily: 'inherit',
+                          resize: 'vertical'
                         }}
                       />
                     </div>
 
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
                       <div>
-                        <label style={{ display: 'block', fontWeight: 600, marginBottom: '0.5rem', fontSize: '0.875rem', color: '#374151' }}>
-                          Intensity Level
+                        <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600, color: '#374151' }}>
+                          Max Messages per Day
                         </label>
                         <input
                           type="number"
-                          min="1"
-                          value={newItem.nivel}
-                          onChange={(e) => setNewItem({...newItem, nivel: parseInt(e.target.value)})}
-                          placeholder="1"
+                          value={config.max_messages_per_day || 500}
+                          onChange={(e) => setConfig({ ...config, max_messages_per_day: parseInt(e.target.value) })}
                           style={{
                             width: '100%',
                             padding: '0.75rem',
                             border: '2px solid #e5e7eb',
-                            borderRadius: '0.5rem'
+                            borderRadius: '0.375rem',
+                            fontSize: '1rem'
                           }}
                         />
-                        <p style={{ fontSize: '0.75rem', color: '#6b7280', marginTop: '0.25rem' }}>
-                          Higher number = more explicit content
-                        </p>
                       </div>
 
                       <div>
-                        <label style={{ display: 'block', fontWeight: 600, marginBottom: '0.5rem', fontSize: '0.875rem', color: '#374151' }}>
-                          Tags (comma-separated)
+                        <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600, color: '#374151' }}>
+                          Message Delay (seconds)
                         </label>
                         <input
-                          type="text"
-                          value={newItem.tags}
-                          onChange={(e) => setNewItem({...newItem, tags: e.target.value})}
-                          placeholder="photos,exclusive,fitness"
+                          type="number"
+                          value={config.message_delay || 5}
+                          onChange={(e) => setConfig({ ...config, message_delay: parseInt(e.target.value) })}
+                          min="3"
+                          max="30"
                           style={{
                             width: '100%',
                             padding: '0.75rem',
                             border: '2px solid #e5e7eb',
-                            borderRadius: '0.5rem'
+                            borderRadius: '0.375rem',
+                            fontSize: '1rem'
                           }}
                         />
                       </div>
@@ -920,77 +636,378 @@ export default function Settings() {
                       type="submit"
                       disabled={saving}
                       style={{
-                        width: '100%',
-                        padding: '0.75rem',
+                        padding: '1rem',
                         background: saving ? '#9ca3af' : '#7c3aed',
                         color: 'white',
+                        border: 'none',
+                        borderRadius: '0.5rem',
+                        fontSize: '1.125rem',
+                        fontWeight: 600,
+                        cursor: saving ? 'not-allowed' : 'pointer'
+                      }}
+                    >
+                      {saving ? '💾 Saving...' : '💾 Save Config'}
+                    </button>
+                  </form>
+                )}
+              </div>
+            )}
+
+            {/* TAB 2: TIER RULES */}
+            {activeTab === 'tiers' && (
+              <div>
+                <h2 style={{ fontSize: '1.5rem', fontWeight: 600, marginBottom: '1.5rem', color: '#1f2937' }}>
+                  💎 Tier Rules
+                </h2>
+                
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                  {tierRules.map((rule) => (
+                    <div key={rule.id} style={{
+                      padding: '1.5rem',
+                      border: '2px solid #e5e7eb',
+                      borderRadius: '0.5rem',
+                      background: '#f9fafb'
+                    }}>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr 2fr 1fr', gap: '1rem', alignItems: 'center' }}>
+                        <div>
+                          <div style={{ fontSize: '1.25rem', fontWeight: 700, color: '#7c3aed' }}>
+                            {rule.tier_name}
+                          </div>
+                          <div style={{ fontSize: '0.875rem', color: '#6b7280' }}>
+                            Tier {rule.tier_level}
+                          </div>
+                        </div>
+
+                        <div>
+                          <label style={{ display: 'block', fontSize: '0.75rem', marginBottom: '0.25rem', color: '#6b7280' }}>
+                            Min Spent ($)
+                          </label>
+                          <input
+                            type="number"
+                            value={rule.min_spent}
+                            onChange={(e) => {
+                              const updated = tierRules.map(r => 
+                                r.id === rule.id ? { ...r, min_spent: parseFloat(e.target.value) } : r
+                              )
+                              setTierRules(updated)
+                            }}
+                            style={{
+                              width: '100%',
+                              padding: '0.5rem',
+                              border: '1px solid #d1d5db',
+                              borderRadius: '0.375rem'
+                            }}
+                          />
+                        </div>
+
+                        <div>
+                          <label style={{ display: 'block', fontSize: '0.75rem', marginBottom: '0.25rem', color: '#6b7280' }}>
+                            Max Spent ($)
+                          </label>
+                          <input
+                            type="number"
+                            value={rule.max_spent || 999999}
+                            onChange={(e) => {
+                              const updated = tierRules.map(r => 
+                                r.id === rule.id ? { ...r, max_spent: parseFloat(e.target.value) } : r
+                              )
+                              setTierRules(updated)
+                            }}
+                            style={{
+                              width: '100%',
+                              padding: '0.5rem',
+                              border: '1px solid #d1d5db',
+                              borderRadius: '0.375rem'
+                            }}
+                          />
+                        </div>
+
+                        <div>
+                          <label style={{ display: 'block', fontSize: '0.75rem', marginBottom: '0.25rem', color: '#6b7280' }}>
+                            Price Multiplier
+                          </label>
+                          <input
+                            type="number"
+                            step="0.1"
+                            value={rule.price_multiplier}
+                            onChange={(e) => {
+                              const updated = tierRules.map(r => 
+                                r.id === rule.id ? { ...r, price_multiplier: parseFloat(e.target.value) } : r
+                              )
+                              setTierRules(updated)
+                            }}
+                            style={{
+                              width: '100%',
+                              padding: '0.5rem',
+                              border: '1px solid #d1d5db',
+                              borderRadius: '0.375rem'
+                            }}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                <button
+                  onClick={handleSaveTierRules}
+                  disabled={saving}
+                  style={{
+                    marginTop: '1.5rem',
+                    width: '100%',
+                    padding: '1rem',
+                    background: saving ? '#9ca3af' : '#7c3aed',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '0.5rem',
+                    fontSize: '1.125rem',
+                    fontWeight: 600,
+                    cursor: saving ? 'not-allowed' : 'pointer'
+                  }}
+                >
+                  {saving ? '💾 Saving...' : '💾 Save Tier Rules'}
+                </button>
+              </div>
+            )}
+
+            {/* TAB 3: CATALOG */}
+            {activeTab === 'catalog' && (
+              <div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+                  <h2 style={{ fontSize: '1.5rem', fontWeight: 600, color: '#1f2937' }}>
+                    📦 Content Catalog
+                  </h2>
+                  <button
+                    onClick={() => setShowAddCatalog(!showAddCatalog)}
+                    style={{
+                      padding: '0.75rem 1.5rem',
+                      background: '#7c3aed',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '0.5rem',
+                      fontWeight: 600,
+                      cursor: 'pointer'
+                    }}
+                  >
+                    {showAddCatalog ? '✕ Cancel' : '+ Add Item'}
+                  </button>
+                </div>
+
+                {/* Add Item Form */}
+                {showAddCatalog && (
+                  <form onSubmit={handleAddCatalogItem} style={{
+                    marginBottom: '2rem',
+                    padding: '1.5rem',
+                    background: '#f9fafb',
+                    border: '2px solid #e5e7eb',
+                    borderRadius: '0.5rem'
+                  }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
+                      <div>
+                        <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600, color: '#374151' }}>
+                          Offer ID
+                        </label>
+                        <input
+                          type="text"
+                          value={newItem.offer_id}
+                          onChange={(e) => setNewItem({ ...newItem, offer_id: e.target.value })}
+                          required
+                          style={{
+                            width: '100%',
+                            padding: '0.75rem',
+                            border: '2px solid #e5e7eb',
+                            borderRadius: '0.375rem'
+                          }}
+                        />
+                      </div>
+
+                      <div>
+                        <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600, color: '#374151' }}>
+                          Title
+                        </label>
+                        <input
+                          type="text"
+                          value={newItem.title}
+                          onChange={(e) => setNewItem({ ...newItem, title: e.target.value })}
+                          required
+                          style={{
+                            width: '100%',
+                            padding: '0.75rem',
+                            border: '2px solid #e5e7eb',
+                            borderRadius: '0.375rem'
+                          }}
+                        />
+                      </div>
+
+                      <div>
+                        <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600, color: '#374151' }}>
+                          Base Price ($)
+                        </label>
+                        <input
+                          type="number"
+                          step="0.01"
+                          value={newItem.base_price}
+                          onChange={(e) => setNewItem({ ...newItem, base_price: e.target.value })}
+                          required
+                          style={{
+                            width: '100%',
+                            padding: '0.75rem',
+                            border: '2px solid #e5e7eb',
+                            borderRadius: '0.375rem'
+                          }}
+                        />
+                      </div>
+
+                      <div>
+                        <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600, color: '#374151' }}>
+                          Level
+                        </label>
+                        <select
+                          value={newItem.nivel}
+                          onChange={(e) => setNewItem({ ...newItem, nivel: parseInt(e.target.value) })}
+                          style={{
+                            width: '100%',
+                            padding: '0.75rem',
+                            border: '2px solid #e5e7eb',
+                            borderRadius: '0.375rem'
+                          }}
+                        >
+                          <option value={1}>1 - Basic</option>
+                          <option value={2}>2 - Standard</option>
+                          <option value={3}>3 - Premium</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    <div style={{ marginBottom: '1rem' }}>
+                      <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600, color: '#374151' }}>
+                        Tags (comma-separated)
+                      </label>
+                      <input
+                        type="text"
+                        value={newItem.tags}
+                        onChange={(e) => setNewItem({ ...newItem, tags: e.target.value })}
+                        placeholder="e.g., feet, lingerie, custom"
+                        style={{
+                          width: '100%',
+                          padding: '0.75rem',
+                          border: '2px solid #e5e7eb',
+                          borderRadius: '0.375rem'
+                        }}
+                      />
+                    </div>
+
+                    <div style={{ marginBottom: '1rem' }}>
+                      <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600, color: '#374151' }}>
+                        Description
+                      </label>
+                      <textarea
+                        value={newItem.description}
+                        onChange={(e) => setNewItem({ ...newItem, description: e.target.value })}
+                        rows={3}
+                        style={{
+                          width: '100%',
+                          padding: '0.75rem',
+                          border: '2px solid #e5e7eb',
+                          borderRadius: '0.375rem',
+                          fontFamily: 'inherit',
+                          resize: 'vertical'
+                        }}
+                      />
+                    </div>
+
+                    <button
+                      type="submit"
+                      disabled={saving}
+                      style={{
+                        width: '100%',
+                        padding: '1rem',
+                        background: saving ? '#9ca3af' : '#10b981',
+                        color: 'white',
+                        border: 'none',
                         borderRadius: '0.5rem',
                         fontWeight: 600,
                         cursor: saving ? 'not-allowed' : 'pointer'
                       }}
                     >
-                      {saving ? 'Adding...' : 'Add to Catalog'}
+                      {saving ? '➕ Adding...' : '➕ Add to Catalog'}
                     </button>
                   </form>
                 )}
 
                 {/* Catalog List */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                   {catalog.length === 0 ? (
                     <div style={{ textAlign: 'center', padding: '3rem', color: '#6b7280' }}>
-                      <p style={{ fontSize: '1.125rem' }}>No content in catalog yet.</p>
-                      <p style={{ fontSize: '0.875rem' }}>Click "Add New Content" to get started.</p>
+                      <p>No catalog items yet.</p>
+                      <p style={{ fontSize: '0.875rem' }}>Add your first content item above.</p>
                     </div>
                   ) : (
                     catalog.map((item) => (
-                      <div key={item.offer_id} style={{
-                        background: 'white',
+                      <div key={item.id} style={{
+                        padding: '1.5rem',
                         border: '2px solid #e5e7eb',
                         borderRadius: '0.5rem',
-                        padding: '1rem',
-                        transition: 'border-color 0.2s'
+                        background: 'white'
                       }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start' }}>
                           <div style={{ flex: 1 }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.5rem' }}>
+                              <h3 style={{ fontSize: '1.125rem', fontWeight: 600, color: '#1f2937', margin: 0 }}>
+                                {item.title}
+                              </h3>
                               <span style={{
-                                padding: '0.25rem 0.5rem',
-                                borderRadius: '0.25rem',
+                                padding: '0.25rem 0.75rem',
+                                background: '#ede9fe',
+                                color: '#7c3aed',
+                                borderRadius: '9999px',
                                 fontSize: '0.75rem',
-                                fontWeight: 600,
-                                background: item.nivel <= 3 ? '#d1fae5' : item.nivel <= 6 ? '#dbeafe' : '#ede9fe',
-                                color: item.nivel <= 3 ? '#065f46' : item.nivel <= 6 ? '#1e3a8a' : '#5b21b6'
+                                fontWeight: 600
                               }}>
-                                Intensity {item.nivel}
+                                Level {item.nivel}
                               </span>
-                              <span style={{ fontSize: '0.75rem', color: '#6b7280' }}>{item.offer_id}</span>
                             </div>
-                            <h3 style={{ fontSize: '1.125rem', fontWeight: 'bold', color: '#1f2937' }}>{item.title}</h3>
-                            <p style={{ fontSize: '0.875rem', color: '#6b7280', marginTop: '0.25rem' }}>{item.description}</p>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginTop: '0.5rem' }}>
-                              <span style={{ fontSize: '1.5rem', fontWeight: 'bold', color: '#10b981' }}>${item.base_price}</span>
-                              {item.tags && (
-                                <span style={{ fontSize: '0.75rem', color: '#6b7280' }}>
-                                  ðŸ·ï¸ {item.tags}
-                                </span>
-                              )}
+                            <div style={{ fontSize: '0.875rem', color: '#6b7280', marginBottom: '0.75rem' }}>
+                              ID: {item.offer_id}
                             </div>
+                            <div style={{ fontSize: '1.25rem', fontWeight: 700, color: '#10b981', marginBottom: '0.75rem' }}>
+                              ${item.base_price}
+                            </div>
+                            {item.tags && (
+                              <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginBottom: '0.75rem' }}>
+                                {item.tags.split(',').map((tag, i) => (
+                                  <span key={i} style={{
+                                    padding: '0.25rem 0.75rem',
+                                    background: '#dbeafe',
+                                    color: '#1e40af',
+                                    borderRadius: '0.25rem',
+                                    fontSize: '0.75rem'
+                                  }}>
+                                    {tag.trim()}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
+                            {item.description && (
+                              <p style={{ fontSize: '0.875rem', color: '#6b7280', margin: 0 }}>
+                                {item.description}
+                              </p>
+                            )}
                           </div>
                           <button
-                            onClick={() => handleDeleteCatalogItem(item.offer_id)}
+                            onClick={() => handleDeleteCatalogItem(item.id)}
                             style={{
-                              marginLeft: '1rem',
                               padding: '0.5rem 1rem',
-                              background: '#fee2e2',
-                              color: '#991b1b',
-                              borderRadius: '0.5rem',
+                              background: 'transparent',
+                              border: '2px solid #ef4444',
+                              color: '#ef4444',
+                              borderRadius: '0.375rem',
                               fontWeight: 600,
-                              fontSize: '0.875rem',
                               cursor: 'pointer',
-                              transition: 'background 0.2s'
+                              fontSize: '0.875rem'
                             }}
                           >
-                            ðŸ—‘ï¸ Delete
+                            Delete
                           </button>
                         </div>
                       </div>
@@ -1000,7 +1017,7 @@ export default function Settings() {
               </div>
             )}
 
-            {/* ðŸ†• TAB 4: FAN NOTES */}
+            {/* TAB 4: FAN NOTES */}
             {activeTab === 'notes' && (
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '1.5rem', minHeight: '500px' }}>
                 
@@ -1012,13 +1029,13 @@ export default function Settings() {
                   maxHeight: '600px'
                 }}>
                   <h3 style={{ fontSize: '1.125rem', fontWeight: 600, marginBottom: '1rem', color: '#374151' }}>
-                    ðŸ“‹ Select a Fan
+                    📋 Select a Fan
                   </h3>
                   
-                  {/* ðŸ†• Search Bar */}
+                  {/* Search Bar */}
                   <div style={{ marginBottom: '1rem' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                      <span style={{ fontSize: '1rem' }}>ðŸ”</span>
+                      <span style={{ fontSize: '1rem' }}>🔍</span>
                       <input
                         type="text"
                         value={fanSearchQuery}
@@ -1045,7 +1062,7 @@ export default function Settings() {
                             color: '#6b7280'
                           }}
                         >
-                          âœ•
+                          ✕
                         </button>
                       )}
                     </div>
@@ -1095,7 +1112,7 @@ export default function Settings() {
                                     borderRadius: '0.25rem',
                                     fontWeight: 600
                                   }}>
-                                    ðŸ“œ
+                                    📝
                                   </span>
                                 )}
                               </div>
@@ -1132,7 +1149,7 @@ export default function Settings() {
                           {selectedFan.name || 'Unknown'}
                         </h3>
                         <div style={{ fontSize: '0.875rem', color: '#6b7280' }}>
-                          {selectedFan.fan_id} â€¢ {selectedFan.tier} â€¢ ${selectedFan.spent_total} spent
+                          {selectedFan.fan_id} • {selectedFan.tier} • ${selectedFan.spent_total} spent
                         </div>
                       </div>
 
@@ -1143,7 +1160,7 @@ export default function Settings() {
                         border: '1px solid #fbbf24'
                       }}>
                         <p style={{ fontSize: '0.875rem', color: '#92400e', margin: 0 }}>
-                          ðŸ’¡ <strong>Add context about this fan</strong> that the AI will use to personalize responses.
+                          💡 <strong>Add context about this fan</strong> that the AI will use to personalize responses.
                           Include: name, age, interests, purchase history, preferences, etc.
                         </p>
                       </div>
@@ -1187,7 +1204,7 @@ export default function Settings() {
                           cursor: saving ? 'not-allowed' : 'pointer'
                         }}
                       >
-                        {saving ? 'ðŸ’¾ Saving...' : 'ðŸ’¾ Save Notes'}
+                        {saving ? '💾 Saving...' : '💾 Save Notes'}
                       </button>
                     </div>
                   ) : (
@@ -1199,7 +1216,7 @@ export default function Settings() {
                       color: '#6b7280'
                     }}>
                       <div style={{ textAlign: 'center' }}>
-                        <p style={{ fontSize: '1.125rem', marginBottom: '0.5rem' }}>ðŸ‘ˆ Select a fan to edit their notes</p>
+                        <p style={{ fontSize: '1.125rem', marginBottom: '0.5rem' }}>👈 Select a fan to edit their notes</p>
                         <p style={{ fontSize: '0.875rem' }}>Notes help the AI personalize responses based on past history</p>
                       </div>
                     </div>
