@@ -1,6 +1,7 @@
-// /api/test-of-fans.js - Prueba con headers reales de BD (SIN PROXY)
+// /api/test-of-fans.js - Prueba con headers reales de BD
 import crypto from 'crypto';
 import { createClient } from '@supabase/supabase-js';
+import { HttpsProxyAgent } from 'https-proxy-agent';
 
 const supabase = createClient(
   process.env.VITE_SUPABASE_URL,
@@ -8,6 +9,7 @@ const supabase = createClient(
 );
 
 const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY || 'your-32-byte-encryption-key-here!!';
+const PROXY_URL = 'http://stonysolitude151430:KhLvKb761WX0@3hsu5e5kjf.cn.fxdx.in:16508';
 
 function decrypt(text) {
   const parts = text.split(':');
@@ -64,10 +66,14 @@ export default async function handler(req, res) {
 
     console.log('📋 Using headers:', Object.keys(headers));
 
+    // Configurar proxy
+    const agent = new HttpsProxyAgent(PROXY_URL);
+
     // Test: Obtener suscriptores
     console.log('🔍 Fetching subscribers...');
     const response = await fetch('https://onlyfans.com/api2/v2/subscriptions/subscribers?limit=10', {
-      headers
+      headers,
+      agent
     });
 
     console.log('📊 Response status:', response.status);
