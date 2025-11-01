@@ -41,15 +41,13 @@ export default async function handler(req, res) {
       model_id, modelId,
       sess_cookie, sess,
       auth_id, authId,
-      user_agent, userAgent,
-      ofHeaders // ✨ NUEVO
+      user_agent, userAgent
     } = req.body;
 
     const finalModelId = model_id || modelId;
     const finalSess = sess_cookie || sess;
     const finalAuthId = auth_id || authId;
     const finalUserAgent = user_agent || userAgent;
-    const finalHeaders = ofHeaders || {};
 
     if (!finalModelId || !finalSess || !finalAuthId) {
       return res.status(400).json({ 
@@ -69,7 +67,6 @@ export default async function handler(req, res) {
         sess_encrypted: sessEncrypted,
         auth_id_encrypted: authIdEncrypted,
         user_agent: finalUserAgent || 'Unknown',
-        of_headers: finalHeaders, // ✨ NUEVO
         last_sync: new Date().toISOString(),
         expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
         is_active: true
@@ -84,7 +81,7 @@ export default async function handler(req, res) {
 
     console.log('✅ Session saved for:', finalModelId);
 
-    const syncResult = await syncInitialData(finalModelId, finalSess, finalAuthId, finalUserAgent, finalHeaders);
+    const syncResult = await syncInitialData(finalModelId, finalSess, finalAuthId, finalUserAgent);
 
     res.json({ 
       success: true,
@@ -100,7 +97,7 @@ export default async function handler(req, res) {
   }
 }
 
-async function syncInitialData(modelId, sessCookie, authId, userAgent, ofHeaders = {}) {
+async function syncInitialData(modelId, sessCookie, authId, userAgent) {
   console.log('🔄 Starting initial sync for:', modelId);
 
   let fansCount = 0;
@@ -109,8 +106,7 @@ async function syncInitialData(modelId, sessCookie, authId, userAgent, ofHeaders
     const headers = {
       'Cookie': `sess=${sessCookie}; auth_id=${authId}`,
       'User-Agent': userAgent,
-      'Accept': 'application/json',
-      ...ofHeaders // ✨ Agregar headers capturados (x-bc, app-token, etc)
+      'Accept': 'application/json'
     };
 
     // 1. Sync fans
