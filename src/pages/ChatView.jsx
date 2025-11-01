@@ -44,21 +44,29 @@ export default function ChatView() {
     const modelId = user.user_metadata.model_id;
 
     try {
+      // 🔥 FIX: Usar maybeSingle() en vez de single() para evitar error 406
       const { data: fanData, error: fanError } = await supabase
         .from('fans')
         .select('*')
         .eq('fan_id', fanId)
         .eq('model_id', modelId)
-        .single();
+        .maybeSingle();
 
       if (fanError) {
         console.error('❌ Fan error:', fanError);
         setLoading(false);
         return;
       }
+      
+      if (!fanData) {
+        console.log('⚠️ Fan no encontrado');
+        setLoading(false);
+        return;
+      }
 
       setFan(fanData);
 
+      // 🔥 FIX: Log para ver cuántos mensajes se cargan
       const { data: messagesData, error: messagesError } = await supabase
         .from('chat')
         .select('*')
@@ -67,7 +75,10 @@ export default function ChatView() {
         .order('ts', { ascending: true })
         .limit(200);
 
-      if (!messagesError) {
+      if (messagesError) {
+        console.error('❌ Messages error:', messagesError);
+      } else {
+        console.log(`✅ Loaded ${messagesData?.length || 0} messages`);
         setMessages(messagesData || []);
         
         // 🔥 CALCULAR STATS DEL FAN
@@ -81,16 +92,25 @@ export default function ChatView() {
     }
   }
   
-  // 🔥 NUEVO: Calcular estadísticas del fan
+  // 🔥 FIX: Calcular estadísticas del fan con conversión correcta de números
   function calculateFanStats(msgs) {
     const tips = msgs.filter(m => m.message_type === 'tip');
     const ppvs = msgs.filter(m => m.message_type === 'ppv_unlocked');
     const lastMsg = msgs.filter(m => m.from === 'fan').slice(-1)[0];
     
+    // 🔥 FIX: Convertir a número correctamente
+    const totalTips = tips.reduce((sum, t) => sum + (parseFloat(t.amount) || 0), 0);
+    const totalPPV = ppvs.reduce((sum, p) => sum + (parseFloat(p.amount) || 0), 0);
+    
+    console.log('📊 Stats calculadas:', {
+      tips: `${tips.length} tips = $${totalTips}`,
+      ppvs: `${ppvs.length} PPVs = $${totalPPV}`
+    });
+    
     setFanStats({
-      totalTips: tips.reduce((sum, t) => sum + (t.amount || 0), 0),
+      totalTips: totalTips,
       tipsCount: tips.length,
-      ppvUnlocked: ppvs.reduce((sum, p) => sum + (p.amount || 0), 0),
+      ppvUnlocked: totalPPV,
       ppvCount: ppvs.length,
       lastInteraction: lastMsg?.ts || null
     });
@@ -369,23 +389,37 @@ export default function ChatView() {
                         : 'bg-white border'
                     }`}
                   >
-                    <p className="text-sm">{msg.message}</p>
+                    <p className="text-sm whitespace-pre-wrap">{msg.message}</p>
                     
-                    {/* 🔥 MOSTRAR TIP/PPV */}
+                    {/* 🔥 MOSTRAR TIP/PPV/PPV LOCKED */}
                     {msg.amount && (
-                      <div className="mt-1 text-xs font-bold">
-                        {msg.message_type === 'tip' && '💰 Tip: $'}
-                        {msg.message_type === 'ppv_unlocked' && '🔓 PPV: $'}
-                        {msg.amount}
+                      <div className={`mt-2 px-2 py-1 rounded text-xs font-bold ${
+                        msg.message_type === 'tip' ? 'bg-green-100 text-green-700' :
+                        msg.message_type === 'ppv_unlocked' ? 'bg-blue-100 text-blue-700' :
+                        msg.message_type === 'ppv_locked' ? 'bg-yellow-100 text-yellow-700' :
+                        'bg-gray-100'
+                      }`}>
+                        {msg.message_type === 'tip' && '💰 Tip: $' + msg.amount}
+                        {msg.message_type === 'ppv_unlocked' && '🔓 PPV Comprado: $' + msg.amount}
+                        {msg.message_type === 'ppv_locked' && '🔒 PPV Bloqueado: $' + msg.amount}
                       </div>
                     )}
                     
                     {/* 🔥 MOSTRAR IMÁGENES */}
-                    {msg.media_urls && (
-                      <div className="mt-2">
-                        <span className="text-xs">📷 {JSON.parse(msg.media_urls).length} imagen(es)</span>
-                      </div>
-                    )}
+                    {msg.media_urls && (() => {
+                      try {
+                        const urls = JSON.parse(msg.media_urls);
+                        return (
+                          <div className="mt-2">
+                            <span className="text-xs bg-purple-100 text-purple-700 px-2 py-1 rounded">
+                              📷 {urls.length} imagen(es)
+                            </span>
+                          </div>
+                        );
+                      } catch (e) {
+                        return null;
+                      }
+                    })()}
                     
                     <p className="text-xs mt-1 opacity-75">
                       {new Date(msg.ts).toLocaleString()}
