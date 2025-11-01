@@ -222,11 +222,15 @@ export default function ChatterDashboard() {
       })
 
       console.log('✅ AI Response:', data)
+      console.log('📝 AI Response KEYS:', data ? Object.keys(data) : 'no data')
+      console.log('📝 AI Response.response.texto:', data?.response?.texto)
+      console.log('📝 Full JSON:', JSON.stringify(data, null, 2))
       console.log('❌ AI Error:', error)
 
       if (error) throw error
 
-      setAiSuggestion(data)
+      // ✅ Guardar data.response, no data directamente
+      setAiSuggestion(data.response)
     } catch (error) {
       console.error('❌ Error generating AI:', error)
       alert('Error generating AI response: ' + error.message)
