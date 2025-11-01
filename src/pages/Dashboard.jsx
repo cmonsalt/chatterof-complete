@@ -221,7 +221,7 @@ export default function Dashboard() {
                     onClick={() => setShowActiveOnly(false)}
                     className={`px-4 py-1.5 rounded-md text-sm font-medium transition ${
                       !showActiveOnly 
-                        : 'bg-white shadow text-blue-600' 
+                        ? 'bg-white shadow text-blue-600' 
                         : 'text-gray-600 hover:text-gray-900'
                     }`}
                   >
