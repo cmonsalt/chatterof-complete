@@ -1,7 +1,7 @@
 // src/pages/AuthCallback.jsx
 import { useEffect, useState } from 'react'
 import { useSearchParams, useNavigate } from 'react-router-dom'
-import { useAuth } from '../contexts/AuthContext'
+import { useAuth } from '../contexts/AuthContext'  // ← FALTABA ESTO
 import { supabase } from '../lib/supabase'
 
 export default function AuthCallback() {
@@ -27,7 +27,6 @@ export default function AuthCallback() {
       try {
         setStatus('💾 Guardando conexión...')
         
-        // Guardar account_id en el modelo
         const { error } = await supabase
           .from('models')
           .update({ of_account_id: accountId })
@@ -35,15 +34,11 @@ export default function AuthCallback() {
 
         if (error) throw error
 
-        setStatus('✅ ¡Conectado! Sincronizando datos...')
-
-        // Opcional: Ejecutar sync inicial aquí
-        // await fetch(`/api/onlyfans/sync-chats?accountId=${accountId}`)
-        // await fetch(`/api/onlyfans/sync-fans?accountId=${accountId}`)
+        setStatus('✅ ¡Conectado!')
 
         setTimeout(() => {
           navigate('/settings')
-        }, 2000)
+        }, 1500)
 
       } catch (error) {
         setStatus('❌ Error: ' + error.message)
@@ -63,7 +58,7 @@ export default function AuthCallback() {
       gap: '1rem'
     }}>
       <div style={{ fontSize: '3rem' }}>🔗</div>
-      <h2 style={{ fontSize: '1.5rem', fontWeight: 600 }}>{status}</h2>
+      <h2>{status}</h2>
     </div>
   )
 }
