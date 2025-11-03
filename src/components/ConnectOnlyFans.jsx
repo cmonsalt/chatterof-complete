@@ -42,11 +42,25 @@ export default function ConnectOnlyFans({ modelId, onSuccess }) {
         throw new Error(data.message || 'Authentication failed')
       }
 
-      setAttemptId(data.attempt_id)
-      setStep('polling')
-      pollAuthStatus(data.attempt_id)
+      console.log('Auth response:', data)
+
+      // Verificar qué devuelve la API
+      if (data.attempt_id) {
+        setAttemptId(data.attempt_id)
+        setStep('polling')
+        pollAuthStatus(data.attempt_id)
+      } else if (data.account_id) {
+        // Si devuelve account_id directamente
+        setAccountId(data.account_id)
+        await saveAccountId(data.account_id)
+        setStep('success')
+        setLoading(false)
+      } else {
+        throw new Error('No attempt_id or account_id in response')
+      }
 
     } catch (err) {
+      console.error('Auth error:', err)
       setError(err.message)
       setLoading(false)
     }
@@ -62,6 +76,8 @@ export default function ConnectOnlyFans({ modelId, onSuccess }) {
       })
 
       const data = await response.json()
+      
+      console.log('Poll status:', data)
 
       if (data.twoFactorPending) {
         setStep('twofa')
@@ -77,15 +93,21 @@ export default function ConnectOnlyFans({ modelId, onSuccess }) {
         return
       }
 
-      if (data.status === 'pending') {
+      if (data.status === 'pending' || data.status === 'authenticating') {
         // Continue polling
         setTimeout(() => pollAuthStatus(id), 2000)
         return
       }
 
-      throw new Error(data.message || 'Authentication failed')
+      if (data.error) {
+        throw new Error(data.error)
+      }
+
+      // Si no hay error pero tampoco está completado, seguir esperando
+      setTimeout(() => pollAuthStatus(id), 2000)
 
     } catch (err) {
+      console.error('Poll error:', err)
       setError(err.message)
       setLoading(false)
     }
