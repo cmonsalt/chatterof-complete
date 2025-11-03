@@ -97,13 +97,13 @@ async function handleMessage(data, modelId) {
       from: data.isSentByMe ? 'model' : 'fan',
       message_type: data.mediaCount > 0 || data.media?.length > 0 ? 'media' : 'text',
       of_message_id: data.id?.toString(),
-      media_url: data.media?.[0]?.src || data.media?.[0]?.thumb,
-      media_urls: data.media?.map(m => m.src || m.thumb).filter(Boolean).join(','),
+      media_url: data.media?.[0]?.files?.full?.url || data.media?.[0]?.files?.thumb?.url,
+      media_urls: data.media?.map(m => m.files?.full?.url || m.files?.thumb?.url).filter(Boolean).join(','),
       amount: parseFloat(data.price || 0),
       read: data.isOpened || false,
       source: 'webhook',
       is_locked: !data.isFree,
-      is_purchased: data.canPurchaseReason === 'purchased' || data.isFree,
+      is_purchased: data.canPurchaseReason === 'purchased' || data.canPurchaseReason === 'opened' || data.isFree,
       locked_text: data.lockedText || false
     }
 

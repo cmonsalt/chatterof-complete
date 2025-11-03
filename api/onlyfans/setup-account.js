@@ -152,13 +152,13 @@ export default async function handler(req, res) {
               from: msg.isSentByMe ? 'model' : 'fan',
               message_type: msg.mediaCount > 0 ? 'media' : 'text',
               of_message_id: msg.id?.toString(),
-              media_url: msg.media?.[0]?.src || msg.media?.[0]?.thumb,
-              media_urls: msg.media?.map(m => m.src || m.thumb).filter(Boolean).join(','),
+              media_url: msg.media?.[0]?.files?.full?.url || msg.media?.[0]?.files?.thumb?.url,
+              media_urls: msg.media?.map(m => m.files?.full?.url || m.files?.thumb?.url).filter(Boolean).join(','),
               amount: parseFloat(msg.price || 0),
               read: msg.isOpened || false,
               source: 'api_sync',
               is_locked: !msg.isFree,
-              is_purchased: msg.canPurchaseReason === 'purchased' || msg.isFree,
+              is_purchased: msg.canPurchaseReason === 'purchased' || msg.canPurchaseReason === 'opened' || msg.isFree,
               locked_text: msg.lockedText || false
             }
 
