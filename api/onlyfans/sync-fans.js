@@ -36,61 +36,72 @@ export default async function handler(req, res) {
 
     const modelId = model.model_id
 
-    // Fetch subscribers from OnlyFans API
-    const response = await fetch(`https://app.onlyfansapi.com/api/${accountId}/fans/all`, {
-      headers: {
-        'Authorization': `Bearer ${API_KEY}`
-      }
-    })
-
-    if (!response.ok) {
-      const errorText = await response.text()
-      throw new Error(`OnlyFans API error: ${response.status} - ${errorText}`)
-    }
-
-    const responseData = await response.json()
-    
-    console.log('OnlyFans API response structure:', {
-      hasData: !!responseData.data,
-      hasList: !!responseData.data?.list,
-      listLength: responseData.data?.list?.length
-    })
-    
-    // Correct structure: data.list
-    const subscribers = responseData.data?.list || []
-    
-    if (!Array.isArray(subscribers)) {
-      throw new Error('Invalid response format. Expected data.list array')
-    }
-
     let synced = 0
+    let totalFetched = 0
+    let offset = 0
+    let hasMore = true
+    const limit = 50 // Traer 50 por página
 
-    for (const sub of subscribers) {
-      const fanData = {
-        fan_id: sub.id?.toString(),
-        name: sub.name || sub.username || 'Unknown',
-        model_id: modelId,
-        of_username: sub.username,
-        of_avatar_url: sub.avatar,
-        is_subscribed: sub.subscribedBy || false,
-        subscription_date: sub.subscribedByData?.subscribeAt,
-        spent_total: parseFloat(sub.subscribedOnData?.totalSumm || 0),
-        last_update: new Date().toISOString()
+    // Fetch all pages
+    while (hasMore) {
+      const response = await fetch(
+        `https://app.onlyfansapi.com/api/${accountId}/fans/all?limit=${limit}&offset=${offset}`,
+        {
+          headers: {
+            'Authorization': `Bearer ${API_KEY}`
+          }
+        }
+      )
+
+      if (!response.ok) {
+        const errorText = await response.text()
+        throw new Error(`OnlyFans API error: ${response.status} - ${errorText}`)
       }
 
-      const { error } = await supabase
-        .from('fans')
-        .upsert(fanData, { onConflict: 'fan_id' })
+      const responseData = await response.json()
+      
+      const subscribers = responseData.data?.list || []
+      hasMore = responseData.data?.hasMore || false
+      totalFetched += subscribers.length
 
-      if (!error) synced++
-      else console.error('Error upserting fan:', sub.id, error)
+      console.log(`Page ${offset/limit + 1}: Fetched ${subscribers.length} fans, hasMore: ${hasMore}`)
+
+      for (const sub of subscribers) {
+        const fanData = {
+          fan_id: sub.id?.toString(),
+          name: sub.name || sub.username || 'Unknown',
+          model_id: modelId,
+          of_username: sub.username,
+          of_avatar_url: sub.avatar,
+          is_subscribed: sub.subscribedBy || false,
+          subscription_date: sub.subscribedByData?.subscribeAt,
+          spent_total: parseFloat(sub.subscribedOnData?.totalSumm || 0),
+          last_update: new Date().toISOString()
+        }
+
+        const { error } = await supabase
+          .from('fans')
+          .upsert(fanData, { onConflict: 'fan_id' })
+
+        if (!error) synced++
+        else console.error('Error upserting fan:', sub.id, error)
+      }
+
+      offset += limit
+      
+      // Safety limit: stop after 20 pages (1000 fans)
+      if (offset > 1000) {
+        console.log('Reached safety limit of 1000 fans')
+        break
+      }
     }
 
     return res.status(200).json({
       success: true,
       synced,
-      total: subscribers.length,
-      message: `Synced ${synced} fans successfully`
+      total: totalFetched,
+      pages: Math.ceil(offset / limit),
+      message: `Synced ${synced} fans successfully from ${totalFetched} total fans`
     })
 
   } catch (error) {
