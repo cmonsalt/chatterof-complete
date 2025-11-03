@@ -7,6 +7,7 @@ import Dashboard from './pages/Dashboard'
 import ChatView from './pages/ChatView'
 import Settings from './pages/Settings'
 import ChatterDashboard from './pages/ChatterDashboard2'
+import AuthCallback from './pages/AuthCallback'
 
 function App() {
   return (
@@ -43,6 +44,7 @@ function App() {
           <Route path="/" element={<Navigate to="/dashboard" replace />} />
         </Routes>
       </AuthProvider>
+      <Route path="/auth/callback" element={<AuthCallback />} />
     </BrowserRouter>
   )
 }
