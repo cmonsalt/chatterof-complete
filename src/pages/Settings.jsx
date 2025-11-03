@@ -163,11 +163,21 @@ export default function Settings() {
     }
   }
 
+
+
 const handleConnect = () => {
+  //   📝 Nota para el futuro:
+// Cuando compres dominio (chatterof.com):
+
+// Agrégalo en Vercel → Settings → Domains
+// Cambia esa línea por: https://chatterof.com/auth/callback
+// Push y listo
   // ✅ USAR DOMINIO FIJO DE PRODUCTION
-  const redirectUrl = 'chatterof-complete.vercel.app'
-  window.location = `https://app.onlyfansapi.com/connect?redirect_url=${encodeURIComponent(redirectUrl)}`
+  const redirectUrl = 'https://chatterof-complete.vercel.app/auth/callback'
+  window.location.href = `https://app.onlyfansapi.com/connect?redirect_url=${encodeURIComponent(redirectUrl)}`
 }
+
+
   const handleDisconnect = async () => {
     if (!confirm('Disconnect OnlyFans? You will need to reconnect.')) return
     
