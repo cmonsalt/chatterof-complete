@@ -10,7 +10,7 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' })
   }
 
-  const { accountId, limit = 100 } = req.query
+  const { accountId, limit = 50 } = req.query
 
   if (!accountId) {
     return res.status(400).json({ error: 'accountId is required' })
@@ -36,74 +36,110 @@ export default async function handler(req, res) {
 
     const modelId = model.model_id
 
-    // Fetch chats from OnlyFans API
-    const response = await fetch(`https://app.onlyfansapi.com/api/${accountId}/chats?limit=${limit}`, {
-      headers: {
-        'Authorization': `Bearer ${API_KEY}`
-      }
-    })
+    let syncedMessages = 0
+    let totalChats = 0
+    let offset = 0
+    let hasMore = true
+    const chatsLimit = 20 // Límite por página
+    let creditsUsed = 0
 
-    if (!response.ok) {
-      const errorText = await response.text()
-      throw new Error(`OnlyFans API error: ${response.status} - ${errorText}`)
-    }
-
-    const data = await response.json()
-    const chats = data.list || data.chats || []
-
-    let synced = 0
-
-    for (const chat of chats) {
-      // Get messages for this chat
-      const messagesResponse = await fetch(
-        `https://app.onlyfansapi.com/api/${accountId}/chats/${chat.withUser.id}/messages?limit=50`,
+    // Fetch all chats
+    while (hasMore && offset < 200) { // Max 200 chats (10 páginas)
+      const response = await fetch(
+        `https://app.onlyfansapi.com/api/${accountId}/chats?limit=${chatsLimit}&offset=${offset}`,
         {
-          headers: { 'Authorization': `Bearer ${API_KEY}` }
+          headers: {
+            'Authorization': `Bearer ${API_KEY}`
+          }
         }
       )
 
-      if (messagesResponse.ok) {
-        const messagesData = await messagesResponse.json()
-        const messages = messagesData.list || messagesData.messages || []
+      if (!response.ok) {
+        const errorText = await response.text()
+        throw new Error(`OnlyFans API error: ${response.status} - ${errorText}`)
+      }
 
-        for (const msg of messages) {
-          const chatData = {
-            fan_id: chat.withUser.id.toString(),
-            message: msg.text || '',
-            model_id: modelId,
-            timestamp: msg.createdAt || new Date().toISOString(),
-            from: msg.fromUser?.id === accountId ? 'model' : 'fan',
-            message_type: msg.media?.length > 0 ? 'media' : 'text',
-            of_message_id: msg.id?.toString(),
-            media_url: msg.media?.[0]?.src,
-            amount: msg.price || 0,
-            read: msg.isOpened || false
+      const responseData = await response.json()
+      
+      const chats = responseData.data || []
+      hasMore = responseData._pagination?.next_page ? true : false
+      totalChats += chats.length
+      creditsUsed += responseData._meta?._credits?.used || 1
+
+      console.log(`Chats page ${offset/chatsLimit + 1}: Fetched ${chats.length} chats`)
+
+      // For each chat, fetch recent messages
+      for (const chat of chats) {
+        const fanData = chat.fan
+        const fanId = fanData?.id?.toString()
+        
+        if (!fanId) continue
+
+        // Ensure fan exists with spending data
+        await supabase.from('fans').upsert({
+          fan_id: fanId,
+          name: fanData.name || fanData.username || 'Unknown',
+          model_id: modelId,
+          of_username: fanData.username,
+          of_avatar_url: fanData.avatar,
+          last_message_date: chat.lastMessage?.createdAt,
+          spent_total: parseFloat(fanData.subscribedOnData?.totalSumm || 0)
+        }, { onConflict: 'fan_id' })
+
+        // Fetch messages for this chat
+        try {
+          const messagesResponse = await fetch(
+            `https://app.onlyfansapi.com/api/${accountId}/chats/${fanId}/messages?limit=${limit}`,
+            {
+              headers: { 'Authorization': `Bearer ${API_KEY}` }
+            }
+          )
+
+          if (messagesResponse.ok) {
+            const messagesData = await messagesResponse.json()
+            const messages = messagesData.data || []
+            creditsUsed += messagesData._meta?._credits?.used || 1
+
+            console.log(`  Fan ${fanId}: Fetched ${messages.length} messages`)
+
+            for (const msg of messages) {
+              const chatData = {
+                fan_id: fanId,
+                message: msg.text || '',
+                model_id: modelId,
+                timestamp: msg.createdAt || new Date().toISOString(),
+                from: msg.isSentByMe ? 'model' : 'fan',
+                message_type: msg.mediaCount > 0 ? 'media' : 'text',
+                of_message_id: msg.id?.toString(),
+                media_url: msg.media?.[0]?.src || msg.media?.[0]?.thumb,
+                media_urls: msg.media?.map(m => m.src || m.thumb).filter(Boolean).join(','),
+                amount: parseFloat(msg.price || 0),
+                read: msg.isOpened || false,
+                source: 'api_sync'
+              }
+
+              const { error } = await supabase
+                .from('chat')
+                .upsert(chatData, { onConflict: 'of_message_id' })
+
+              if (!error) syncedMessages++
+              else console.error('Error upserting message:', msg.id, error)
+            }
           }
-
-          const { error } = await supabase
-            .from('chat')
-            .upsert(chatData, { onConflict: 'of_message_id' })
-
-          if (!error) synced++
+        } catch (msgError) {
+          console.error(`Error fetching messages for fan ${fanId}:`, msgError)
         }
       }
 
-      // Ensure fan exists
-      await supabase.from('fans').upsert({
-        fan_id: chat.withUser.id.toString(),
-        name: chat.withUser.name || 'Unknown',
-        model_id: modelId,
-        of_username: chat.withUser.username,
-        of_avatar_url: chat.withUser.avatar,
-        last_message_date: chat.lastMessage?.createdAt
-      }, { onConflict: 'fan_id' })
+      offset += chatsLimit
     }
 
     return res.status(200).json({
       success: true,
-      synced,
-      chats: chats.length,
-      message: `Synced ${synced} messages from ${chats.length} chats`
+      syncedMessages,
+      totalChats,
+      creditsUsed,
+      message: `Synced ${syncedMessages} messages from ${totalChats} chats (${creditsUsed} credits used)`
     })
 
   } catch (error) {
