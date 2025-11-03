@@ -163,11 +163,11 @@ export default function Settings() {
     }
   }
 
-  const handleConnect = () => {
-    const redirectUrl = encodeURIComponent(`${window.location.origin}/auth/callback`)
-    window.location = `https://app.onlyfansapi.com/connect?redirect_url=${redirectUrl}`
-  }
-
+const handleConnect = () => {
+  // ✅ USAR DOMINIO FIJO DE PRODUCTION
+  const redirectUrl = 'chatterof-complete.vercel.app'
+  window.location = `https://app.onlyfansapi.com/connect?redirect_url=${encodeURIComponent(redirectUrl)}`
+}
   const handleDisconnect = async () => {
     if (!confirm('Disconnect OnlyFans? You will need to reconnect.')) return
     
