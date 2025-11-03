@@ -88,6 +88,10 @@ export default async function handler(req, res) {
         const subData = sub.subscribedOnData
         const lastSubscribe = subData?.subscribes?.[0]
 
+        // Calculate revenues
+        const netRevenue = parseFloat(subData?.totalSumm || 0)  // Lo que ganaste (API da esto)
+        const grossRevenue = netRevenue > 0 ? netRevenue / 0.8 : 0  // Lo que gastó el fan
+
         const fanData = {
           fan_id: sub.id?.toString(),
           name: sub.name || sub.username || 'Unknown',
@@ -96,10 +100,12 @@ export default async function handler(req, res) {
           of_avatar_url: sub.avatar,
           is_subscribed: sub.subscribedBy || false,
           subscription_date: sub.subscribedByData?.subscribeAt,
-          spent_total: parseFloat(subData?.totalSumm || 0),
+          spent_total: grossRevenue,  // GROSS para compatibilidad
+          gross_revenue: grossRevenue,  // Lo que gastó el fan
+          net_revenue: netRevenue,  // Lo que ganaste
           last_update: new Date().toISOString(),
-          // New fields
-          subscription_type: lastSubscribe?.type || null,  // trial, paid, free, promo
+          // Subscription fields
+          subscription_type: lastSubscribe?.type || null,
           subscription_price: parseFloat(lastSubscribe?.price || 0),
           is_renewal_enabled: sub.subscribedByAutoprolong || false,
           subscription_expires_at: lastSubscribe?.expireDate || null
