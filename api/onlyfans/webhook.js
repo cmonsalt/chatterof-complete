@@ -55,15 +55,15 @@ export default async function handler(req, res) {
 
     console.log('📦 Payload:', {
       event: payload.event,
-      accountId: payload.account?.id,
-      dataKeys: Object.keys(payload.data || {})
+      accountId: payload.account_id,
+      payloadKeys: Object.keys(payload.payload || {})
     })
 
     // Get model_id from account_id
     const { data: model, error: modelError } = await supabase
       .from('models')
       .select('model_id')
-      .eq('of_account_id', payload.account?.id)
+      .eq('of_account_id', payload.account_id)
       .single()
 
     if (modelError) {
@@ -71,30 +71,33 @@ export default async function handler(req, res) {
     }
 
     if (!model) {
-      console.log('⚠️ Model not found for accountId:', payload.account?.id)
+      console.log('⚠️ Model not found for accountId:', payload.account_id)
       return res.status(200).json({ received: true, message: 'Model not found' })
     }
 
     const modelId = model.model_id
     console.log('✅ Model found:', modelId)
 
+    // El data real está en payload.payload
+    const data = payload.payload
+
     // Handle different webhook events
     switch (payload.event) {
-      case 'message.received':
-      case 'message.sent':
+      case 'messages.received':
+      case 'messages.sent':
         console.log('💬 Handling message event')
-        await handleMessage(payload.data, modelId)
+        await handleMessage(data, modelId)
         break
 
-      case 'subscriber.new':
+      case 'subscriptions.new':
         console.log('⭐ Handling new subscriber event')
-        await handleNewSubscriber(payload.data, modelId)
+        await handleNewSubscriber(data, modelId)
         break
 
-      case 'purchase.created':
-      case 'tip.received':
+      case 'purchases.created':
+      case 'tips.received':
         console.log('💰 Handling transaction event')
-        await handleTransaction(payload.data, modelId)
+        await handleTransaction(data, modelId)
         break
 
       default:
