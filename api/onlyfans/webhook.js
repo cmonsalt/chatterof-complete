@@ -16,6 +16,19 @@ function cleanHTML(text) {
     .trim()
 }
 
+// Helper to create notification
+async function createNotification(modelId, fanId, type, title, message, amount = null, metadata = {}) {
+  await supabase.from('notifications').insert({
+    model_id: modelId,
+    fan_id: fanId,
+    type,
+    title,
+    message,
+    amount,
+    metadata
+  })
+}
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' })
@@ -109,6 +122,22 @@ async function handleMessage(data, modelId) {
 
     await supabase.from('chat').upsert(chatData, { onConflict: 'of_message_id' })
 
+    // Create notification if message is from fan
+    if (!data.isSentByMe) {
+      const fanName = data.fromUser?.name || data.user?.name || 'Un fan'
+      const messagePreview = cleanHTML(data.text).slice(0, 50) || (data.mediaCount > 0 ? 'Envió contenido multimedia' : 'Nuevo mensaje')
+      
+      await createNotification(
+        modelId,
+        fanId,
+        'new_message',
+        `${fanName} te escribió`,
+        messagePreview,
+        parseFloat(data.price || 0),
+        { chat_id: data.id }
+      )
+    }
+
     console.log(`Message saved: ${data.id} from fan ${fanId}`)
   } catch (error) {
     console.error('Error handling message:', error)
@@ -138,6 +167,19 @@ async function handleNewSubscriber(data, modelId) {
     }
 
     await supabase.from('fans').upsert(fanData, { onConflict: 'fan_id' })
+
+    // Create notification
+    const fanName = data.user?.name || data.subscriber?.name || 'Un nuevo fan'
+    const amount = parseFloat(subInfo.price || 0)
+    
+    await createNotification(
+      modelId,
+      fanId,
+      'new_subscriber',
+      `${fanName} se suscribió! 🎉`,
+      `Nueva suscripción ${amount > 0 ? `por $${amount.toFixed(2)}` : 'gratuita'}`,
+      amount
+    )
 
     console.log(`New subscriber: ${fanId}`)
   } catch (error) {
@@ -191,6 +233,25 @@ async function handleTransaction(data, modelId) {
     }
 
     console.log(`Transaction saved: $${amount} from fan ${fanId}`)
+
+    // Create notification
+    const fanName = data.user?.name || data.fromUser?.name || 'Un fan'
+    const notifType = type === 'tip' ? 'new_tip' : 'new_purchase'
+    const title = type === 'tip' 
+      ? `${fanName} te envió un tip de $${amount.toFixed(2)}! 💸`
+      : `${fanName} compró contenido por $${amount.toFixed(2)} 💰`
+    const message = data.description || data.text || cleanHTML(data.message) || 'Nueva transacción'
+    
+    await createNotification(
+      modelId,
+      fanId,
+      notifType,
+      title,
+      message.slice(0, 50),
+      amount,
+      { transaction_id: data.id }
+    )
+
   } catch (error) {
     console.error('Error handling transaction:', error)
   }
