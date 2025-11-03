@@ -40,7 +40,7 @@ export default async function handler(req, res) {
     let totalFetched = 0
     let offset = 0
     let hasMore = true
-    const limit = 50 // Traer 50 por página
+    const limit = 20 // Máximo permitido por la API
 
     // Fetch all pages
     while (hasMore) {
