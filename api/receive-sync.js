@@ -93,17 +93,25 @@ async function syncChats(modelId, chats) {
   console.log(`💾 Saving ${chats.length} chats to database...`);
   
   for (const chat of chats) {
-    const { data, error } = await supabase.from('fans').upsert({
-      fan_id: chat.withUser?.id?.toString() || chat.withUser?.username,
-      model_id: modelId,
-      name: chat.withUser?.name || 'Unknown',
-      of_username: chat.withUser?.username || 'unknown',
-      last_message_date: chat.lastMessage?.createdAt || new Date().toISOString()
-    }, {
-      onConflict: 'fan_id,model_id'
-    });
+    // Primero intentar insertar como fan si no existe
+    const { error } = await supabase.from('fans')
+      .insert({
+        fan_id: chat.withUser?.id?.toString() || chat.withUser?.username,
+        model_id: modelId,
+        name: chat.withUser?.name || 'Unknown',
+        of_username: chat.withUser?.username || 'unknown',
+        last_message_date: chat.lastMessage?.createdAt || new Date().toISOString()
+      })
+      .select()
+      .single();
     
-    if (error) {
+    // Si ya existe (error duplicate), actualizar fecha
+    if (error && error.code === '23505') {
+      await supabase.from('fans')
+        .update({ last_message_date: chat.lastMessage?.createdAt || new Date().toISOString() })
+        .eq('fan_id', chat.withUser?.id?.toString() || chat.withUser?.username)
+        .eq('model_id', modelId);
+    } else if (error) {
       console.error(`❌ Error saving chat:`, error);
     }
   }
