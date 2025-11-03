@@ -18,7 +18,9 @@ function cleanHTML(text) {
 
 // Helper to create notification
 async function createNotification(modelId, fanId, type, title, message, amount = null, metadata = {}) {
-  await supabase.from('notifications').insert({
+  console.log('🔔 Creating notification:', { modelId, fanId, type, title, message, amount })
+  
+  const { data, error } = await supabase.from('notifications').insert({
     model_id: modelId,
     fan_id: fanId,
     type,
@@ -27,9 +29,23 @@ async function createNotification(modelId, fanId, type, title, message, amount =
     amount,
     metadata
   })
+  
+  if (error) {
+    console.error('❌ Error creating notification:', error)
+  } else {
+    console.log('✅ Notification created successfully')
+  }
+  
+  return { data, error }
 }
 
 export default async function handler(req, res) {
+  console.log('🎯 Webhook received:', {
+    method: req.method,
+    headers: req.headers,
+    body: req.body
+  })
+
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' })
   }
@@ -37,61 +53,79 @@ export default async function handler(req, res) {
   try {
     const payload = req.body
 
-    console.log('Webhook received:', {
+    console.log('📦 Payload:', {
       event: payload.event,
-      accountId: payload.account?.id
+      accountId: payload.account?.id,
+      dataKeys: Object.keys(payload.data || {})
     })
 
     // Get model_id from account_id
-    const { data: model } = await supabase
+    const { data: model, error: modelError } = await supabase
       .from('models')
       .select('model_id')
       .eq('of_account_id', payload.account?.id)
       .single()
 
+    if (modelError) {
+      console.error('❌ Error finding model:', modelError)
+    }
+
     if (!model) {
-      console.log('Model not found for accountId:', payload.account?.id)
-      return res.status(200).json({ received: true })
+      console.log('⚠️ Model not found for accountId:', payload.account?.id)
+      return res.status(200).json({ received: true, message: 'Model not found' })
     }
 
     const modelId = model.model_id
+    console.log('✅ Model found:', modelId)
 
     // Handle different webhook events
     switch (payload.event) {
       case 'message.received':
       case 'message.sent':
+        console.log('💬 Handling message event')
         await handleMessage(payload.data, modelId)
         break
 
-      case 'subscription.created':
-      case 'subscription.renewed':
+      case 'subscriber.new':
+        console.log('⭐ Handling new subscriber event')
         await handleNewSubscriber(payload.data, modelId)
         break
 
       case 'purchase.created':
       case 'tip.received':
+        console.log('💰 Handling transaction event')
         await handleTransaction(payload.data, modelId)
         break
 
       default:
-        console.log('Unknown event type:', payload.event)
+        console.log('❓ Unknown event type:', payload.event)
     }
 
     return res.status(200).json({ received: true })
 
   } catch (error) {
-    console.error('Webhook error:', error)
+    console.error('💥 Webhook error:', error)
     return res.status(500).json({ error: error.message })
   }
 }
 
 async function handleMessage(data, modelId) {
   try {
+    console.log('📨 Processing message:', { 
+      messageId: data.id,
+      fromUser: data.fromUser?.id,
+      isSentByMe: data.isSentByMe 
+    })
+
     const fanId = data.fromUser?.id?.toString() || data.user?.id?.toString()
     
-    if (!fanId) return
+    if (!fanId) {
+      console.log('⚠️ No fanId found in message')
+      return
+    }
 
     // Ensure fan exists
+    console.log('👤 Upserting fan:', fanId)
     await supabase.from('fans').upsert({
       fan_id: fanId,
       name: data.fromUser?.name || data.user?.name || 'Unknown',
@@ -102,6 +136,7 @@ async function handleMessage(data, modelId) {
     }, { onConflict: 'fan_id' })
 
     // Save message
+    console.log('💾 Saving message to chat table')
     const chatData = {
       fan_id: fanId,
       message: cleanHTML(data.text),
@@ -120,10 +155,17 @@ async function handleMessage(data, modelId) {
       locked_text: data.lockedText || false
     }
 
-    await supabase.from('chat').upsert(chatData, { onConflict: 'of_message_id' })
+    const { error: chatError } = await supabase.from('chat').upsert(chatData, { onConflict: 'of_message_id' })
+    
+    if (chatError) {
+      console.error('❌ Error saving message:', chatError)
+    } else {
+      console.log('✅ Message saved successfully')
+    }
 
     // Create notification if message is from fan
     if (!data.isSentByMe) {
+      console.log('🔔 Message is from fan, creating notification')
       const fanName = data.fromUser?.name || data.user?.name || 'Un fan'
       const messagePreview = cleanHTML(data.text).slice(0, 50) || (data.mediaCount > 0 ? 'Envió contenido multimedia' : 'Nuevo mensaje')
       
@@ -136,19 +178,25 @@ async function handleMessage(data, modelId) {
         parseFloat(data.price || 0),
         { chat_id: data.id }
       )
+    } else {
+      console.log('📤 Message sent by model, no notification needed')
     }
 
-    console.log(`Message saved: ${data.id} from fan ${fanId}`)
+    console.log(`✅ Message handled: ${data.id} from fan ${fanId}`)
   } catch (error) {
-    console.error('Error handling message:', error)
+    console.error('💥 Error handling message:', error)
   }
 }
 
 async function handleNewSubscriber(data, modelId) {
   try {
+    console.log('⭐ Processing new subscriber')
     const fanId = data.user?.id?.toString() || data.subscriber?.id?.toString()
     
-    if (!fanId) return
+    if (!fanId) {
+      console.log('⚠️ No fanId found in subscriber data')
+      return
+    }
 
     const subInfo = data.subscription || data
 
@@ -181,17 +229,21 @@ async function handleNewSubscriber(data, modelId) {
       amount
     )
 
-    console.log(`New subscriber: ${fanId}`)
+    console.log(`✅ New subscriber: ${fanId}`)
   } catch (error) {
-    console.error('Error handling subscriber:', error)
+    console.error('💥 Error handling subscriber:', error)
   }
 }
 
 async function handleTransaction(data, modelId) {
   try {
+    console.log('💰 Processing transaction')
     const fanId = data.user?.id?.toString() || data.fromUser?.id?.toString()
     
-    if (!fanId) return
+    if (!fanId) {
+      console.log('⚠️ No fanId found in transaction')
+      return
+    }
 
     // Determine transaction type
     let type = 'compra'
@@ -232,7 +284,7 @@ async function handleTransaction(data, modelId) {
         .eq('fan_id', fanId)
     }
 
-    console.log(`Transaction saved: $${amount} from fan ${fanId}`)
+    console.log(`✅ Transaction saved: $${amount} from fan ${fanId}`)
 
     // Create notification
     const fanName = data.user?.name || data.fromUser?.name || 'Un fan'
@@ -253,6 +305,6 @@ async function handleTransaction(data, modelId) {
     )
 
   } catch (error) {
-    console.error('Error handling transaction:', error)
+    console.error('💥 Error handling transaction:', error)
   }
 }
