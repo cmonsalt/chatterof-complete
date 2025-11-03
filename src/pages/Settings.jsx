@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
 import Navbar from '../components/Navbar'
+import ConnectOnlyFans from '../components/ConnectOnlyFans'
 
 export default function Settings() {
   const { modelId, currentModel } = useAuth()
@@ -162,21 +163,6 @@ export default function Settings() {
       console.log('No OF connection')
     }
   }
-
-
-
-const handleConnect = () => {
-  //   📝 Nota para el futuro:
-// Cuando compres dominio (chatterof.com):
-
-// Agrégalo en Vercel → Settings → Domains
-// Cambia esa línea por: https://chatterof.com/auth/callback
-// Push y listo
-  // ✅ USAR DOMINIO FIJO DE PRODUCTION
-  const redirectUrl = 'https://chatterof-complete.vercel.app/auth/callback'
-  window.location.href = `https://app.onlyfansapi.com/connect?redirect_url=${encodeURIComponent(redirectUrl)}`
-}
-
 
   const handleDisconnect = async () => {
     if (!confirm('Disconnect OnlyFans? You will need to reconnect.')) return
@@ -469,33 +455,14 @@ const handleConnect = () => {
                     </button>
                   </div>
                 ) : (
-                  <div style={{ 
-                    background: '#fef3c7', 
-                    border: '2px solid #fbbf24', 
-                    borderRadius: '0.75rem', 
-                    padding: '1.5rem' 
-                  }}>
-                    <p style={{ fontSize: '1.125rem', fontWeight: 600, color: '#92400e', marginBottom: '0.75rem' }}>
-                      ⚠️ Not connected to OnlyFans
-                    </p>
-                    <p style={{ fontSize: '0.875rem', color: '#78350f', marginBottom: '1.5rem' }}>
-                      Connect your OnlyFans account to start syncing chats, fans, and transactions automatically.
-                    </p>
-                    <button 
-                      onClick={handleConnect}
-                      style={{
-                        padding: '0.75rem 1.5rem',
-                        background: '#7c3aed',
-                        color: 'white',
-                        borderRadius: '0.5rem',
-                        fontWeight: 600,
-                        border: 'none',
-                        cursor: 'pointer'
-                      }}
-                    >
-                      🔗 Connect OnlyFans
-                    </button>
-                  </div>
+                  <ConnectOnlyFans 
+                    modelId={modelId} 
+                    onSuccess={(accId) => { 
+                      setIsConnected(true)
+                      setAccountId(accId)
+                      setMessage({ type: 'success', text: '✅ Connected successfully!' })
+                    }} 
+                  />
                 )}
               </div>
             )}
