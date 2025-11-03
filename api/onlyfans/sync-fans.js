@@ -37,7 +37,7 @@ export default async function handler(req, res) {
     const modelId = model.model_id
 
     // Fetch subscribers from OnlyFans API
-    const response = await fetch(`https://app.onlyfansapi.com/api/${accountId}/subscribers`, {
+    const response = await fetch(`https://app.onlyfansapi.com/api/${accountId}/fans/all`, {
       headers: {
         'Authorization': `Bearer ${API_KEY}`
       }
@@ -49,7 +49,7 @@ export default async function handler(req, res) {
     }
 
     const data = await response.json()
-    const subscribers = data.list || data.subscribers || []
+    const subscribers = data.list || data.data || data.fans || []
 
     let synced = 0
 
