@@ -36,7 +36,7 @@ export default async function handler(req, res) {
 
     const modelId = model.model_id
 
-    // ⏱️ Check if we synced recently (less than 1 hour ago)
+    // Check if we synced recently (less than 1 hour ago)
     if (!force) {
       const lastSync = model.updated_at
       const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000)
@@ -84,6 +84,10 @@ export default async function handler(req, res) {
       console.log(`Page ${offset/limit + 1}: Fetched ${subscribers.length} fans, hasMore: ${hasMore}`)
 
       for (const sub of subscribers) {
+        // Get subscription details
+        const subData = sub.subscribedOnData
+        const lastSubscribe = subData?.subscribes?.[0]
+
         const fanData = {
           fan_id: sub.id?.toString(),
           name: sub.name || sub.username || 'Unknown',
@@ -92,8 +96,13 @@ export default async function handler(req, res) {
           of_avatar_url: sub.avatar,
           is_subscribed: sub.subscribedBy || false,
           subscription_date: sub.subscribedByData?.subscribeAt,
-          spent_total: parseFloat(sub.subscribedOnData?.totalSumm || 0),
-          last_update: new Date().toISOString()
+          spent_total: parseFloat(subData?.totalSumm || 0),
+          last_update: new Date().toISOString(),
+          // New fields
+          subscription_type: lastSubscribe?.type || null,  // trial, paid, free, promo
+          subscription_price: parseFloat(lastSubscribe?.price || 0),
+          is_renewal_enabled: sub.subscribedByAutoprolong || false,
+          subscription_expires_at: lastSubscribe?.expireDate || null
         }
 
         const { error } = await supabase

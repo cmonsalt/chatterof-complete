@@ -5,12 +5,24 @@ const supabase = createClient(
   process.env.VITE_SUPABASE_ANON_KEY
 )
 
+// Helper function to clean HTML from messages
+function cleanHTML(text) {
+  if (!text) return ''
+  return text
+    .replace(/<p>/gi, '')
+    .replace(/<\/p>/gi, '')
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<[^>]*>/g, '')
+    .trim()
+}
+
 export default async function handler(req, res) {
   if (req.method !== 'GET') {
     return res.status(405).json({ error: 'Method not allowed' })
   }
 
-  const { accountId, limit = 50 } = req.query
+  const { accountId } = req.query
+  const messagesLimit = 50 // Últimos 50 mensajes por chat
 
   if (!accountId) {
     return res.status(400).json({ error: 'accountId is required' })
@@ -75,7 +87,11 @@ export default async function handler(req, res) {
         
         if (!fanId) continue
 
-        // Ensure fan exists with spending data
+        // Get subscription details
+        const subData = fanData.subscribedOnData
+        const lastSubscribe = subData?.subscribes?.[0]
+
+        // Ensure fan exists with all data
         await supabase.from('fans').upsert({
           fan_id: fanId,
           name: fanData.name || fanData.username || 'Unknown',
@@ -83,13 +99,17 @@ export default async function handler(req, res) {
           of_username: fanData.username,
           of_avatar_url: fanData.avatar,
           last_message_date: chat.lastMessage?.createdAt,
-          spent_total: parseFloat(fanData.subscribedOnData?.totalSumm || 0)
+          spent_total: parseFloat(subData?.totalSumm || 0),
+          subscription_type: lastSubscribe?.type || null,
+          subscription_price: parseFloat(lastSubscribe?.price || 0),
+          is_renewal_enabled: fanData.subscribedByAutoprolong || false,
+          subscription_expires_at: lastSubscribe?.expireDate || null
         }, { onConflict: 'fan_id' })
 
         // Fetch messages for this chat
         try {
           const messagesResponse = await fetch(
-            `https://app.onlyfansapi.com/api/${accountId}/chats/${fanId}/messages?limit=${limit}`,
+            `https://app.onlyfansapi.com/api/${accountId}/chats/${fanId}/messages?limit=${messagesLimit}`,
             {
               headers: { 'Authorization': `Bearer ${API_KEY}` }
             }
@@ -105,7 +125,7 @@ export default async function handler(req, res) {
             for (const msg of messages) {
               const chatData = {
                 fan_id: fanId,
-                message: msg.text || '',
+                message: cleanHTML(msg.text),  // Clean HTML tags
                 model_id: modelId,
                 timestamp: msg.createdAt || new Date().toISOString(),
                 from: msg.isSentByMe ? 'model' : 'fan',
@@ -115,7 +135,11 @@ export default async function handler(req, res) {
                 media_urls: msg.media?.map(m => m.src || m.thumb).filter(Boolean).join(','),
                 amount: parseFloat(msg.price || 0),
                 read: msg.isOpened || false,
-                source: 'api_sync'
+                source: 'api_sync',
+                // PPV fields
+                is_locked: !msg.isFree,
+                is_purchased: msg.canPurchaseReason === 'purchased' || msg.isFree,
+                locked_text: msg.lockedText || false
               }
 
               const { error } = await supabase
