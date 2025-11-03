@@ -405,21 +405,10 @@ export default function ChatView() {
                       </div>
                     )}
                     
-                    {/* 🔥 MOSTRAR IMÁGENES - FIX: media_urls es STRING separado por comas */}
-                    {(msg.media_url || msg.media_urls) && (() => {
+                    {/* 🔥 MOSTRAR SOLO IMÁGENES (NO VIDEOS) */}
+                    {msg.media_urls && (() => {
                       try {
-                        // 🔥 FIX: Obtener URLs desde media_url o media_urls
-                        let urls = [];
-                        
-                        if (msg.media_url) {
-                          urls.push(msg.media_url);
-                        }
-                        
-                        if (msg.media_urls) {
-                          // 🔥 CLAVE: Split por comas, NO JSON.parse
-                          const urlsFromString = msg.media_urls.split(',').map(u => u.trim()).filter(u => u);
-                          urls = [...urls, ...urlsFromString];
-                        }
+                        const urls = JSON.parse(msg.media_urls);
                         
                         // 🔥 Filtrar solo imágenes (no videos)
                         const imageUrls = urls.filter(url => {
@@ -440,7 +429,7 @@ export default function ChatView() {
                         
                         return (
                           <div className="mt-2">
-                            {/* Grid de imágenes */}
+                            {/* Grid de imágenes - Sin contador */}
                             <div className="grid grid-cols-2 gap-2">
                               {uniqueUrls.map((url, i) => (
                                 <a 
@@ -456,7 +445,6 @@ export default function ChatView() {
                                     className="w-full h-24 object-cover rounded border hover:opacity-80 cursor-pointer"
                                     onError={(e) => {
                                       e.target.style.display = 'none';
-                                      console.log('❌ Error cargando imagen:', url);
                                     }}
                                   />
                                 </a>
@@ -465,7 +453,7 @@ export default function ChatView() {
                           </div>
                         );
                       } catch (e) {
-                        console.error('❌ Error rendering media:', e, msg);
+                        console.error('Error parsing media_urls:', e);
                         return null;
                       }
                     })()}
