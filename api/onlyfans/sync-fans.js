@@ -48,21 +48,33 @@ export default async function handler(req, res) {
       throw new Error(`OnlyFans API error: ${response.status} - ${errorText}`)
     }
 
-    const data = await response.json()
-    const subscribers = data.list || data.data || data.fans || []
+    const responseData = await response.json()
+    
+    console.log('OnlyFans API response structure:', {
+      hasData: !!responseData.data,
+      hasList: !!responseData.data?.list,
+      listLength: responseData.data?.list?.length
+    })
+    
+    // Correct structure: data.list
+    const subscribers = responseData.data?.list || []
+    
+    if (!Array.isArray(subscribers)) {
+      throw new Error('Invalid response format. Expected data.list array')
+    }
 
     let synced = 0
 
     for (const sub of subscribers) {
       const fanData = {
-        fan_id: sub.id.toString(),
+        fan_id: sub.id?.toString(),
         name: sub.name || sub.username || 'Unknown',
         model_id: modelId,
         of_username: sub.username,
         of_avatar_url: sub.avatar,
-        is_subscribed: true,
-        subscription_date: sub.subscribedOn || sub.subscribed_on,
-        spent_total: parseFloat(sub.spentTotal || 0),
+        is_subscribed: sub.subscribedBy || false,
+        subscription_date: sub.subscribedByData?.subscribeAt,
+        spent_total: parseFloat(sub.subscribedOnData?.totalSumm || 0),
         last_update: new Date().toISOString()
       }
 
@@ -71,6 +83,7 @@ export default async function handler(req, res) {
         .upsert(fanData, { onConflict: 'fan_id' })
 
       if (!error) synced++
+      else console.error('Error upserting fan:', sub.id, error)
     }
 
     return res.status(200).json({
