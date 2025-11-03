@@ -65,36 +65,29 @@ export default async function handler(req, res) {
 
 // Sincronizar fans
 async function syncFans(modelId, fans) {
-  console.log(`💾 Saving ${fans.length} fans to database...`);
-  
   for (const fan of fans) {
-    const { data, error } = await supabase.from('fans').upsert({
-      fan_id: fan.id?.toString() || fan.username,
+    await supabase.from('fans').upsert({
+      fan_id: fan.id?.toString(),
       model_id: modelId,
-      name: fan.name || `Fan ${fan.username}`,
-      of_username: fan.username || fan.id,
-      of_avatar_url: fan.avatar || null,
+      name: fan.name || `Fan ${fan.id}`,
+      of_username: fan.username || `u${fan.id}`,
+      of_avatar_url: fan.avatar || fan.avatarUrl || null,
       tier: 0,
-      spent_total: 0,
+      spent_total: parseFloat(fan.spentTotal || 0),
       last_message_date: fan.subscribedOn || new Date().toISOString()
     }, {
       onConflict: 'fan_id,model_id'
     });
-    
-    if (error) {
-      console.error(`❌ Error saving fan ${fan.username}:`, error);
-    }
   }
   console.log(`✅ Synced ${fans.length} fans`);
 }
 
 // Sincronizar chats
 async function syncChats(modelId, chats) {
-  console.log(`💾 Saving ${chats.length} chats to database...`);
-  
   for (const chat of chats) {
-    const { data, error } = await supabase.from('fans').upsert({
-      fan_id: chat.withUser?.id?.toString() || chat.withUser?.username,
+    // Actualizar fan con último mensaje
+    await supabase.from('fans').upsert({
+      fan_id: chat.withUser?.id?.toString(),
       model_id: modelId,
       name: chat.withUser?.name || 'Unknown',
       of_username: chat.withUser?.username || 'unknown',
@@ -102,10 +95,6 @@ async function syncChats(modelId, chats) {
     }, {
       onConflict: 'fan_id,model_id'
     });
-    
-    if (error) {
-      console.error(`❌ Error saving chat:`, error);
-    }
   }
   console.log(`✅ Synced ${chats.length} chats`);
 }
