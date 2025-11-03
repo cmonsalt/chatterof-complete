@@ -41,10 +41,12 @@ function App() {
             </ProtectedRoute>
           } />
 
+          {/* ✅ MOVER ESTA LÍNEA AQUÍ DENTRO */}
+          <Route path="/auth/callback" element={<AuthCallback />} />
+
           <Route path="/" element={<Navigate to="/dashboard" replace />} />
         </Routes>
       </AuthProvider>
-      <Route path="/auth/callback" element={<AuthCallback />} />
     </BrowserRouter>
   )
 }
