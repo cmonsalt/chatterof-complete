@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { useNavigate } from 'react-router-dom'
+import NotificationBell from '../components/NotificationBell'
 
 export default function Navbar() {
   const { user, models, currentModel, switchModel, signOut } = useAuth()
@@ -31,7 +32,7 @@ export default function Navbar() {
   const handleModelSwitch = (modelId) => {
     switchModel(modelId)
     setShowModelSelector(false)
-    // Recargar la página para actualizar los fans
+    // Recargar la pÃ¡gina para actualizar los fans
     window.location.reload()
   }
 
@@ -62,6 +63,9 @@ export default function Navbar() {
         </h1>
         
         <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+          {/* Notification Bell */}
+          <NotificationBell />
+
           {/* Chatter Mode Button - NUEVO */}
           <button
             onClick={() => navigate('/chatter')}
@@ -89,7 +93,7 @@ export default function Navbar() {
               e.target.style.boxShadow = '0 2px 4px rgba(0,0,0,0.1)'
             }}
           >
-            <span>💬</span>
+            <span>ðŸ’¬</span>
             <span>Chatter Mode</span>
           </button>
 
@@ -111,9 +115,9 @@ export default function Navbar() {
                   border: '2px solid #7c3aed'
                 }}
               >
-                <span>💎</span>
+                <span>ðŸ’Ž</span>
                 <span>{currentModel?.name || 'Select Model'}</span>
-                <span style={{ fontSize: '0.75rem' }}>▼</span>
+                <span style={{ fontSize: '0.75rem' }}>â–¼</span>
               </button>
 
               {/* Dropdown */}
@@ -167,7 +171,7 @@ export default function Navbar() {
                         }}
                       >
                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                          {currentModel?.model_id === model.model_id && <span>✓</span>}
+                          {currentModel?.model_id === model.model_id && <span>âœ“</span>}
                           <div>
                             <div>{model.name}</div>
                             {model.niche && (
