@@ -1,59 +1,90 @@
-import { createClient } from '@supabase/supabase-js';
+import { createClient } from '@supabase/supabase-js'
 
 const supabase = createClient(
   process.env.VITE_SUPABASE_URL,
   process.env.VITE_SUPABASE_ANON_KEY
-);
+)
 
 export default async function handler(req, res) {
-  const { accountId } = req.query;
-  const API_KEY = process.env.ONLYFANS_API_KEY;
+  if (req.method !== 'GET') {
+    return res.status(405).json({ error: 'Method not allowed' })
+  }
+
+  const { accountId } = req.query
 
   if (!accountId) {
-    return res.status(400).json({ error: 'accountId required' });
+    return res.status(400).json({ error: 'accountId is required' })
   }
 
   try {
-    // Obtener todos los fans con spending
-    const response = await fetch(
-      `https://app.onlyfansapi.com/api/${accountId}/fans/list-all-fans`,
-      {
-        headers: { 
-          'Authorization': `Bearer ${API_KEY}`,
-          'Content-Type': 'application/json'
-        }
+    const API_KEY = process.env.ONLYFANS_API_KEY
+
+    if (!API_KEY) {
+      throw new Error('ONLYFANS_API_KEY not configured')
+    }
+
+    // Get model_id from account_id
+    const { data: model, error: modelError } = await supabase
+      .from('models')
+      .select('model_id')
+      .eq('of_account_id', accountId)
+      .single()
+
+    if (modelError || !model) {
+      throw new Error('Model not found for this account')
+    }
+
+    const modelId = model.model_id
+
+    // Fetch subscribers from OnlyFans API
+    const response = await fetch(`https://app.onlyfansapi.com/api/${accountId}/subscribers`, {
+      headers: {
+        'Authorization': `Bearer ${API_KEY}`
       }
-    );
+    })
 
     if (!response.ok) {
-      throw new Error(`API error: ${response.status}`);
+      const errorText = await response.text()
+      throw new Error(`OnlyFans API error: ${response.status} - ${errorText}`)
     }
 
-    const data = await response.json();
-    const fans = data.data || [];
+    const data = await response.json()
+    const subscribers = data.list || data.subscribers || []
 
-    // Guardar/actualizar fans con su spending total
-    for (const fan of fans) {
-      await supabase.from('fans').upsert({
-        fan_id: fan.id,
-        of_username: fan.username,
-        of_avatar_url: fan.avatar,
-        spent_total: fan.spentTotal || 0,
-        subscription_active: fan.subscribedBy,
-        subscription_price: fan.subscribePrice || 0,
-        last_seen: fan.lastSeen ? new Date(fan.lastSeen) : null,
-        model_id: accountId
-      }, {
-        onConflict: 'fan_id'
-      });
+    let synced = 0
+
+    for (const sub of subscribers) {
+      const fanData = {
+        fan_id: sub.id.toString(),
+        name: sub.name || sub.username || 'Unknown',
+        model_id: modelId,
+        of_username: sub.username,
+        of_avatar_url: sub.avatar,
+        is_subscribed: true,
+        subscription_date: sub.subscribedOn || sub.subscribed_on,
+        spent_total: parseFloat(sub.spentTotal || 0),
+        last_update: new Date().toISOString()
+      }
+
+      const { error } = await supabase
+        .from('fans')
+        .upsert(fanData, { onConflict: 'fan_id' })
+
+      if (!error) synced++
     }
 
-    res.status(200).json({ 
-      success: true, 
-      fansCount: fans.length 
-    });
+    return res.status(200).json({
+      success: true,
+      synced,
+      total: subscribers.length,
+      message: `Synced ${synced} fans successfully`
+    })
+
   } catch (error) {
-    console.error('Sync fans error:', error);
-    res.status(500).json({ error: error.message });
+    console.error('Sync fans error:', error)
+    return res.status(500).json({
+      error: 'Failed to sync fans',
+      details: error.message
+    })
   }
 }

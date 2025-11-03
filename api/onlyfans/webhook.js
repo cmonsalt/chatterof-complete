@@ -1,112 +1,138 @@
-import { createClient } from '@supabase/supabase-js';
+import { createClient } from '@supabase/supabase-js'
 
 const supabase = createClient(
   process.env.VITE_SUPABASE_URL,
   process.env.VITE_SUPABASE_ANON_KEY
-);
+)
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method not allowed' });
+    return res.status(405).json({ error: 'Method not allowed' })
   }
-
-  const { event, data } = req.body;
 
   try {
-    switch (event) {
-      // Nuevo mensaje recibido
-      case 'messages.received':
-        await supabase.from('chat').insert({
-          fan_id: data.fromUser.id,
-          message: data.text,
-          timestamp: new Date(data.createdAt),
-          from: 'fan',
-          model_id: data.toUser.id,
-          media: data.media || []
-        });
-        break;
+    const payload = req.body
 
-      // PPV desbloqueado (comprado)
-      case 'messages.ppv.unlocked':
-        // Actualizar total gastado del fan
-        await supabase.rpc('increment_fan_spending', {
-          p_fan_id: data.fromUser.id,
-          p_amount: data.price
-        });
+    console.log('Webhook received:', payload)
 
-        // Registrar transacción
-        await supabase.from('transactions').insert({
-          fan_id: data.fromUser.id,
-          type: 'ppv',
-          amount: data.price,
-          created_at: new Date(data.unlockedAt),
-          message_id: data.id
-        });
-        break;
+    // Get model_id from account_id
+    const { data: model } = await supabase
+      .from('models')
+      .select('model_id')
+      .eq('of_account_id', payload.accountId)
+      .single()
 
-      // Tip recibido
-      case 'tip.received':
-        await supabase.rpc('increment_fan_spending', {
-          p_fan_id: data.fromUser.id,
-          p_amount: data.amount
-        });
-
-        await supabase.from('transactions').insert({
-          fan_id: data.fromUser.id,
-          type: 'tip',
-          amount: data.amount,
-          created_at: new Date(data.createdAt)
-        });
-        break;
-
-      // Nueva suscripción
-      case 'subscription.new':
-      case 'subscription.renewed':
-        await supabase.from('fans').upsert({
-          fan_id: data.user.id,
-          of_username: data.user.username,
-          of_avatar_url: data.user.avatar,
-          subscription_active: true,
-          subscription_price: data.price,
-          last_subscription_date: new Date(data.subscribedAt),
-          model_id: data.creator.id
-        });
-
-        await supabase.rpc('increment_fan_spending', {
-          p_fan_id: data.user.id,
-          p_amount: data.price
-        });
-
-        await supabase.from('transactions').insert({
-          fan_id: data.user.id,
-          type: 'subscription',
-          amount: data.price,
-          created_at: new Date(data.subscribedAt)
-        });
-        break;
+    if (!model) {
+      console.log('Model not found for accountId:', payload.accountId)
+      return res.status(200).json({ received: true })
     }
 
-    // Log del webhook recibido
-    await supabase.from('webhooks').insert({
-      event_type: event,
-      payload: data,
-      created_at: new Date(),
-      processed: true
-    });
+    const modelId = model.model_id
 
-    res.status(200).json({ success: true });
+    // Handle different webhook events
+    switch (payload.event) {
+      case 'message:new':
+        await handleNewMessage(payload.data, modelId)
+        break
+
+      case 'transaction:new':
+        await handleNewTransaction(payload.data, modelId)
+        break
+
+      case 'subscriber:new':
+        await handleNewSubscriber(payload.data, modelId)
+        break
+
+      default:
+        console.log('Unknown event type:', payload.event)
+    }
+
+    return res.status(200).json({ received: true })
+
   } catch (error) {
-    console.error('Webhook error:', error);
-    
-    // Log del error
-    await supabase.from('webhooks').insert({
-      event_type: event,
-      payload: data,
-      created_at: new Date(),
-      processed: false,
-      error: error.message
-    });
-
-    res.status(500).json({ error: error.message });
+    console.error('Webhook error:', error)
+    return res.status(500).json({ error: error.message })
   }
+}
+
+async function handleNewMessage(data, modelId) {
+  const chatData = {
+    fan_id: data.fromUser?.id?.toString() || data.userId?.toString(),
+    message: data.text || '',
+    model_id: modelId,
+    timestamp: data.createdAt || new Date().toISOString(),
+    from: data.isFromFan ? 'fan' : 'model',
+    message_type: data.media?.length > 0 ? 'media' : 'text',
+    of_message_id: data.id?.toString(),
+    media_url: data.media?.[0]?.src,
+    amount: data.price || 0,
+    source: 'webhook'
+  }
+
+  await supabase.from('chat').upsert(chatData, { onConflict: 'of_message_id' })
+  
+  // Ensure fan exists
+  if (data.fromUser || data.user) {
+    const user = data.fromUser || data.user
+    await supabase.from('fans').upsert({
+      fan_id: user.id?.toString(),
+      name: user.name || user.username || 'Unknown',
+      model_id: modelId,
+      of_username: user.username,
+      of_avatar_url: user.avatar,
+      last_message_date: data.createdAt
+    }, { onConflict: 'fan_id' })
+  }
+}
+
+async function handleNewTransaction(data, modelId) {
+  let type = 'compra'
+  if (data.type === 'tip') type = 'tip'
+  if (data.type === 'subscription') type = 'suscripcion'
+
+  const txnData = {
+    fan_id: data.user?.id?.toString() || 'unknown',
+    type,
+    amount: parseFloat(data.amount || 0),
+    model_id: modelId,
+    created_at: data.createdAt || new Date().toISOString(),
+    description: data.description || data.text || '',
+    of_transaction_id: data.id?.toString(),
+    payment_method: data.paymentType || 'locked_content',
+    detected_by: 'webhook'
+  }
+
+  await supabase.from('transactions').upsert(txnData, { onConflict: 'of_transaction_id' })
+
+  // Update fan spent_total
+  if (data.user?.id) {
+    const { data: fan } = await supabase
+      .from('fans')
+      .select('spent_total')
+      .eq('fan_id', data.user.id.toString())
+      .single()
+
+    if (fan) {
+      await supabase
+        .from('fans')
+        .update({ 
+          spent_total: (fan.spent_total || 0) + parseFloat(data.amount || 0)
+        })
+        .eq('fan_id', data.user.id.toString())
+    }
+  }
+}
+
+async function handleNewSubscriber(data, modelId) {
+  const fanData = {
+    fan_id: data.id?.toString() || data.userId?.toString(),
+    name: data.name || data.username || 'Unknown',
+    model_id: modelId,
+    of_username: data.username,
+    of_avatar_url: data.avatar,
+    is_subscribed: true,
+    subscription_date: data.subscribedOn || new Date().toISOString()
+  }
+
+  await supabase.from('fans').upsert(fanData, { onConflict: 'fan_id' })
 }
