@@ -549,36 +549,43 @@ function VaultMediaGrid({ medias, loading }) {
 
   return (
     <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-      {medias.map(media => (
-        <div key={media.id} className="border rounded-lg overflow-hidden hover:shadow-md transition-shadow cursor-pointer">
-          <div className="aspect-video bg-gray-100 relative">
-            {media.thumb ? (
-              <img 
-                src={media.thumb} 
-                alt={`Media ${media.id}`}
-                className="w-full h-full object-cover"
-                onError={(e) => {
-                  e.target.style.display = 'none';
-                  e.target.nextSibling.style.display = 'flex';
-                }}
-              />
-            ) : null}
-            <div 
-              className="flex items-center justify-center h-full text-gray-400 text-4xl"
-              style={{ display: media.thumb ? 'none' : 'flex' }}
-            >
-              {media.type === 'video' ? '🎥' : media.type === 'audio' ? '🎵' : '📷'}
+      {medias.map(media => {
+        // Usar Weserv proxy para las imágenes
+        const proxyUrl = media.thumb 
+          ? `https://images.weserv.nl/?url=${encodeURIComponent(media.thumb)}`
+          : null;
+        
+        return (
+          <div key={media.id} className="border rounded-lg overflow-hidden hover:shadow-md transition-shadow cursor-pointer">
+            <div className="aspect-video bg-gray-100 relative">
+              {proxyUrl ? (
+                <img 
+                  src={proxyUrl}
+                  alt={`Media ${media.id}`}
+                  className="w-full h-full object-cover"
+                  onError={(e) => {
+                    e.target.style.display = 'none';
+                    e.target.nextSibling.style.display = 'flex';
+                  }}
+                />
+              ) : null}
+              <div 
+                className="flex items-center justify-center h-full text-gray-400 text-4xl"
+                style={{ display: proxyUrl ? 'none' : 'flex' }}
+              >
+                {media.type === 'video' ? '🎥' : media.type === 'audio' ? '🎵' : '📷'}
+              </div>
+            </div>
+            <div className="p-2">
+              <p className="text-xs text-gray-600 truncate">
+                {media.type === 'video' ? '🎥' : media.type === 'audio' ? '🎵' : '📷'} 
+                {' '}
+                {media.type} • {media.likesCount || 0} ❤️
+              </p>
             </div>
           </div>
-          <div className="p-2">
-            <p className="text-xs text-gray-600 truncate">
-              {media.type === 'video' ? '🎥' : media.type === 'audio' ? '🎵' : '📷'} 
-              {' '}
-              {media.type} • {media.likesCount || 0} ❤️
-            </p>
-          </div>
-        </div>
-      ))}
+        );
+      })}
     </div>
   )
 }
