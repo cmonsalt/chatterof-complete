@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
 import Navbar from '../components/Navbar'
+import ConnectOnlyFans from '../components/ConnectOnlyFans'
 
 export default function Settings() {
   const { modelId, currentModel } = useAuth()
@@ -30,7 +31,7 @@ export default function Settings() {
 
   // 🔗 OnlyFans Connection  
   const [isConnected, setIsConnected] = useState(false)
-  const [lastSync, setLastSync] = useState(null)
+  const [accountId, setAccountId] = useState(null)
 
   // Fan Notes
   const [fans, setFans] = useState([])
@@ -148,15 +149,18 @@ export default function Settings() {
   // ✨ Check OnlyFans Connection
   const checkConnection = async () => {
     try {
-      const response = await fetch(`/api/check-connection?modelId=${modelId}`);
-      const data = await response.json();
+      const { data } = await supabase
+        .from('models')
+        .select('of_account_id')
+        .eq('model_id', modelId)
+        .single()
       
-      if (data.connected) {
-        setIsConnected(true);
-        setLastSync(new Date(data.lastSync).toLocaleString());
+      if (data?.of_account_id) {
+        setIsConnected(true)
+        setAccountId(data.of_account_id)
       }
     } catch (error) {
-      console.log('No OF connection');
+      console.log('No OF connection')
     }
   }
 
@@ -165,11 +169,12 @@ export default function Settings() {
     
     try {
       await supabase
-        .from('of_sessions')
-        .update({ is_active: false })
+        .from('models')
+        .update({ of_account_id: null })
         .eq('model_id', modelId)
       
       setIsConnected(false)
+      setAccountId(null)
       setMessage({ type: 'success', text: '✅ Disconnected from OnlyFans' })
     } catch (error) {
       setMessage({ type: 'error', text: '❌ Error: ' + error.message })
@@ -431,7 +436,7 @@ export default function Settings() {
                         ✅ Connected to OnlyFans
                       </p>
                       <p style={{ fontSize: '0.875rem', color: '#047857' }}>
-                        Last sync: {lastSync || 'Never'}
+                        Account ID: {accountId}
                       </p>
                     </div>
                     <button 
@@ -450,53 +455,14 @@ export default function Settings() {
                     </button>
                   </div>
                 ) : (
-                  <div style={{ 
-                    background: '#fef3c7', 
-                    border: '2px solid #fbbf24', 
-                    borderRadius: '0.75rem', 
-                    padding: '1.5rem' 
-                  }}>
-                    <p style={{ fontSize: '1.125rem', fontWeight: 600, color: '#92400e', marginBottom: '0.75rem' }}>
-                      ⚠️ Not connected to OnlyFans
-                    </p>
-                    <p style={{ fontSize: '0.875rem', color: '#78350f', marginBottom: '1.5rem' }}>
-                      Install the ChatterOF extension and connect your account to start syncing data automatically.
-                    </p>
-                    <div style={{ display: 'flex', gap: '1rem' }}>
-                      <a 
-                        href="/extension/chatterof-extension.zip"
-                        download
-                        style={{
-                          display: 'inline-block',
-                          padding: '0.75rem 1.5rem',
-                          background: '#7c3aed',
-                          color: 'white',
-                          borderRadius: '0.5rem',
-                          fontWeight: 600,
-                          textDecoration: 'none'
-                        }}
-                      >
-                        📥 Download Extension
-                      </a>
-                      <a
-                        href="https://docs.google.com/document/d/YOUR_DOCS_LINK"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        style={{
-                          display: 'inline-block',
-                          padding: '0.75rem 1.5rem',
-                          border: '2px solid #7c3aed',
-                          color: '#7c3aed',
-                          background: 'white',
-                          borderRadius: '0.5rem',
-                          fontWeight: 600,
-                          textDecoration: 'none'
-                        }}
-                      >
-                        📖 Instructions
-                      </a>
-                    </div>
-                  </div>
+                  <ConnectOnlyFans 
+                    modelId={modelId} 
+                    onSuccess={(accId) => { 
+                      setIsConnected(true)
+                      setAccountId(accId)
+                      setMessage({ type: 'success', text: '✅ Connected successfully!' })
+                    }} 
+                  />
                 )}
               </div>
             )}
