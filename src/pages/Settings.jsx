@@ -1,5 +1,6 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useAuth } from '../contexts/AuthContext'
+import { supabase } from '../lib/supabase'
 import Navbar from '../components/Navbar'
 import ConnectOnlyFans from '../components/ConnectOnlyFans'
 import ConfigTab from '../components/settings/ConfigTab'
@@ -9,6 +10,50 @@ import VaultTab from '../components/settings/VaultTab'
 export default function Settings() {
   const { modelId, currentModel } = useAuth()
   const [activeTab, setActiveTab] = useState('connect')
+  const [isConnected, setIsConnected] = useState(false)
+  const [accountId, setAccountId] = useState(null)
+  const [checkingConnection, setCheckingConnection] = useState(true)
+
+  useEffect(() => {
+    if (modelId) {
+      checkConnection()
+    }
+  }, [modelId])
+
+  const checkConnection = async () => {
+    try {
+      const { data } = await supabase
+        .from('models')
+        .select('of_account_id')
+        .eq('model_id', modelId)
+        .single()
+      
+      if (data?.of_account_id) {
+        setIsConnected(true)
+        setAccountId(data.of_account_id)
+      }
+    } catch (error) {
+      console.log('No OF connection')
+    } finally {
+      setCheckingConnection(false)
+    }
+  }
+
+  const handleDisconnect = async () => {
+    if (!confirm('Disconnect OnlyFans? You will need to reconnect.')) return
+    
+    try {
+      await supabase
+        .from('models')
+        .update({ of_account_id: null })
+        .eq('model_id', modelId)
+      
+      setIsConnected(false)
+      setAccountId(null)
+    } catch (error) {
+      console.error('Error disconnecting:', error)
+    }
+  }
 
   return (
     <>
@@ -57,7 +102,41 @@ export default function Settings() {
 
             {/* Tab Content */}
             <div className="p-6">
-              {activeTab === 'connect' && <ConnectOnlyFans modelId={modelId} />}
+              {activeTab === 'connect' && (
+                checkingConnection ? (
+                  <div className="flex items-center justify-center py-12">
+                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
+                  </div>
+                ) : isConnected ? (
+                  <div>
+                    <h2 className="text-2xl font-bold text-gray-900 mb-6">🔗 OnlyFans Connection</h2>
+                    <div className="flex items-center gap-4">
+                      <div className="flex-1 bg-green-50 border-2 border-green-500 rounded-lg p-6">
+                        <p className="text-lg font-semibold text-green-900 mb-2">
+                          ✅ Connected to OnlyFans
+                        </p>
+                        <p className="text-sm text-green-700">
+                          Account ID: {accountId}
+                        </p>
+                      </div>
+                      <button 
+                        onClick={handleDisconnect}
+                        className="px-6 py-3 border-2 border-red-500 text-red-500 bg-white rounded-lg font-semibold hover:bg-red-50 transition-colors"
+                      >
+                        Disconnect
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <ConnectOnlyFans 
+                    modelId={modelId}
+                    onSuccess={(accId) => {
+                      setIsConnected(true)
+                      setAccountId(accId)
+                    }}
+                  />
+                )
+              )}
               {activeTab === 'config' && <ConfigTab modelId={modelId} />}
               {activeTab === 'tiers' && <TiersTab modelId={modelId} />}
               {activeTab === 'vault' && <VaultTab modelId={modelId} />}
