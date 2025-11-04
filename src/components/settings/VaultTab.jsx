@@ -454,6 +454,16 @@ export default function VaultTab({ modelId }) {
             📦 Sessions ({sessions.length})
           </button>
           <button
+            onClick={() => setActiveTab('singles')}
+            className={`px-4 py-2 border-b-2 transition-colors ${
+              activeTab === 'singles'
+                ? 'border-green-600 text-green-600 font-medium'
+                : 'border-transparent text-gray-600 hover:text-gray-900'
+            }`}
+          >
+            🎯 Singles ({singles.length})
+          </button>
+          <button
             onClick={() => setActiveTab('vault')}
             className={`px-4 py-2 border-b-2 transition-colors ${
               activeTab === 'vault'
@@ -479,10 +489,21 @@ export default function VaultTab({ modelId }) {
           handleDeleteSession={handleDeleteSession}
           saving={saving}
         />
+      ) : activeTab === 'singles' ? (
+        <SinglesView
+          singles={singles}
+          tierRules={tierRules}
+          calculatePriceForTier={calculatePriceForTier}
+          getNivelLabel={getNivelLabel}
+          openMediaSelectorForPart={openMediaSelectorForPart}
+          handleDeleteSingle={handleDeleteSingle}
+          saving={saving}
+        />
       ) : (
         <VaultMediaGrid
           medias={vaultMedias}
           loading={loadingVault}
+          onMediaClick={openPreviewModal}
         />
       )}
 
@@ -589,6 +610,76 @@ function SessionsView({
           )}
         </div>
       ))}
+    </div>
+  )
+}
+
+// Singles View component
+function SinglesView({
+  singles,
+  tierRules,
+  calculatePriceForTier,
+  getNivelLabel,
+  openMediaSelectorForPart,
+  handleDeleteSingle,
+  saving
+}) {
+  if (singles.length === 0) {
+    return (
+      <div className="text-center py-12 bg-gray-50 rounded-lg">
+        <p className="text-gray-600">No singles yet. Singles are standalone PPV content.</p>
+      </div>
+    )
+  }
+
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      {singles.map(single => {
+        const nivelLabel = getNivelLabel(single.nivel)
+        
+        return (
+          <div key={single.id} className="border border-gray-200 rounded-lg p-4">
+            <div className="flex justify-between items-start mb-3">
+              <h3 className="font-semibold text-lg">{single.title}</h3>
+              <button
+                onClick={() => handleDeleteSingle(single.id)}
+                className="text-red-500 hover:text-red-700"
+                disabled={saving}
+              >
+                🗑️
+              </button>
+            </div>
+
+            {single.description && (
+              <p className="text-sm text-gray-600 mb-3">{single.description}</p>
+            )}
+
+            <div className="flex items-center gap-2 mb-3">
+              <span className={`text-xs px-2 py-1 rounded ${nivelLabel.color}`}>
+                {nivelLabel.text}
+              </span>
+              <span className="text-xs text-gray-500">Nivel {single.nivel}</span>
+            </div>
+
+            {/* Pricing Tiers */}
+            <div className="space-y-1 text-sm mb-3">
+              {tierRules.map(tier => (
+                <div key={tier.id} className="flex justify-between">
+                  <span className="text-gray-600">{tier.emoji} {tier.tier_name}:</span>
+                  <span className="font-medium">${calculatePriceForTier(single.base_price, tier.price_multiplier)}</span>
+                </div>
+              ))}
+            </div>
+
+            <button
+              onClick={() => openMediaSelectorForPart(single)}
+              className="w-full px-3 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 text-sm"
+            >
+              {single.of_media_id ? '✓ Media Assigned' : '+ Assign Media'}
+            </button>
+          </div>
+        )
+      })}
     </div>
   )
 }
