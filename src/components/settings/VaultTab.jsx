@@ -1,17 +1,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
 
-// ═══════════════════════════════════════════════════════════════
-// 🗂️ VAULT TAB - COMPLETE COMPONENT
-// ═══════════════════════════════════════════════════════════════
-// Gestión completa de contenido PPV (Sessions + Singles)
-// ═══════════════════════════════════════════════════════════════
-
 export default function VaultTab({ modelId }) {
-  // ═══════════════════════════════════════════════════════════════
-  // 📊 STATE MANAGEMENT
-  // ═══════════════════════════════════════════════════════════════
-  
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState(null)
@@ -21,9 +11,17 @@ export default function VaultTab({ modelId }) {
   const [singles, setSingles] = useState([])
   const [tierRules, setTierRules] = useState([])
   
+  // 🎬 OnlyFans Vault Media
+  const [vaultMedias, setVaultMedias] = useState([])
+  const [loadingVault, setLoadingVault] = useState(false)
+  const [vaultCache, setVaultCache] = useState(null)
+  const [vaultCacheTime, setVaultCacheTime] = useState(null)
+  const [showMediaSelector, setShowMediaSelector] = useState(false)
+  const [selectingForPart, setSelectingForPart] = useState(null)
+  
   // UI State
   const [expandedSessions, setExpandedSessions] = useState([])
-  const [activeTab, setActiveTab] = useState('sessions') // 'sessions' | 'singles'
+  const [activeTab, setActiveTab] = useState('sessions')
   
   // Modals
   const [showNewSessionModal, setShowNewSessionModal] = useState(false)
@@ -56,10 +54,6 @@ export default function VaultTab({ modelId }) {
     of_media_ids: []
   })
 
-  // ═══════════════════════════════════════════════════════════════
-  // 🔄 DATA LOADING
-  // ═══════════════════════════════════════════════════════════════
-  
   useEffect(() => {
     if (modelId) {
       loadData()
@@ -72,13 +66,61 @@ export default function VaultTab({ modelId }) {
       await Promise.all([
         loadSessions(),
         loadSingles(),
-        loadTierRules()
+        loadTierRules(),
+        loadVaultFromOnlyFans()
       ])
     } catch (error) {
       console.error('Error loading vault data:', error)
       showMessage('error', 'Error loading vault data')
     } finally {
       setLoading(false)
+    }
+  }
+
+  // 🎬 LOAD VAULT FROM ONLYFANS (with cache)
+  const loadVaultFromOnlyFans = async (forceRefresh = false) => {
+    // Check cache (5 minutes)
+    if (!forceRefresh && vaultCache && vaultCacheTime) {
+      const cacheAge = Date.now() - vaultCacheTime
+      if (cacheAge < 300000) {
+        console.log('✅ Using cached vault data')
+        setVaultMedias(vaultCache)
+        return
+      }
+    }
+
+    setLoadingVault(true)
+    try {
+      const { data: model } = await supabase
+        .from('models')
+        .select('of_account_id')
+        .eq('model_id', modelId)
+        .single()
+
+      if (!model?.of_account_id) {
+        console.log('⚠️ No OnlyFans account connected')
+        setVaultMedias([])
+        return
+      }
+
+      const response = await fetch(`/api/onlyfans/get-vault?accountId=${model.of_account_id}`)
+      const data = await response.json()
+
+      if (!data.success) {
+        throw new Error(data.error || 'Failed to load vault')
+      }
+
+      console.log('✅ Vault loaded:', data.medias?.length || 0, 'medias')
+      
+      setVaultMedias(data.medias || [])
+      setVaultCache(data.medias || [])
+      setVaultCacheTime(Date.now())
+
+    } catch (error) {
+      console.error('Error loading OnlyFans vault:', error)
+      showMessage('error', 'Error loading OnlyFans vault')
+    } finally {
+      setLoadingVault(false)
     }
   }
 
@@ -94,7 +136,6 @@ export default function VaultTab({ modelId }) {
 
       if (error) throw error
 
-      // Group by session_id
       const sessionsMap = {}
       data?.forEach(item => {
         if (!sessionsMap[item.session_id]) {
@@ -150,10 +191,6 @@ export default function VaultTab({ modelId }) {
     }
   }
 
-  // ═══════════════════════════════════════════════════════════════
-  // 📦 SESSION MANAGEMENT
-  // ═══════════════════════════════════════════════════════════════
-  
   const handleCreateSession = async (e) => {
     e.preventDefault()
     setSaving(true)
@@ -162,7 +199,6 @@ export default function VaultTab({ modelId }) {
       const sessionId = `session_${Date.now()}`
       const parts = []
       
-      // Create all parts for the session
       for (let i = 1; i <= sessionForm.steps_count; i++) {
         parts.push({
           model_id: modelId,
@@ -188,9 +224,7 @@ export default function VaultTab({ modelId }) {
 
       if (error) throw error
 
-      showMessage('success', `✅ Session "${sessionForm.name}" created with ${sessionForm.steps_count} parts!`)
-      
-      // Reset form and reload
+      showMessage('success', `✅ Session "${sessionForm.name}" created!`)
       setSessionForm({ name: '', description: '', steps_count: 3 })
       setShowNewSessionModal(false)
       await loadSessions()
@@ -215,7 +249,7 @@ export default function VaultTab({ modelId }) {
 
       if (error) throw error
 
-      showMessage('success', '✅ Session deleted')
+      showMessage('success', '✅ Session deleted!')
       await loadSessions()
       
     } catch (error) {
@@ -226,138 +260,48 @@ export default function VaultTab({ modelId }) {
     }
   }
 
-  // ═══════════════════════════════════════════════════════════════
-  // 🎬 SINGLE MANAGEMENT
-  // ═══════════════════════════════════════════════════════════════
-  
-  const handleCreateSingle = async (e) => {
-    e.preventDefault()
-    setSaving(true)
-
-    try {
-      const offerId = `single_${Date.now()}`
-      
-      const { error } = await supabase
-        .from('catalog')
-        .insert({
-          model_id: modelId,
-          offer_id: offerId,
-          parent_type: 'single',
-          title: singleForm.title,
-          description: singleForm.description,
-          base_price: singleForm.base_price,
-          nivel: singleForm.nivel,
-          tags: singleForm.tags,
-          of_media_ids: singleForm.of_media_ids,
-          media_thumbnails: {}
-        })
-
-      if (error) throw error
-
-      showMessage('success', '✅ Individual PPV created!')
-      
-      // Reset form and reload
-      setSingleForm({
-        title: '',
-        description: '',
-        base_price: 0,
-        nivel: 5,
-        tags: '',
-        of_media_ids: []
-      })
-      setShowNewSingleModal(false)
-      await loadSingles()
-      
-    } catch (error) {
-      console.error('Error creating single:', error)
-      showMessage('error', 'Error creating single')
-    } finally {
-      setSaving(false)
-    }
+  // 🎬 OPEN MEDIA SELECTOR
+  const openMediaSelectorForPart = (part) => {
+    setSelectingForPart(part)
+    setShowMediaSelector(true)
   }
 
-  const handleDeleteSingle = async (id, title) => {
-    if (!confirm(`Delete "${title}"?`)) return
+  // 🎬 ASSIGN MEDIA TO PART
+  const handleAssignMediaToPart = async (media) => {
+    if (!selectingForPart) return
 
     setSaving(true)
-    try {
-      const { error } = await supabase
-        .from('catalog')
-        .delete()
-        .eq('id', id)
-
-      if (error) throw error
-
-      showMessage('success', '✅ Single deleted')
-      await loadSingles()
-      
-    } catch (error) {
-      console.error('Error deleting single:', error)
-      showMessage('error', 'Error deleting single')
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  // ═══════════════════════════════════════════════════════════════
-  // ✏️ PART EDITING
-  // ═══════════════════════════════════════════════════════════════
-  
-  const openEditPartModal = (part) => {
-    setEditingPart(part)
-    setPartForm({
-      title: part.title || '',
-      description: part.description || '',
-      base_price: part.base_price || 0,
-      nivel: part.nivel || 5,
-      tags: part.tags || '',
-      of_media_ids: part.of_media_ids || []
-    })
-    setShowEditPartModal(true)
-  }
-
-  const handleUpdatePart = async (e) => {
-    e.preventDefault()
-    setSaving(true)
-
     try {
       const { error } = await supabase
         .from('catalog')
         .update({
-          title: partForm.title,
-          description: partForm.description,
-          base_price: partForm.base_price,
-          nivel: partForm.nivel,
-          tags: partForm.tags,
-          of_media_ids: partForm.of_media_ids
+          of_media_ids: [media.id],
+          media_thumbnails: {
+            [media.id]: media.thumb?.url || media.preview?.url
+          }
         })
-        .eq('id', editingPart.id)
+        .eq('id', selectingForPart.id)
 
       if (error) throw error
 
-      showMessage('success', '✅ Part updated!')
-      setShowEditPartModal(false)
-      setEditingPart(null)
+      showMessage('success', '✅ Media assigned!')
+      setShowMediaSelector(false)
+      setSelectingForPart(null)
       
-      // Reload appropriate data
-      if (editingPart.parent_type === 'session') {
+      if (selectingForPart.parent_type === 'session') {
         await loadSessions()
       } else {
         await loadSingles()
       }
       
     } catch (error) {
-      console.error('Error updating part:', error)
-      showMessage('error', 'Error updating part')
+      console.error('Error assigning media:', error)
+      showMessage('error', 'Error assigning media')
     } finally {
       setSaving(false)
     }
   }
 
-  // ═══════════════════════════════════════════════════════════════
-  // 🎨 HELPER FUNCTIONS
-  // ═══════════════════════════════════════════════════════════════
-  
   const toggleSession = (sessionId) => {
     setExpandedSessions(prev => 
       prev.includes(sessionId)
@@ -381,10 +325,6 @@ export default function VaultTab({ modelId }) {
     setTimeout(() => setMessage(null), 3000)
   }
 
-  // ═══════════════════════════════════════════════════════════════
-  // 🎨 RENDER
-  // ═══════════════════════════════════════════════════════════════
-  
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -400,22 +340,23 @@ export default function VaultTab({ modelId }) {
         <div>
           <h2 className="text-2xl font-bold text-gray-900">🗂️ Content Vault</h2>
           <p className="text-sm text-gray-600 mt-1">
-            Manage your PPV content library (Sessions & Singles)
+            Organize your PPV content • {vaultMedias.length} medias from OnlyFans
           </p>
         </div>
         
         <div className="flex gap-2">
           <button
+            onClick={() => loadVaultFromOnlyFans(true)}
+            disabled={loadingVault}
+            className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors disabled:opacity-50"
+          >
+            {loadingVault ? '🔄 Syncing...' : '🔄 Refresh Vault'}
+          </button>
+          <button
             onClick={() => setShowNewSessionModal(true)}
             className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
           >
             + Create Session
-          </button>
-          <button
-            onClick={() => setShowNewSingleModal(true)}
-            className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
-          >
-            + Add Single
           </button>
         </div>
       </div>
@@ -443,14 +384,14 @@ export default function VaultTab({ modelId }) {
             📦 Sessions ({sessions.length})
           </button>
           <button
-            onClick={() => setActiveTab('singles')}
+            onClick={() => setActiveTab('vault')}
             className={`px-4 py-2 border-b-2 transition-colors ${
-              activeTab === 'singles'
+              activeTab === 'vault'
                 ? 'border-purple-600 text-purple-600 font-medium'
                 : 'border-transparent text-gray-600 hover:text-gray-900'
             }`}
           >
-            🎬 Singles ({singles.length})
+            🎬 OnlyFans Vault ({vaultMedias.length})
           </button>
         </nav>
       </div>
@@ -464,23 +405,31 @@ export default function VaultTab({ modelId }) {
           tierRules={tierRules}
           calculatePriceForTier={calculatePriceForTier}
           getNivelLabel={getNivelLabel}
-          openEditPartModal={openEditPartModal}
+          openMediaSelectorForPart={openMediaSelectorForPart}
           handleDeleteSession={handleDeleteSession}
           saving={saving}
         />
       ) : (
-        <SinglesView
-          singles={singles}
-          tierRules={tierRules}
-          calculatePriceForTier={calculatePriceForTier}
-          getNivelLabel={getNivelLabel}
-          openEditPartModal={openEditPartModal}
-          handleDeleteSingle={handleDeleteSingle}
-          saving={saving}
+        <VaultMediaGrid
+          medias={vaultMedias}
+          loading={loadingVault}
         />
       )}
 
-      {/* Modals */}
+      {/* Media Selector Modal */}
+      {showMediaSelector && (
+        <MediaSelectorModal
+          medias={vaultMedias}
+          onSelect={handleAssignMediaToPart}
+          onClose={() => {
+            setShowMediaSelector(false)
+            setSelectingForPart(null)
+          }}
+          partTitle={selectingForPart?.title}
+        />
+      )}
+
+      {/* New Session Modal */}
       {showNewSessionModal && (
         <NewSessionModal
           sessionForm={sessionForm}
@@ -490,35 +439,11 @@ export default function VaultTab({ modelId }) {
           saving={saving}
         />
       )}
-
-      {showNewSingleModal && (
-        <NewSingleModal
-          singleForm={singleForm}
-          setSingleForm={setSingleForm}
-          handleCreateSingle={handleCreateSingle}
-          setShowNewSingleModal={setShowNewSingleModal}
-          saving={saving}
-        />
-      )}
-
-      {showEditPartModal && editingPart && (
-        <EditPartModal
-          partForm={partForm}
-          setPartForm={setPartForm}
-          handleUpdatePart={handleUpdatePart}
-          setShowEditPartModal={setShowEditPartModal}
-          editingPart={editingPart}
-          saving={saving}
-        />
-      )}
     </div>
   )
 }
 
-// ═══════════════════════════════════════════════════════════════
-// 📦 SESSIONS VIEW COMPONENT
-// ═══════════════════════════════════════════════════════════════
-
+// SessionsView component (simplified)
 function SessionsView({ 
   sessions, 
   expandedSessions, 
@@ -526,7 +451,7 @@ function SessionsView({
   tierRules,
   calculatePriceForTier,
   getNivelLabel,
-  openEditPartModal,
+  openMediaSelectorForPart,
   handleDeleteSession,
   saving
 }) {
@@ -541,88 +466,36 @@ function SessionsView({
   return (
     <div className="space-y-4">
       {sessions.map(session => (
-        <div key={session.session_id} className="border border-gray-200 rounded-lg overflow-hidden">
-          {/* Session Header */}
+        <div key={session.session_id} className="border border-gray-200 rounded-lg">
           <div 
-            className="bg-gray-50 p-4 flex items-center justify-between cursor-pointer hover:bg-gray-100 transition-colors"
+            className="bg-gray-50 p-4 flex items-center justify-between cursor-pointer hover:bg-gray-100"
             onClick={() => toggleSession(session.session_id)}
           >
-            <div className="flex-1">
-              <div className="flex items-center gap-3">
-                <h3 className="text-lg font-semibold text-gray-900">{session.name}</h3>
-                <span className="px-2 py-1 text-xs bg-indigo-100 text-indigo-800 rounded">
-                  {session.parts.length} parts
-                </span>
-              </div>
-              {session.description && (
-                <p className="text-sm text-gray-600 mt-1">{session.description}</p>
-              )}
+            <div>
+              <h3 className="text-lg font-semibold">{session.name}</h3>
+              <p className="text-sm text-gray-600">{session.parts.length} parts</p>
             </div>
-            
-            <div className="flex items-center gap-2">
-              <button
-                onClick={(e) => {
-                  e.stopPropagation()
-                  handleDeleteSession(session.session_id, session.name)
-                }}
-                disabled={saving}
-                className="px-3 py-1 text-sm text-red-600 hover:bg-red-50 rounded transition-colors"
-              >
-                🗑️ Delete
-              </button>
-              <span className="text-gray-400">
-                {expandedSessions.includes(session.session_id) ? '▼' : '▶'}
-              </span>
-            </div>
+            <span>{expandedSessions.includes(session.session_id) ? '▼' : '▶'}</span>
           </div>
 
-          {/* Session Parts */}
           {expandedSessions.includes(session.session_id) && (
-            <div className="p-4 space-y-3 bg-white">
-              {session.parts.map((part, index) => (
-                <div key={part.id} className="border border-gray-200 rounded-lg p-4">
-                  <div className="flex items-start justify-between">
+            <div className="p-4 space-y-3">
+              {session.parts.map(part => (
+                <div key={part.id} className="border p-4 rounded-lg">
+                  <div className="flex justify-between items-start">
                     <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-2">
-                        <span className="px-2 py-1 text-xs font-medium bg-gray-100 text-gray-700 rounded">
-                          Part {part.step_number}
-                        </span>
-                        {part.of_media_ids?.length > 0 && (
-                          <span className="px-2 py-1 text-xs bg-blue-50 text-blue-700 rounded">
-                            {part.of_media_ids.length} media
-                          </span>
-                        )}
-                        <span className={`px-2 py-1 text-xs rounded ${getNivelLabel(part.nivel).color}`}>
-                          {getNivelLabel(part.nivel).text} (Lv {part.nivel})
-                        </span>
-                      </div>
-                      
-                      <h4 className="font-medium text-gray-900">{part.title || `Part ${part.step_number}`}</h4>
-                      {part.description && (
-                        <p className="text-sm text-gray-600 mt-1">{part.description}</p>
+                      <h4 className="font-medium">{part.title || `Part ${part.step_number}`}</h4>
+                      {part.of_media_ids?.length > 0 && (
+                        <p className="text-xs text-blue-600 mt-1">
+                          📎 {part.of_media_ids.length} media attached
+                        </p>
                       )}
-                      {part.tags && (
-                        <p className="text-xs text-gray-500 mt-2">Tags: {part.tags}</p>
-                      )}
-
-                      {/* Tier Pricing */}
-                      <div className="mt-3 flex gap-3">
-                        {tierRules.map(tier => (
-                          <div key={tier.id} className="text-sm">
-                            <span className="font-medium">{tier.emoji} {tier.tier_name}:</span>
-                            <span className="ml-1 text-gray-700">
-                              ${calculatePriceForTier(part.base_price, tier.price_multiplier)}
-                            </span>
-                          </div>
-                        ))}
-                      </div>
                     </div>
-
                     <button
-                      onClick={() => openEditPartModal(part)}
-                      className="px-3 py-1 text-sm text-indigo-600 hover:bg-indigo-50 rounded transition-colors"
+                      onClick={() => openMediaSelectorForPart(part)}
+                      className="px-3 py-1 text-sm bg-purple-50 text-purple-600 rounded hover:bg-purple-100"
                     >
-                      ✏️ Edit
+                      📎 Attach Media
                     </button>
                   </div>
                 </div>
@@ -635,81 +508,41 @@ function SessionsView({
   )
 }
 
-// ═══════════════════════════════════════════════════════════════
-// 🎬 SINGLES VIEW COMPONENT
-// ═══════════════════════════════════════════════════════════════
+// Vault Media Grid
+function VaultMediaGrid({ medias, loading }) {
+  if (loading) {
+    return <div className="text-center py-12">Loading vault...</div>
+  }
 
-function SinglesView({ 
-  singles,
-  tierRules,
-  calculatePriceForTier,
-  getNivelLabel,
-  openEditPartModal,
-  handleDeleteSingle,
-  saving
-}) {
-  if (singles.length === 0) {
+  if (medias.length === 0) {
     return (
       <div className="text-center py-12 bg-gray-50 rounded-lg">
-        <p className="text-gray-600">No individual PPVs yet. Add your first one!</p>
+        <p className="text-gray-600">No medias in your OnlyFans vault</p>
       </div>
     )
   }
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-      {singles.map(single => (
-        <div key={single.id} className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
-          <div className="flex items-start justify-between mb-3">
-            <div className="flex-1">
-              <div className="flex items-center gap-2 mb-2">
-                {single.of_media_ids?.length > 0 && (
-                  <span className="px-2 py-1 text-xs bg-blue-50 text-blue-700 rounded">
-                    {single.of_media_ids.length} media
-                  </span>
-                )}
-                <span className={`px-2 py-1 text-xs rounded ${getNivelLabel(single.nivel).color}`}>
-                  {getNivelLabel(single.nivel).text} (Lv {single.nivel})
-                </span>
+    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+      {medias.map(media => (
+        <div key={media.id} className="border rounded-lg overflow-hidden hover:shadow-md transition-shadow">
+          <div className="aspect-video bg-gray-100 relative">
+            {media.thumb?.url ? (
+              <img 
+                src={media.thumb.url} 
+                alt={media.info?.source?.source || 'Media'}
+                className="w-full h-full object-cover"
+              />
+            ) : (
+              <div className="flex items-center justify-center h-full text-gray-400">
+                🎬
               </div>
-              
-              <h3 className="font-semibold text-gray-900">{single.title}</h3>
-              {single.description && (
-                <p className="text-sm text-gray-600 mt-1 line-clamp-2">{single.description}</p>
-              )}
-              {single.tags && (
-                <p className="text-xs text-gray-500 mt-2">Tags: {single.tags}</p>
-              )}
-            </div>
+            )}
           </div>
-
-          {/* Tier Pricing */}
-          <div className="mt-3 space-y-1">
-            {tierRules.map(tier => (
-              <div key={tier.id} className="flex justify-between text-sm">
-                <span>{tier.emoji} {tier.tier_name}</span>
-                <span className="font-medium">
-                  ${calculatePriceForTier(single.base_price, tier.price_multiplier)}
-                </span>
-              </div>
-            ))}
-          </div>
-
-          {/* Actions */}
-          <div className="mt-4 flex gap-2">
-            <button
-              onClick={() => openEditPartModal(single)}
-              className="flex-1 px-3 py-1 text-sm text-indigo-600 hover:bg-indigo-50 rounded transition-colors"
-            >
-              ✏️ Edit
-            </button>
-            <button
-              onClick={() => handleDeleteSingle(single.id, single.title)}
-              disabled={saving}
-              className="px-3 py-1 text-sm text-red-600 hover:bg-red-50 rounded transition-colors"
-            >
-              🗑️
-            </button>
+          <div className="p-2">
+            <p className="text-xs text-gray-600 truncate">
+              {media.type === 'video' ? '🎥' : '📷'} {media.info?.source?.source || 'Untitled'}
+            </p>
           </div>
         </div>
       ))}
@@ -717,10 +550,58 @@ function SinglesView({
   )
 }
 
-// ═══════════════════════════════════════════════════════════════
-// 🆕 NEW SESSION MODAL
-// ═══════════════════════════════════════════════════════════════
+// Media Selector Modal
+function MediaSelectorModal({ medias, onSelect, onClose, partTitle }) {
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-lg max-w-4xl w-full max-h-[80vh] overflow-hidden">
+        <div className="p-6 border-b">
+          <h3 className="text-xl font-bold">Select Media for: {partTitle}</h3>
+        </div>
+        
+        <div className="p-6 overflow-y-auto max-h-[60vh]">
+          <div className="grid grid-cols-3 gap-4">
+            {medias.map(media => (
+              <button
+                key={media.id}
+                onClick={() => onSelect(media)}
+                className="border-2 border-gray-200 rounded-lg overflow-hidden hover:border-indigo-600 transition-colors"
+              >
+                <div className="aspect-video bg-gray-100">
+                  {media.thumb?.url ? (
+                    <img 
+                      src={media.thumb.url} 
+                      alt="Media"
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <div className="flex items-center justify-center h-full text-gray-400">
+                      🎬
+                    </div>
+                  )}
+                </div>
+                <div className="p-2 text-xs text-gray-600">
+                  {media.type === 'video' ? '🎥' : '📷'} Select
+                </div>
+              </button>
+            ))}
+          </div>
+        </div>
 
+        <div className="p-6 border-t flex justify-end">
+          <button
+            onClick={onClose}
+            className="px-6 py-2 bg-gray-200 rounded-lg hover:bg-gray-300"
+          >
+            Cancel
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// New Session Modal (simplified)
 function NewSessionModal({ sessionForm, setSessionForm, handleCreateSession, setShowNewSessionModal, saving }) {
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
@@ -729,43 +610,35 @@ function NewSessionModal({ sessionForm, setSessionForm, handleCreateSession, set
         
         <form onSubmit={handleCreateSession} className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Session Name *
-            </label>
+            <label className="block text-sm font-medium mb-1">Session Name *</label>
             <input
               type="text"
               value={sessionForm.name}
               onChange={(e) => setSessionForm({ ...sessionForm, name: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              placeholder="e.g., Beach Yoga Experience"
+              className="w-full px-3 py-2 border rounded-lg"
               required
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Description
-            </label>
+            <label className="block text-sm font-medium mb-1">Description</label>
             <textarea
               value={sessionForm.description}
               onChange={(e) => setSessionForm({ ...sessionForm, description: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              placeholder="Optional description for AI storytelling"
+              className="w-full px-3 py-2 border rounded-lg"
               rows="3"
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Number of Parts (1-10)
-            </label>
+            <label className="block text-sm font-medium mb-1">Number of Parts (1-10)</label>
             <input
               type="number"
               min="1"
               max="10"
               value={sessionForm.steps_count}
               onChange={(e) => setSessionForm({ ...sessionForm, steps_count: parseInt(e.target.value) || 1 })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              className="w-full px-3 py-2 border rounded-lg"
             />
           </div>
 
@@ -773,239 +646,17 @@ function NewSessionModal({ sessionForm, setSessionForm, handleCreateSession, set
             <button
               type="button"
               onClick={() => setShowNewSessionModal(false)}
-              className="flex-1 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+              className="flex-1 px-4 py-2 border rounded-lg hover:bg-gray-50"
               disabled={saving}
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="flex-1 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors disabled:opacity-50"
+              className="flex-1 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50"
               disabled={saving}
             >
               {saving ? 'Creating...' : 'Create Session'}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
-  )
-}
-
-// ═══════════════════════════════════════════════════════════════
-// 🆕 NEW SINGLE MODAL
-// ═══════════════════════════════════════════════════════════════
-
-function NewSingleModal({ singleForm, setSingleForm, handleCreateSingle, setShowNewSingleModal, saving }) {
-  return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg p-6 max-w-md w-full max-h-[90vh] overflow-y-auto">
-        <h3 className="text-xl font-bold mb-4">Create Individual PPV</h3>
-        
-        <form onSubmit={handleCreateSingle} className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Title *
-            </label>
-            <input
-              type="text"
-              value={singleForm.title}
-              onChange={(e) => setSingleForm({ ...singleForm, title: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
-              placeholder="e.g., BJ POV Video"
-              required
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Description
-            </label>
-            <textarea
-              value={singleForm.description}
-              onChange={(e) => setSingleForm({ ...singleForm, description: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
-              placeholder="Description for AI matching"
-              rows="3"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Base Price ($)
-            </label>
-            <input
-              type="number"
-              min="0"
-              step="0.01"
-              value={singleForm.base_price}
-              onChange={(e) => setSingleForm({ ...singleForm, base_price: parseFloat(e.target.value) || 0 })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Explicitness Level (1-10)
-            </label>
-            <input
-              type="number"
-              min="1"
-              max="10"
-              value={singleForm.nivel}
-              onChange={(e) => setSingleForm({ ...singleForm, nivel: parseInt(e.target.value) || 5 })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
-            />
-            <p className="text-xs text-gray-500 mt-1">
-              1-3: Soft, 4-6: Medium, 7-10: Hardcore
-            </p>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Tags (comma separated)
-            </label>
-            <input
-              type="text"
-              value={singleForm.tags}
-              onChange={(e) => setSingleForm({ ...singleForm, tags: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
-              placeholder="e.g., bj, pov, bedroom"
-            />
-          </div>
-
-          <div className="flex gap-2 pt-4">
-            <button
-              type="button"
-              onClick={() => setShowNewSingleModal(false)}
-              className="flex-1 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-              disabled={saving}
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              className="flex-1 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors disabled:opacity-50"
-              disabled={saving}
-            >
-              {saving ? 'Creating...' : 'Create PPV'}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
-  )
-}
-
-// ═══════════════════════════════════════════════════════════════
-// ✏️ EDIT PART MODAL
-// ═══════════════════════════════════════════════════════════════
-
-function EditPartModal({ partForm, setPartForm, handleUpdatePart, setShowEditPartModal, editingPart, saving }) {
-  return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg p-6 max-w-md w-full max-h-[90vh] overflow-y-auto">
-        <h3 className="text-xl font-bold mb-4">
-          Edit {editingPart.parent_type === 'session' ? `Part ${editingPart.step_number}` : 'PPV'}
-        </h3>
-        
-        <form onSubmit={handleUpdatePart} className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Title *
-            </label>
-            <input
-              type="text"
-              value={partForm.title}
-              onChange={(e) => setPartForm({ ...partForm, title: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              required
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Description
-            </label>
-            <textarea
-              value={partForm.description}
-              onChange={(e) => setPartForm({ ...partForm, description: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              rows="3"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Base Price ($)
-            </label>
-            <input
-              type="number"
-              min="0"
-              step="0.01"
-              value={partForm.base_price}
-              onChange={(e) => setPartForm({ ...partForm, base_price: parseFloat(e.target.value) || 0 })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Explicitness Level (1-10)
-            </label>
-            <input
-              type="number"
-              min="1"
-              max="10"
-              value={partForm.nivel}
-              onChange={(e) => setPartForm({ ...partForm, nivel: parseInt(e.target.value) || 5 })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            />
-            <p className="text-xs text-gray-500 mt-1">
-              1-3: Soft, 4-6: Medium, 7-10: Hardcore
-            </p>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Tags (comma separated)
-            </label>
-            <input
-              type="text"
-              value={partForm.tags}
-              onChange={(e) => setPartForm({ ...partForm, tags: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              placeholder="e.g., beach, yoga, outdoor"
-            />
-          </div>
-
-          {/* TODO: Add media management UI here */}
-          {partForm.of_media_ids?.length > 0 && (
-            <div className="bg-blue-50 p-3 rounded-lg">
-              <p className="text-sm text-blue-800">
-                📁 {partForm.of_media_ids.length} media files attached
-              </p>
-            </div>
-          )}
-
-          <div className="flex gap-2 pt-4">
-            <button
-              type="button"
-              onClick={() => {
-                setShowEditPartModal(false)
-                setEditingPart(null)
-              }}
-              className="flex-1 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-              disabled={saving}
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              className="flex-1 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors disabled:opacity-50"
-              disabled={saving}
-            >
-              {saving ? 'Saving...' : 'Save Changes'}
             </button>
           </div>
         </form>
