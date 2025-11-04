@@ -28,13 +28,13 @@ export default function ChatterDashboard() {
 
   const chatContainerRef = useRef(null)
 
-  // 🎨 Helper: Get Tier Badge with emoji + color
+  // ðŸŽ¨ Helper: Get Tier Badge with emoji + color
   const getTierBadge = (tier) => {
     const tiers = {
-      0: { emoji: '⚪', label: 'New Fan', color: 'bg-gray-100 text-gray-700' },
-      1: { emoji: '🟡', label: 'Regular', color: 'bg-yellow-100 text-yellow-700' },
-      2: { emoji: '🟢', label: 'VIP', color: 'bg-green-100 text-green-700' },
-      3: { emoji: '🟣', label: 'Whale', color: 'bg-purple-100 text-purple-700' }
+      0: { emoji: 'âšª', label: 'New Fan', color: 'bg-gray-100 text-gray-700' },
+      1: { emoji: 'ðŸŸ¡', label: 'Regular', color: 'bg-yellow-100 text-yellow-700' },
+      2: { emoji: 'ðŸŸ¢', label: 'VIP', color: 'bg-green-100 text-green-700' },
+      3: { emoji: 'ðŸŸ£', label: 'Whale', color: 'bg-purple-100 text-purple-700' }
     }
     return tiers[tier] || tiers[0]
   }
@@ -55,7 +55,7 @@ export default function ChatterDashboard() {
         <Navbar />
         <div className="flex items-center justify-center h-screen">
           <div className="text-center">
-            <h2 className="text-2xl font-bold mb-4">⚠️ No Model ID Found</h2>
+            <h2 className="text-2xl font-bold mb-4">âš ï¸ No Model ID Found</h2>
             <p className="text-gray-600 mb-4">Please configure your account first</p>
             <button 
               onClick={() => navigate('/settings')}
@@ -71,7 +71,7 @@ export default function ChatterDashboard() {
 
   useEffect(() => {
     if (actualModelId) {
-      console.log('🔥 ChatterDashboard loaded with modelId:', actualModelId)
+      console.log('ðŸ”¥ ChatterDashboard loaded with modelId:', actualModelId)
       loadActiveChats()
       loadTodayStats()
       
@@ -319,7 +319,7 @@ export default function ChatterDashboard() {
                   type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="🔍 Search fans..."
+                  placeholder="ðŸ” Search fans..."
                   className="w-full px-4 py-2 border rounded-lg"
                 />
               </div>
@@ -327,7 +327,7 @@ export default function ChatterDashboard() {
               <div className="space-y-2 max-h-[calc(100vh-300px)] overflow-y-auto">
                 {filteredChats.length === 0 ? (
                   <div className="text-center py-12">
-                    <div className="text-6xl mb-4">💬</div>
+                    <div className="text-6xl mb-4">ðŸ’¬</div>
                     <p className="text-gray-500 font-semibold">No active chats</p>
                     <p className="text-gray-400 text-sm mt-2">
                       {searchQuery 
@@ -364,8 +364,8 @@ export default function ChatterDashboard() {
                         </div>
 
                         <div className="text-xs text-gray-600 truncate">
-                          {chat.lastMessageFrom === 'fan' && '👤 '}
-                          {chat.lastMessageFrom === 'model' && '💎 '}
+                          {chat.lastMessageFrom === 'fan' && 'ðŸ‘¤ '}
+                          {chat.lastMessageFrom === 'model' && 'ðŸ’Ž '}
                           {chat.lastMessage}
                         </div>
                       </div>
@@ -401,7 +401,7 @@ export default function ChatterDashboard() {
                         onClick={() => navigate(`/chat/${selectedFan.fan_id}`)}
                         className="text-blue-600 hover:text-blue-800 text-sm font-semibold"
                       >
-                        Open Full View →
+                        Open Full View â†’
                       </button>
                     </div>
                   </div>
@@ -414,21 +414,33 @@ export default function ChatterDashboard() {
                     {selectedFan.history?.slice(-10).map((msg, idx) => (
                       <div
                         key={idx}
-                        className={`p-3 rounded-lg ${
-                          msg.from === 'fan'
-                            ? 'bg-gray-100 ml-8'
-                            : 'bg-blue-50 mr-8'
-                        }`}
+                        className={`flex ${msg.from === 'model' ? 'justify-end' : 'justify-start'}`}
                       >
-                        <div className="flex items-center gap-2 mb-1">
-                          <span className="text-xs font-semibold">
-                            {msg.from === 'fan' ? '👤 Fan' : '💎 You'}
-                          </span>
-                          <span className="text-xs text-gray-500">
-                            {new Date(msg.ts).toLocaleTimeString()}
-                          </span>
+                        <div className={`max-w-[70%] ${msg.from === 'model' ? 'items-end' : 'items-start'} flex flex-col`}>
+                          {/* 🔥 ETIQUETA DE QUIÉN ESCRIBE */}
+                          <div className={`text-xs font-semibold mb-1 ${msg.from === 'model' ? 'text-blue-600' : 'text-gray-600'}`}>
+                            {msg.from === 'model' ? '👩‍💼 You' : '👤 Fan'}
+                          </div>
+                          
+                          {/* BURBUJA DEL MENSAJE */}
+                          <div
+                            className={`px-4 py-2 rounded-lg ${
+                              msg.from === 'model'
+                                ? 'bg-blue-500 text-white rounded-br-none'
+                                : 'bg-gray-100 text-gray-800 border rounded-bl-none'
+                            }`}
+                          >
+                            {/* 🔥 SOLO MOSTRAR TEXTO SI NO ES "0" O VACÍO */}
+                            {msg.message && msg.message !== '0' && msg.message.trim() !== '' && (
+                              <p className="text-sm whitespace-pre-wrap">{msg.message}</p>
+                            )}
+                            
+                            {/* TIMESTAMP */}
+                            <p className="text-xs mt-1 opacity-75">
+                              {new Date(msg.ts).toLocaleTimeString()}
+                            </p>
+                          </div>
                         </div>
-                        <div className="text-sm">{msg.message}</div>
                       </div>
                     ))}
                   </div>
@@ -440,7 +452,7 @@ export default function ChatterDashboard() {
                       disabled={generating}
                       className="w-full bg-gradient-to-r from-purple-500 to-pink-500 text-white py-3 rounded-lg font-semibold disabled:opacity-50 mb-4 hover:shadow-lg transition"
                     >
-                      {generating ? '🤖 Generating...' : '🤖 Generate AI Response'}
+                      {generating ? 'ðŸ¤– Generating...' : 'ðŸ¤– Generate AI Response'}
                     </button>
                   )}
 
@@ -448,12 +460,12 @@ export default function ChatterDashboard() {
                   {aiSuggestion && (
                     <div className="bg-gradient-to-r from-purple-50 to-pink-50 border-2 border-purple-300 rounded-lg p-4 mb-4">
                       <div className="flex items-center justify-between mb-2">
-                        <span className="font-bold text-purple-700">🤖 AI Suggestion:</span>
+                        <span className="font-bold text-purple-700">ðŸ¤– AI Suggestion:</span>
                         <button
                           onClick={() => setAiSuggestion(null)}
                           className="text-gray-500 hover:text-gray-700"
                         >
-                          ✕
+                          âœ•
                         </button>
                       </div>
                       
@@ -464,7 +476,7 @@ export default function ChatterDashboard() {
                       {aiSuggestion.content_to_offer && (
                         <div className="bg-yellow-50 border border-yellow-300 rounded p-2 mb-3">
                           <div className="text-xs font-semibold text-yellow-800">
-                            💰 Suggested Content: {aiSuggestion.content_to_offer.titulo} - ${aiSuggestion.content_to_offer.precio}
+                            ðŸ’° Suggested Content: {aiSuggestion.content_to_offer.titulo} - ${aiSuggestion.content_to_offer.precio}
                           </div>
                         </div>
                       )}
@@ -475,14 +487,14 @@ export default function ChatterDashboard() {
                           disabled={sending}
                           className="flex-1 bg-green-500 hover:bg-green-600 text-white py-2 rounded-lg font-semibold"
                         >
-                          ✅ Send As-Is
+                          âœ… Send As-Is
                         </button>
                         <button
                           onClick={handleGenerateAI}
                           disabled={generating}
                           className="px-4 bg-blue-500 hover:bg-blue-600 text-white py-2 rounded-lg font-semibold"
                         >
-                          🔄 Regenerate
+                          ðŸ”„ Regenerate
                         </button>
                         <button
                           onClick={() => {
@@ -491,7 +503,7 @@ export default function ChatterDashboard() {
                           }}
                           className="px-4 bg-gray-500 hover:bg-gray-600 text-white py-2 rounded-lg font-semibold"
                         >
-                          📋 Copy
+                          ðŸ“‹ Copy
                         </button>
                       </div>
                     </div>
@@ -500,7 +512,7 @@ export default function ChatterDashboard() {
               ) : (
                 <div className="flex items-center justify-center h-full text-gray-400">
                   <div className="text-center">
-                    <div className="text-6xl mb-4">💬</div>
+                    <div className="text-6xl mb-4">ðŸ’¬</div>
                     <p>Select a chat to start</p>
                   </div>
                 </div>
