@@ -77,50 +77,75 @@ export default function VaultTab({ modelId }) {
     }
   }
 
-  // 🎬 LOAD VAULT FROM ONLYFANS (with cache)
+  // 🎬 LOAD VAULT FROM ONLYFANS (with localStorage cache)
   const loadVaultFromOnlyFans = async (forceRefresh = false) => {
-    // Check cache (5 minutes)
-    if (!forceRefresh && vaultCache && vaultCacheTime) {
-      const cacheAge = Date.now() - vaultCacheTime
-      if (cacheAge < 300000) {
-        console.log('✅ Using cached vault data')
-        setVaultMedias(vaultCache)
-        return
+    // Check localStorage cache (5 minutes)
+    const CACHE_KEY = `vault_${modelId}`;
+    const CACHE_TIME_KEY = `vault_${modelId}_time`;
+    
+    if (!forceRefresh) {
+      try {
+        const cachedData = localStorage.getItem(CACHE_KEY);
+        const cachedTime = localStorage.getItem(CACHE_TIME_KEY);
+        
+        if (cachedData && cachedTime) {
+          const cacheAge = Date.now() - parseInt(cachedTime);
+          if (cacheAge < 300000) { // 5 min
+            console.log('✅ Using localStorage cache');
+            const parsed = JSON.parse(cachedData);
+            setVaultMedias(parsed);
+            setVaultCache(parsed);
+            setVaultCacheTime(parseInt(cachedTime));
+            return;
+          }
+        }
+      } catch (err) {
+        console.log('Cache read error:', err);
       }
     }
 
-    setLoadingVault(true)
+    setLoadingVault(true);
     try {
       const { data: model } = await supabase
         .from('models')
         .select('of_account_id')
         .eq('model_id', modelId)
-        .single()
+        .single();
 
       if (!model?.of_account_id) {
-        console.log('⚠️ No OnlyFans account connected')
-        setVaultMedias([])
-        return
+        console.log('⚠️ No OnlyFans account connected');
+        setVaultMedias([]);
+        return;
       }
 
-      const response = await fetch(`/api/onlyfans/get-vault?accountId=${model.of_account_id}`)
-      const data = await response.json()
+      const response = await fetch(`/api/onlyfans/get-vault?accountId=${model.of_account_id}`);
+      const data = await response.json();
 
       if (!data.success) {
-        throw new Error(data.error || 'Failed to load vault')
+        throw new Error(data.error || 'Failed to load vault');
       }
 
-      console.log('✅ Vault loaded:', data.medias?.length || 0, 'medias')
+      console.log('✅ Vault loaded:', data.medias?.length || 0, 'medias');
       
-      setVaultMedias(data.medias || [])
-      setVaultCache(data.medias || [])
-      setVaultCacheTime(Date.now())
+      const medias = data.medias || [];
+      
+      // Save to localStorage
+      try {
+        localStorage.setItem(CACHE_KEY, JSON.stringify(medias));
+        localStorage.setItem(CACHE_TIME_KEY, Date.now().toString());
+      } catch (err) {
+        console.log('Cache write error:', err);
+      }
+      
+      setVaultMedias(medias);
+      setVaultCache(medias);
+      setVaultCacheTime(Date.now());
 
     } catch (error) {
-      console.error('Error loading OnlyFans vault:', error)
-      showMessage('error', 'Error loading OnlyFans vault')
+      console.error('Error loading OnlyFans vault:', error);
+      showMessage('error', 'Error loading OnlyFans vault');
     } finally {
-      setLoadingVault(false)
+      setLoadingVault(false);
     }
   }
 
@@ -525,23 +550,31 @@ function VaultMediaGrid({ medias, loading }) {
   return (
     <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
       {medias.map(media => (
-        <div key={media.id} className="border rounded-lg overflow-hidden hover:shadow-md transition-shadow">
+        <div key={media.id} className="border rounded-lg overflow-hidden hover:shadow-md transition-shadow cursor-pointer">
           <div className="aspect-video bg-gray-100 relative">
-            {media.thumb?.url ? (
+            {media.thumb ? (
               <img 
-                src={media.thumb.url} 
-                alt={media.info?.source?.source || 'Media'}
+                src={media.thumb} 
+                alt={`Media ${media.id}`}
                 className="w-full h-full object-cover"
+                onError={(e) => {
+                  e.target.style.display = 'none';
+                  e.target.nextSibling.style.display = 'flex';
+                }}
               />
-            ) : (
-              <div className="flex items-center justify-center h-full text-gray-400">
-                🎬
-              </div>
-            )}
+            ) : null}
+            <div 
+              className="flex items-center justify-center h-full text-gray-400 text-4xl"
+              style={{ display: media.thumb ? 'none' : 'flex' }}
+            >
+              {media.type === 'video' ? '🎥' : media.type === 'audio' ? '🎵' : '📷'}
+            </div>
           </div>
           <div className="p-2">
             <p className="text-xs text-gray-600 truncate">
-              {media.type === 'video' ? '🎥' : '📷'} {media.info?.source?.source || 'Untitled'}
+              {media.type === 'video' ? '🎥' : media.type === 'audio' ? '🎵' : '📷'} 
+              {' '}
+              {media.type} • {media.likesCount || 0} ❤️
             </p>
           </div>
         </div>
