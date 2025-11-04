@@ -18,7 +18,14 @@ export default function ChatView() {
   const [iaLoading, setIaLoading] = useState(false);
   const [showIaPanel, setShowIaPanel] = useState(true);
   
-  // 🔥 NUEVO: Stats del fan
+  // 🔥 NUEVO: Sidebar de notas
+  const [showNotesSidebar, setShowNotesSidebar] = useState(true);
+  const [editingNickname, setEditingNickname] = useState(false);
+  const [nicknameValue, setNicknameValue] = useState('');
+  const [notesValue, setNotesValue] = useState('');
+  const [chatterNotesValue, setChatterNotesValue] = useState('');
+  const [savingNotes, setSavingNotes] = useState(false);
+  
   const [fanStats, setFanStats] = useState({
     totalTips: 0,
     tipsCount: 0,
@@ -27,9 +34,18 @@ export default function ChatView() {
     lastInteraction: null
   });
   
-  // 🔥 NUEVO: Catálogo de contenido
   const [catalog, setCatalog] = useState([]);
   const [selectedContent, setSelectedContent] = useState(null);
+
+  // Helper para tier badge
+  const getTierBadge = (tier) => {
+    const tiers = {
+      0: { emoji: '🆕', label: 'New Fan', color: 'bg-gray-100 text-gray-700' },
+      1: { emoji: '💎', label: 'VIP', color: 'bg-blue-100 text-blue-700' },
+      2: { emoji: '🐋', label: 'Whale', color: 'bg-purple-100 text-purple-700' }
+    }
+    return tiers[tier] || tiers[0]
+  }
 
   useEffect(() => {
     loadFanAndMessages();
@@ -38,13 +54,88 @@ export default function ChatView() {
     return () => clearInterval(interval);
   }, [fanId, user]);
 
+  // 🔥 NUEVO: Cargar notas cuando se carga el fan
+  useEffect(() => {
+    if (fan) {
+      setNicknameValue(fan.display_name || '');
+      setNotesValue(fan.notes || '');
+      setChatterNotesValue(fan.chatter_notes || '');
+    }
+  }, [fan]);
+
+  // 🔥 NUEVO: Guardar nickname
+  const handleSaveNickname = async () => {
+    if (!fan) return
+    
+    try {
+      const { error } = await supabase
+        .from('fans')
+        .update({ display_name: nicknameValue })
+        .eq('fan_id', fan.fan_id)
+      
+      if (error) throw error
+      
+      setFan({ ...fan, display_name: nicknameValue })
+      setEditingNickname(false)
+      alert('Nickname saved!')
+    } catch (error) {
+      console.error('Error saving nickname:', error)
+      alert('Error saving nickname')
+    }
+  }
+
+  // 🔥 NUEVO: Guardar notas generales
+  const handleSaveNotes = async () => {
+    if (!fan) return
+    
+    setSavingNotes(true)
+    try {
+      const { error } = await supabase
+        .from('fans')
+        .update({ notes: notesValue })
+        .eq('fan_id', fan.fan_id)
+      
+      if (error) throw error
+      
+      setFan({ ...fan, notes: notesValue })
+      alert('Notes saved!')
+    } catch (error) {
+      console.error('Error saving notes:', error)
+      alert('Error saving notes')
+    } finally {
+      setSavingNotes(false)
+    }
+  }
+
+  // 🔥 NUEVO: Guardar chatter tips
+  const handleSaveChatterNotes = async () => {
+    if (!fan) return
+    
+    setSavingNotes(true)
+    try {
+      const { error } = await supabase
+        .from('fans')
+        .update({ chatter_notes: chatterNotesValue })
+        .eq('fan_id', fan.fan_id)
+      
+      if (error) throw error
+      
+      setFan({ ...fan, chatter_notes: chatterNotesValue })
+      alert('Chatter tips saved!')
+    } catch (error) {
+      console.error('Error saving chatter notes:', error)
+      alert('Error saving chatter tips')
+    } finally {
+      setSavingNotes(false)
+    }
+  }
+
   async function loadFanAndMessages() {
     if (!user?.user_metadata?.model_id) return;
     
     const modelId = user.user_metadata.model_id;
 
     try {
-      // 🔥 FIX: Usar maybeSingle() en vez de single() para evitar error 406
       const { data: fanData, error: fanError } = await supabase
         .from('fans')
         .select('*')
@@ -66,7 +157,6 @@ export default function ChatView() {
 
       setFan(fanData);
 
-      // 🔥 FIX: Log para ver cuántos mensajes se cargan
       const { data: messagesData, error: messagesError } = await supabase
         .from('chat')
         .select('*')
@@ -80,8 +170,6 @@ export default function ChatView() {
       } else {
         console.log(`✅ Loaded ${messagesData?.length || 0} messages`);
         setMessages(messagesData || []);
-        
-        // 🔥 CALCULAR STATS DEL FAN
         calculateFanStats(messagesData || []);
       }
 
@@ -92,120 +180,51 @@ export default function ChatView() {
     }
   }
   
-  // 🔥 FIX: Calcular estadísticas del fan con conversión correcta de números
   function calculateFanStats(msgs) {
     const tips = msgs.filter(m => m.message_type === 'tip');
     const ppvs = msgs.filter(m => m.message_type === 'ppv_unlocked');
     const lastMsg = msgs.filter(m => m.from === 'fan').slice(-1)[0];
     
-    // 🔥 FIX: Convertir a número correctamente
-    const totalTips = tips.reduce((sum, t) => sum + (parseFloat(t.amount) || 0), 0);
-    const totalPPV = ppvs.reduce((sum, p) => sum + (parseFloat(p.amount) || 0), 0);
+    const totalTips = tips.reduce((sum, t) => {
+      const amount = parseFloat(t.amount);
+      return sum + (isNaN(amount) ? 0 : amount);
+    }, 0);
     
-    console.log('📊 Stats calculadas:', {
-      tips: `${tips.length} tips = $${totalTips}`,
-      ppvs: `${ppvs.length} PPVs = $${totalPPV}`
-    });
+    const ppvTotal = ppvs.reduce((sum, p) => {
+      const amount = parseFloat(p.amount);
+      return sum + (isNaN(amount) ? 0 : amount);
+    }, 0);
     
     setFanStats({
       totalTips: totalTips,
       tipsCount: tips.length,
-      ppvUnlocked: totalPPV,
+      ppvUnlocked: ppvTotal,
       ppvCount: ppvs.length,
       lastInteraction: lastMsg?.ts || null
     });
   }
-  
-  // 🔥 NUEVO: Cargar catálogo
+
   async function loadCatalog() {
     if (!user?.user_metadata?.model_id) return;
     
     const modelId = user.user_metadata.model_id;
     
-    const { data, error } = await supabase
-      .from('catalog')
-      .select('*')
-      .eq('model_id', modelId)
-      .order('created_at', { ascending: false })
-      .limit(20);
-    
-    if (!error && data) {
-      setCatalog(data);
-    }
-  }
-
-  // 🔥 USANDO EDGE FUNCTION MEJORADA
-  async function generarAnalisisIA() {
-    if (!user?.user_metadata?.model_id || !fan) return;
-    
-    setIaLoading(true);
-    
     try {
-      const modelId = user.user_metadata.model_id;
+      const { data, error } = await supabase
+        .from('catalog')
+        .select('*')
+        .eq('model_id', modelId)
+        .order('created_at', { ascending: false });
       
-      // Obtener último mensaje del fan
-      const lastFanMessage = messages.filter(m => m.from === 'fan').slice(-1)[0];
-      
-      if (!lastFanMessage) {
-        alert('No hay mensajes del fan para analizar');
-        setIaLoading(false);
-        return;
-      }
-
-      // 🔥 LLAMAR EDGE FUNCTION con contexto completo
-      const { data, error } = await supabase.functions.invoke('chat-generate', {
-        body: {
-          model_id: modelId,
-          fan_id: fanId,
-          message: lastFanMessage.message,
-          // 🔥 ENVIAR CONTEXTO ADICIONAL
-          fan_context: {
-            name: fan.name,
-            tier: fan.tier,
-            spent_total: fan.spent_total,
-            tips_total: fanStats.totalTips,
-            tips_count: fanStats.tipsCount,
-            ppv_total: fanStats.ppvUnlocked,
-            ppv_count: fanStats.ppvCount,
-            last_interaction: fanStats.lastInteraction
-          },
-          // 🔥 ENVIAR HISTORIAL RECIENTE (últimos 10 mensajes)
-          recent_messages: messages.slice(-10).map(m => ({
-            from: m.from,
-            message: m.message,
-            type: m.message_type,
-            amount: m.amount
-          }))
-        }
-      });
-
-      if (error) {
-        console.error('❌ IA error:', error);
-        alert('Error generando análisis IA');
-      } else {
-        console.log('✅ Análisis IA:', data);
-        setIaAnalisis(data.response);
-        setNewMessage(data.response.texto || '');
-        
-        // 🔥 AUTO-SELECCIONAR CONTENIDO RECOMENDADO
-        if (data.response.content_to_offer?.of_media_id) {
-          const recommended = catalog.find(c => c.of_media_id === data.response.content_to_offer.of_media_id);
-          if (recommended) {
-            setSelectedContent(recommended);
-          }
-        }
-      }
-      
+      if (error) throw error;
+      setCatalog(data || []);
     } catch (error) {
-      console.error('💥 Error IA:', error);
-      alert('Error generando respuesta IA');
-    } finally {
-      setIaLoading(false);
+      console.error('Error loading catalog:', error);
     }
   }
 
-  async function handleSendMessage() {
-    if (!newMessage.trim()) return;
+  async function enviarMensaje() {
+    if (!newMessage.trim() || !user?.user_metadata?.model_id) return;
     
     const modelId = user.user_metadata.model_id;
 
@@ -215,84 +234,53 @@ export default function ChatView() {
         .insert({
           fan_id: fanId,
           model_id: modelId,
-          message: newMessage,
           from: 'model',
-          ts: new Date().toISOString()
+          message: newMessage,
+          message_type: 'text',
+          ts: new Date().toISOString(),
+          source: 'manual',
+          chatter_id: user?.id // 🔥 NUEVO: Track quien envió
         });
 
-      if (error) {
-        console.error('❌ Error enviando mensaje:', error);
-        alert('Error enviando mensaje');
-      } else {
-        setNewMessage('');
-        setIaAnalisis(null);
-        setSelectedContent(null);
-        loadFanAndMessages();
-      }
+      if (error) throw error;
+
+      setNewMessage('');
+      await loadFanAndMessages();
     } catch (error) {
-      console.error('💥 Error general:', error);
-      alert('Error enviando mensaje');
+      console.error('Error enviando mensaje:', error);
+      alert('Error al enviar mensaje');
     }
   }
-  
-  // 🔥 NUEVO: Función para enviar a OnlyFans via extensión
-  async function enviarAOnlyFans() {
-    if (!newMessage.trim()) {
-      alert('No hay mensaje para enviar');
-      return;
-    }
+
+  async function analizarConIA() {
+    if (!user?.user_metadata?.model_id) return;
     
-    const payload = {
-      action: 'sendMessage',
-      fanId: fanId,
-      message: newMessage,
-      content: selectedContent ? {
-        of_media_id: selectedContent.of_media_id,
-        precio: selectedContent.base_price,
-        titulo: selectedContent.title
-      } : null
-    };
-    
-    console.log('📤 Enviando a extensión:', payload);
-    
-    // Enviar comando a extensión Chrome
+    const modelId = user.user_metadata.model_id;
+    setIaLoading(true);
+
     try {
-      chrome.runtime.sendMessage(payload, (response) => {
-        if (chrome.runtime.lastError) {
-          alert('❌ Error: La extensión no está instalada o no responde');
-        } else {
-          alert('✅ Mensaje enviado a OnlyFans!');
-          handleSendMessage(); // Guardar también en BD
+      const conversacion = messages.map(m => ({
+        role: m.from === 'fan' ? 'user' : 'assistant',
+        content: m.message
+      }));
+
+      const { data, error } = await supabase.functions.invoke('chat-analyze', {
+        body: {
+          model_id: modelId,
+          fan_id: fanId,
+          conversation: conversacion,
+          fan_stats: fanStats
         }
       });
+
+      if (error) throw error;
+      setIaAnalisis(data);
     } catch (error) {
-      alert('❌ La extensión Chrome no está disponible. El mensaje solo se guardará en la BD.');
-      handleSendMessage();
+      console.error('Error en análisis IA:', error);
+      alert('Error al analizar con IA');
+    } finally {
+      setIaLoading(false);
     }
-  }
-  
-  // 🔥 NUEVO: Formatear tiempo relativo
-  function timeAgo(dateString) {
-    if (!dateString) return 'Nunca';
-    
-    const seconds = Math.floor((new Date() - new Date(dateString)) / 1000);
-    
-    let interval = seconds / 31536000;
-    if (interval > 1) return Math.floor(interval) + " años";
-    
-    interval = seconds / 2592000;
-    if (interval > 1) return Math.floor(interval) + " meses";
-    
-    interval = seconds / 86400;
-    if (interval > 1) return Math.floor(interval) + " días";
-    
-    interval = seconds / 3600;
-    if (interval > 1) return Math.floor(interval) + " horas";
-    
-    interval = seconds / 60;
-    if (interval > 1) return Math.floor(interval) + " minutos";
-    
-    return "Hace un momento";
   }
 
   if (loading) {
@@ -300,7 +288,7 @@ export default function ChatView() {
       <>
         <Navbar />
         <div className="flex items-center justify-center h-screen">
-          <div className="text-xl">Cargando...</div>
+          <div className="text-xl">Loading...</div>
         </div>
       </>
     );
@@ -313,14 +301,11 @@ export default function ChatView() {
         <div className="flex items-center justify-center h-screen">
           <div className="text-center">
             <h2 className="text-2xl font-bold mb-4">Fan not found</h2>
-            <p className="text-gray-600 mb-4">
-              Este fan no existe o pertenece a otro modelo.
-            </p>
-            <button 
+            <button
               onClick={() => navigate('/dashboard')}
-              className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+              className="px-4 py-2 bg-blue-500 text-white rounded"
             >
-              Volver al Dashboard
+              Back to Dashboard
             </button>
           </div>
         </div>
@@ -331,310 +316,302 @@ export default function ChatView() {
   return (
     <>
       <Navbar />
-      <div className="flex h-screen max-w-full">
-        {/* CHAT AREA */}
-        <div className={`flex flex-col ${showIaPanel ? 'w-2/3' : 'w-full'} border-r`}>
-          <div className="bg-white border-b p-4 flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <button 
-                onClick={() => navigate('/dashboard')}
-                className="text-blue-500 hover:text-blue-700"
-              >
-                ← Volver
-              </button>
-              
-              {fan.of_avatar_url ? (
-                <img 
-                  src={fan.of_avatar_url} 
-                  alt={fan.name}
-                  className="w-10 h-10 rounded-full"
-                />
-              ) : (
-                <div className="w-10 h-10 rounded-full bg-gray-300 flex items-center justify-center">
-                  👤
+      <div className="min-h-screen bg-gradient-to-br from-purple-50 to-pink-50 p-6">
+        <div className="max-w-7xl mx-auto">
+          
+          {/* Header con info del fan */}
+          <div className="bg-white rounded-xl shadow-lg p-6 mb-6">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                {fan.of_avatar_url ? (
+                  <img 
+                    src={fan.of_avatar_url} 
+                    alt={fan.name}
+                    className="w-20 h-20 rounded-full object-cover border-4 border-purple-200"
+                  />
+                ) : (
+                  <div className="w-20 h-20 rounded-full bg-gradient-to-br from-purple-400 to-pink-400 flex items-center justify-center text-white text-3xl font-bold border-4 border-purple-200">
+                    {fan.name?.[0]?.toUpperCase() || '👤'}
+                  </div>
+                )}
+                
+                <div>
+                  <h1 className="text-3xl font-bold text-gray-800">
+                    {fan.display_name || fan.name || fan.of_username || 'Unknown Fan'}
+                  </h1>
+                  <div className="flex items-center gap-3 mt-2">
+                    {(() => {
+                      const tierBadge = getTierBadge(fan.tier || 0)
+                      return (
+                        <span className={`px-3 py-1 rounded-full text-sm font-semibold ${tierBadge.color}`}>
+                          {tierBadge.emoji} {tierBadge.label}
+                        </span>
+                      )
+                    })()}
+                    <span className="text-lg font-bold text-green-600">${fan.spent_total || 0} spent</span>
+                  </div>
                 </div>
-              )}
-              
-              <div>
-                <h2 className="font-bold">{fan.name || fan.of_username}</h2>
-                <p className="text-sm text-gray-600">
-                  Tier {fan.tier || 0} • ${fan.spent_total || 0}
-                </p>
               </div>
-            </div>
 
-            <button
-              onClick={() => setShowIaPanel(!showIaPanel)}
-              className="px-3 py-1 bg-gray-100 rounded hover:bg-gray-200 text-sm"
-            >
-              {showIaPanel ? '⬅️ Ocultar IA' : '🤖 Mostrar IA'}
-            </button>
-          </div>
-
-          <div className="flex-1 overflow-y-auto p-4 bg-gray-50">
-            {messages.length === 0 ? (
-              <div className="text-center text-gray-500 mt-8">
-                No hay mensajes todavía
-              </div>
-            ) : (
-              messages.map((msg, idx) => (
-                <div
-                  key={idx}
-                  className={`mb-4 flex ${msg.from === 'model' ? 'justify-end' : 'justify-start'}`}
+              <div className="flex gap-2">
+                <button
+                  onClick={() => navigate('/dashboard')}
+                  className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300"
                 >
-                  <div className={`max-w-md ${msg.from === 'model' ? 'items-end' : 'items-start'} flex flex-col`}>
-                    {/* 🔥 ETIQUETA DE QUIÉN ESCRIBE */}
-                    <div className={`text-xs font-semibold mb-1 ${msg.from === 'model' ? 'text-blue-600' : 'text-gray-600'}`}>
-                      {msg.from === 'model' ? '👩‍💼 Modelo' : '👤 ' + (fan.name || fan.of_username || 'Fan')}
-                    </div>
-                    
-                    {/* BURBUJA DEL MENSAJE */}
-                    <div
-                      className={`px-4 py-2 rounded-lg ${
-                        msg.from === 'model'
-                          ? 'bg-blue-500 text-white rounded-br-none'
-                          : 'bg-gray-100 text-gray-800 border rounded-bl-none'
-                      }`}
-                    >
-                      {/* 🔥 SOLO MOSTRAR TEXTO SI NO ES "0" O VACÍO */}
-                      {msg.message && msg.message !== '0' && msg.message.trim() !== '' && (
-                        <p className="text-sm whitespace-pre-wrap">{msg.message}</p>
-                      )}
-                      
-                      {/* 🔥 MOSTRAR TIP/PPV/PPV LOCKED SOLO SI TIENE AMOUNT REAL (no "0" ni 0) */}
-                      {msg.amount && parseFloat(msg.amount) > 0 && (
-                        <div className={`mt-2 px-2 py-1 rounded text-xs font-bold ${
-                          msg.message_type === 'tip' ? 'bg-green-100 text-green-700' :
-                          msg.message_type === 'ppv_unlocked' ? 'bg-blue-100 text-blue-700' :
-                          msg.message_type === 'ppv_locked' ? 'bg-yellow-100 text-yellow-700' :
-                          'bg-gray-100'
-                        }`}>
-                          {msg.message_type === 'tip' && '💰 Tip: $' + msg.amount}
-                          {msg.message_type === 'ppv_unlocked' && '🔓 PPV Comprado: $' + msg.amount}
-                          {msg.message_type === 'ppv_locked' && '🔒 PPV Bloqueado: $' + msg.amount}
-                        </div>
-                      )}
-                      
-                      {/* 🔥 MOSTRAR IMÁGENES - FIX: media_urls es STRING separado por comas */}
-                      {(msg.media_url || msg.media_urls) && (() => {
-                        try {
-                          // 🔥 FIX: Obtener URLs desde media_url o media_urls
-                          let urls = [];
-                          
-                          if (msg.media_url) {
-                            urls.push(msg.media_url);
-                          }
-                          
-                          if (msg.media_urls) {
-                            // 🔥 CLAVE: Split por comas, NO JSON.parse
-                            const urlsFromString = msg.media_urls.split(',').map(u => u.trim()).filter(u => u);
-                            urls = [...urls, ...urlsFromString];
-                          }
-                          
-                          // 🔥 Filtrar solo imágenes (no videos)
-                          const imageUrls = urls.filter(url => {
-                            const lower = url.toLowerCase();
-                            return lower.includes('.jpg') || 
-                                   lower.includes('.jpeg') || 
-                                   lower.includes('.png') || 
-                                   lower.includes('.gif') || 
-                                   lower.includes('.webp') ||
-                                   lower.includes('/thumb/') ||
-                                   lower.includes('/image/');
-                          });
-                          
-                          // 🔥 Eliminar duplicados
-                          const uniqueUrls = [...new Set(imageUrls)];
-                          
-                          if (uniqueUrls.length === 0) return null;
-                          
-                          return (
-                            <div className="mt-2">
-                              {/* Grid de imágenes */}
-                              <div className="grid grid-cols-2 gap-2">
-                                {uniqueUrls.map((url, i) => (
-                                  <a 
-                                    key={i} 
-                                    href={url} 
-                                    target="_blank" 
-                                    rel="noopener noreferrer"
-                                    className="block"
-                                  >
-                                    <img 
-                                      src={url} 
-                                      alt={`Media ${i+1}`}
-                                      className="w-full h-24 object-cover rounded border hover:opacity-80 cursor-pointer"
-                                      onError={(e) => {
-                                        e.target.style.display = 'none';
-                                        console.log('❌ Error cargando imagen:', url);
-                                      }}
-                                    />
-                                  </a>
-                                ))}
-                              </div>
-                            </div>
-                          );
-                        } catch (e) {
-                          console.error('❌ Error rendering media:', e, msg);
-                          return null;
-                        }
-                      })()}
-                      
-                      {/* TIMESTAMP */}
-                      <p className="text-xs mt-1 opacity-75">
-                        {new Date(msg.ts).toLocaleString()}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
-
-          <div className="bg-white border-t p-4">
-            <div className="flex gap-2">
-              <textarea
-                value={newMessage}
-                onChange={(e) => setNewMessage(e.target.value)}
-                placeholder="Escribe un mensaje..."
-                className="flex-1 px-4 py-2 border rounded-lg resize-none"
-                rows="2"
-              />
-              <button
-                onClick={handleSendMessage}
-                className="px-6 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600"
-              >
-                💾 Guardar
-              </button>
-            </div>
-          </div>
-        </div>
-
-        {/* 🔥 PANEL IA MEJORADO */}
-        {showIaPanel && (
-          <div className="w-1/3 bg-gray-50 p-6 overflow-y-auto">
-            <h3 className="text-lg font-bold mb-4">🤖 Asistente IA</h3>
-            
-            <button
-              onClick={generarAnalisisIA}
-              disabled={iaLoading}
-              className="w-full px-4 py-3 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-lg font-semibold disabled:opacity-50 mb-4"
-            >
-              {iaLoading ? '🤖 Analizando...' : '🤖 Generar Análisis IA'}
-            </button>
-
-            {/* 🔥 TARJETA DE ANÁLISIS DEL FAN */}
-            <div className="bg-white rounded-lg p-4 mb-4 border shadow-sm">
-              <h4 className="font-bold text-sm text-gray-700 mb-3">📊 Datos del Fan</h4>
-              
-              <div className="space-y-2 text-sm">
-                <div className="flex justify-between">
-                  <span className="text-gray-600">💰 Total gastado:</span>
-                  <span className="font-bold">${fan.spent_total || 0}</span>
-                </div>
-                
-                <div className="flex justify-between">
-                  <span className="text-gray-600">💸 Tips recibidos:</span>
-                  <span className="font-bold">${fanStats.totalTips} ({fanStats.tipsCount})</span>
-                </div>
-                
-                <div className="flex justify-between">
-                  <span className="text-gray-600">🔓 PPV comprados:</span>
-                  <span className="font-bold">${fanStats.ppvUnlocked} ({fanStats.ppvCount})</span>
-                </div>
-                
-                <div className="flex justify-between">
-                  <span className="text-gray-600">📊 Tier:</span>
-                  <span className="font-bold">{fan.tier || 0}</span>
-                </div>
-                
-                <div className="flex justify-between">
-                  <span className="text-gray-600">📅 Última interacción:</span>
-                  <span className="font-bold text-xs">{timeAgo(fanStats.lastInteraction)}</span>
-                </div>
+                  ← Back
+                </button>
+                <button
+                  onClick={() => setShowNotesSidebar(!showNotesSidebar)}
+                  className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600"
+                >
+                  {showNotesSidebar ? 'Hide' : 'Show'} Notes
+                </button>
               </div>
             </div>
+          </div>
 
-            {/* 🔥 ANÁLISIS IA */}
-            {iaAnalisis && (
-              <>
-                {/* Análisis del comportamiento */}
-                {iaAnalisis.analisis && (
-                  <div className="bg-purple-50 rounded-lg p-4 mb-4 border border-purple-200">
-                    <p className="text-xs font-semibold text-purple-700 mb-2">🧠 Análisis del Fan:</p>
-                    <p className="text-sm text-gray-700 whitespace-pre-wrap">{iaAnalisis.analisis}</p>
-                  </div>
-                )}
-
-                {/* Mensaje sugerido */}
-                <div className="bg-white rounded-lg p-4 mb-4 border-2 border-purple-300">
-                  <p className="text-sm font-semibold text-purple-700 mb-2">💬 Mensaje Sugerido:</p>
-                  <p className="text-sm whitespace-pre-wrap">{iaAnalisis.texto}</p>
+          {/* Main content con grid */}
+          <div className={`grid gap-6 ${showNotesSidebar ? 'grid-cols-4' : 'grid-cols-3'}`}>
+            
+            {/* Panel IA */}
+            {showIaPanel && (
+              <div className="bg-white rounded-xl shadow-lg p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="font-bold text-lg">🤖 AI Assistant</h3>
+                  <button
+                    onClick={() => setShowIaPanel(false)}
+                    className="text-gray-400 hover:text-gray-600"
+                  >
+                    ✕
+                  </button>
                 </div>
 
-                {/* Contenido recomendado */}
-                {iaAnalisis.content_to_offer && (
-                  <div className="bg-yellow-50 rounded-lg p-4 mb-4 border border-yellow-300">
-                    <p className="text-xs font-semibold text-yellow-800 mb-2">📦 Contenido Sugerido:</p>
-                    <p className="text-sm font-bold">{iaAnalisis.content_to_offer.titulo}</p>
-                    <p className="text-lg font-bold text-yellow-600">${iaAnalisis.content_to_offer.precio}</p>
-                  </div>
-                )}
+                <button
+                  onClick={analizarConIA}
+                  disabled={iaLoading}
+                  className="w-full px-4 py-3 bg-purple-500 text-white rounded-lg hover:bg-purple-600 font-semibold disabled:opacity-50 mb-4"
+                >
+                  {iaLoading ? 'Analyzing...' : '🔮 Analyze Chat'}
+                </button>
 
-                {/* Selector manual de contenido */}
-                {catalog.length > 0 && (
-                  <div className="bg-white rounded-lg p-4 mb-4 border">
-                    <p className="text-xs font-semibold text-gray-700 mb-2">📦 O selecciona otro contenido:</p>
-                    <select
-                      value={selectedContent?.of_media_id || ''}
-                      onChange={(e) => {
-                        const content = catalog.find(c => c.of_media_id === e.target.value);
-                        setSelectedContent(content);
-                      }}
-                      className="w-full p-2 border rounded text-sm"
-                    >
-                      <option value="">-- Seleccionar --</option>
-                      {catalog.map(item => (
-                        <option key={item.of_media_id} value={item.of_media_id}>
-                          {item.title} - ${item.base_price}
-                        </option>
-                      ))}
-                    </select>
+                {iaAnalisis && (
+                  <div className="space-y-3">
+                    <div className="bg-purple-50 border border-purple-200 rounded-lg p-3">
+                      <p className="text-sm font-semibold text-purple-800 mb-1">💡 Suggestion:</p>
+                      <p className="text-sm text-gray-700">{iaAnalisis.suggestion}</p>
+                    </div>
                     
-                    {selectedContent && (
-                      <div className="mt-2 p-2 bg-gray-50 rounded text-xs">
-                        <p className="font-bold">{selectedContent.title}</p>
-                        <p className="text-gray-600">{selectedContent.file_type}</p>
-                        <p className="font-bold text-green-600">${selectedContent.base_price}</p>
+                    {iaAnalisis.recommended_content && (
+                      <div className="bg-green-50 border border-green-200 rounded-lg p-3">
+                        <p className="text-sm font-semibold text-green-800 mb-1">📦 Recommended:</p>
+                        <p className="text-sm text-gray-700">{iaAnalisis.recommended_content}</p>
                       </div>
                     )}
                   </div>
                 )}
 
-                {/* Botones de acción */}
-                <div className="space-y-2">
-                  <button
-                    onClick={() => {
-                      navigator.clipboard.writeText(iaAnalisis.texto);
-                      alert('✅ Copiado al portapapeles');
-                    }}
-                    className="w-full px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 text-sm"
+                {/* Stats */}
+                <div className="mt-6 pt-4 border-t">
+                  <p className="text-xs font-semibold text-gray-500 mb-3">FAN STATS</p>
+                  <div className="space-y-2 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Tips:</span>
+                      <span className="font-semibold">${fanStats.totalTips.toFixed(2)} ({fanStats.tipsCount})</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">PPV:</span>
+                      <span className="font-semibold">${fanStats.ppvUnlocked.toFixed(2)} ({fanStats.ppvCount})</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Chat messages */}
+            <div className={`bg-white rounded-xl shadow-lg p-6 ${showNotesSidebar ? 'col-span-2' : 'col-span-2'}`}>
+              <h3 className="font-bold text-lg mb-4">💬 Conversation</h3>
+              
+              <div className="h-[500px] overflow-y-auto mb-4 space-y-3 px-2">
+                {messages.map((msg, idx) => (
+                  <div
+                    key={idx}
+                    className={`flex ${msg.from === 'model' ? 'justify-end' : 'justify-start'}`}
                   >
-                    📋 Copiar Mensaje
-                  </button>
-                  
-                  {/* 🔥 BOTÓN ENVIAR A OF */}
+                    <div
+                      className={`max-w-[70%] px-4 py-2 rounded-lg ${
+                        msg.from === 'model'
+                          ? 'bg-blue-500 text-white'
+                          : 'bg-gray-100 text-gray-800'
+                      }`}
+                    >
+                      <p className="text-sm">{msg.message}</p>
+                      <p className="text-xs opacity-70 mt-1">
+                        {new Date(msg.ts).toLocaleTimeString()}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Input */}
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={newMessage}
+                  onChange={(e) => setNewMessage(e.target.value)}
+                  onKeyPress={(e) => e.key === 'Enter' && enviarMensaje()}
+                  placeholder="Type your message..."
+                  className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+                <button
+                  onClick={enviarMensaje}
+                  disabled={!newMessage.trim()}
+                  className="px-6 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Send
+                </button>
+              </div>
+            </div>
+
+            {/* 🔥 NUEVO: Sidebar de Notas */}
+            {showNotesSidebar && (
+              <div className="bg-white rounded-xl shadow-lg p-6">
+                <div className="flex items-center justify-between mb-4 pb-3 border-b">
+                  <h3 className="font-bold text-lg">👤 Fan Profile</h3>
                   <button
-                    onClick={enviarAOnlyFans}
-                    className="w-full px-4 py-3 bg-gradient-to-r from-green-500 to-blue-500 text-white rounded-lg font-bold hover:from-green-600 hover:to-blue-600"
+                    onClick={() => setShowNotesSidebar(false)}
+                    className="text-gray-400 hover:text-gray-600"
                   >
-                    📤 Enviar a OnlyFans
+                    ✕
                   </button>
                 </div>
-              </>
+
+                {/* OF Username */}
+                <div className="mb-4">
+                  <p className="text-xs text-gray-500 mb-1">OnlyFans Username</p>
+                  <p className="text-sm font-mono bg-gray-50 px-3 py-2 rounded">
+                    {fan.of_username || fan.fan_id}
+                  </p>
+                </div>
+
+                {/* 🔥 Nickname Editable */}
+                <div className="mb-4">
+                  <p className="text-xs text-gray-500 mb-1">✏️ Nickname</p>
+                  {editingNickname ? (
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={nicknameValue}
+                        onChange={(e) => setNicknameValue(e.target.value)}
+                        className="flex-1 px-3 py-2 border rounded text-sm"
+                        placeholder="e.g., John VIP"
+                      />
+                      <button
+                        onClick={handleSaveNickname}
+                        className="px-3 py-2 bg-blue-500 text-white rounded text-sm hover:bg-blue-600"
+                      >
+                        💾
+                      </button>
+                      <button
+                        onClick={() => {
+                          setEditingNickname(false)
+                          setNicknameValue(fan.display_name || '')
+                        }}
+                        className="px-3 py-2 bg-gray-200 rounded text-sm hover:bg-gray-300"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  ) : (
+                    <div
+                      onClick={() => setEditingNickname(true)}
+                      className="px-3 py-2 bg-gray-50 rounded cursor-pointer hover:bg-gray-100 text-sm"
+                    >
+                      {fan.display_name || <span className="text-gray-400">Click to add nickname</span>}
+                    </div>
+                  )}
+                </div>
+
+                {/* Tier y Spent */}
+                <div className="grid grid-cols-2 gap-3 mb-4">
+                  <div>
+                    <p className="text-xs text-gray-500 mb-1">Tier</p>
+                    {(() => {
+                      const tierBadge = getTierBadge(fan.tier || 0)
+                      return (
+                        <div className={`px-3 py-2 rounded text-center text-sm font-semibold ${tierBadge.color}`}>
+                          {tierBadge.emoji} {tierBadge.label}
+                        </div>
+                      )
+                    })()}
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-500 mb-1">Total Spent</p>
+                    <div className="px-3 py-2 bg-green-50 text-green-700 rounded text-center text-sm font-bold">
+                      ${fan.spent_total || 0}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Last Seen */}
+                <div className="mb-4 pb-4 border-b">
+                  <p className="text-xs text-gray-500 mb-1">📅 Last seen</p>
+                  <p className="text-sm text-gray-700">
+                    {fan.last_seen ? new Date(fan.last_seen).toLocaleString() : 'Unknown'}
+                  </p>
+                </div>
+
+                {/* 🔥 General Notes */}
+                <div className="mb-4">
+                  <p className="text-sm font-semibold mb-2">📝 General Notes</p>
+                  <textarea
+                    value={notesValue}
+                    onChange={(e) => setNotesValue(e.target.value)}
+                    className="w-full px-3 py-2 border rounded text-sm resize-none"
+                    rows="4"
+                    placeholder="Add notes about this fan (preferences, birthday, etc.)"
+                  />
+                  <button
+                    onClick={handleSaveNotes}
+                    disabled={savingNotes}
+                    className="mt-2 w-full px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 text-sm disabled:opacity-50"
+                  >
+                    {savingNotes ? 'Saving...' : 'Save Notes'}
+                  </button>
+                </div>
+
+                {/* 🔥 Chatter Tips */}
+                <div>
+                  <p className="text-sm font-semibold mb-2">💡 Chatter Tips</p>
+                  <textarea
+                    value={chatterNotesValue}
+                    onChange={(e) => setChatterNotesValue(e.target.value)}
+                    className="w-full px-3 py-2 border rounded text-sm resize-none"
+                    rows="4"
+                    placeholder="Tips for selling (best time to message, what they like, etc.)"
+                  />
+                  <button
+                    onClick={handleSaveChatterNotes}
+                    disabled={savingNotes}
+                    className="mt-2 w-full px-4 py-2 bg-purple-500 text-white rounded hover:bg-purple-600 text-sm disabled:opacity-50"
+                  >
+                    {savingNotes ? 'Saving...' : 'Save Tips'}
+                  </button>
+                </div>
+              </div>
             )}
           </div>
-        )}
+
+          {/* Botón flotante para mostrar sidebar si está oculto */}
+          {!showNotesSidebar && (
+            <button
+              onClick={() => setShowNotesSidebar(true)}
+              className="fixed right-6 bottom-6 w-14 h-14 bg-blue-500 text-white rounded-full shadow-lg hover:bg-blue-600 flex items-center justify-center text-2xl"
+            >
+              📝
+            </button>
+          )}
+        </div>
       </div>
     </>
   );
