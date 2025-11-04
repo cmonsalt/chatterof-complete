@@ -66,7 +66,7 @@ export default function ChatView() {
       setNotesValue(fan.notes || '');
       setChatterNotesValue(fan.chatter_notes || '');
     }
-  }, [fan?.fan_id]); // 🔥 Trigger cuando cambia el fan_id
+  }, [fan?.fan_id]);
 
   // 🔥 NUEVO: Guardar nickname
   const handleSaveNickname = async () => {
@@ -80,7 +80,6 @@ export default function ChatView() {
       
       if (error) throw error
       
-      // 🔥 FIX: Actualizar el fan en memoria
       const updatedFan = { ...fan, display_name: nicknameValue }
       setFan(updatedFan)
       setEditingNickname(false)
@@ -104,7 +103,6 @@ export default function ChatView() {
       
       if (error) throw error
       
-      // 🔥 FIX: Actualizar el fan en memoria
       const updatedFan = { ...fan, notes: notesValue }
       setFan(updatedFan)
       alert('✅ Notes saved!')
@@ -129,7 +127,6 @@ export default function ChatView() {
       
       if (error) throw error
       
-      // 🔥 FIX: Actualizar el fan en memoria
       const updatedFan = { ...fan, chatter_notes: chatterNotesValue }
       setFan(updatedFan)
       alert('✅ Chatter tips saved!')
@@ -448,17 +445,26 @@ export default function ChatView() {
                     key={idx}
                     className={`flex ${msg.from === 'model' ? 'justify-end' : 'justify-start'}`}
                   >
-                    <div
-                      className={`max-w-[70%] px-4 py-2 rounded-lg ${
-                        msg.from === 'model'
-                          ? 'bg-blue-500 text-white'
-                          : 'bg-gray-100 text-gray-800'
-                      }`}
-                    >
-                      <p className="text-sm">{msg.message}</p>
-                      <p className="text-xs opacity-70 mt-1">
-                        {new Date(msg.ts).toLocaleTimeString()}
-                      </p>
+                    <div className="flex flex-col items-start max-w-[70%]">
+                      {/* 🔥 NUEVO: Indicador de quién envió */}
+                      <span className={`text-xs font-semibold mb-1 ${
+                        msg.from === 'model' ? 'text-blue-600 self-end' : 'text-gray-500'
+                      }`}>
+                        {msg.from === 'model' ? '💙 You' : '👤 ' + (fan.display_name || fan.name || 'Fan')}
+                      </span>
+                      
+                      <div
+                        className={`px-4 py-2 rounded-lg ${
+                          msg.from === 'model'
+                            ? 'bg-blue-500 text-white'
+                            : 'bg-gray-100 text-gray-800'
+                        }`}
+                      >
+                        <p className="text-sm">{msg.message}</p>
+                        <p className="text-xs opacity-70 mt-1">
+                          {new Date(msg.ts).toLocaleTimeString()}
+                        </p>
+                      </div>
                     </div>
                   </div>
                 ))}
