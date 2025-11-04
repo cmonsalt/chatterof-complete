@@ -7,9 +7,9 @@ export default async function handler(req, res) {
   }
 
   try {
-    // ✅ Endpoint correcto según documentación OnlyFans API
+    // ✅ Endpoint correcto: List Vault Media (no lists)
     const response = await fetch(
-      `https://app.onlyfansapi.com/api/${accountId}/media/vault/lists`,
+      `https://app.onlyfansapi.com/api/${accountId}/media/vault`,
       {
         headers: { 
           'Authorization': `Bearer ${API_KEY}`,
@@ -19,18 +19,26 @@ export default async function handler(req, res) {
     );
 
     if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.message || `API error: ${response.status}`);
+      const errorText = await response.text();
+      console.error('OnlyFans API error:', response.status, errorText);
+      throw new Error(`API error: ${response.status}`);
     }
 
     const data = await response.json();
+    
+    console.log('Vault API response:', {
+      hasData: !!data.data,
+      dataLength: data.data?.length || 0,
+      structure: Object.keys(data)
+    });
 
-    // Retornar solo el data, no el _meta
+    // La respuesta viene en data.data (array de medias)
     res.status(200).json({ 
       success: true,
-      medias: data.data || data,
-      _meta: data._meta // Info de créditos y rate limits
+      medias: data.data || [],
+      _meta: data._meta
     });
+    
   } catch (error) {
     console.error('Get vault error:', error);
     res.status(500).json({ 
