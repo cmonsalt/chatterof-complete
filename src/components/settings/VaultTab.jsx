@@ -743,6 +743,10 @@ function NewSessionModal({ sessionForm, setSessionForm, handleCreateSession, set
             </button>
           </div>
         </form>
+      </div>
+    </div>
+  )
+}
 
 // Media Preview Modal
 function MediaPreviewModal({ 
