@@ -7,46 +7,78 @@ export default async function handler(req, res) {
   }
 
   try {
-    let allMedias = [];
-    let url = `https://app.onlyfansapi.com/api/${accountId}/media/vault`;
-    let hasMore = true;
-
-    // Fetch all pages
-    while (hasMore && allMedias.length < 500) { // Límite de seguridad
-      console.log('Fetching:', url);
-      
-      const response = await fetch(url, {
+    // PASO 1: Obtener todas las listas (categorías) del vault
+    const listsResponse = await fetch(
+      `https://app.onlyfansapi.com/api/${accountId}/media/vault/lists`,
+      {
         headers: { 
           'Authorization': `Bearer ${API_KEY}`,
           'Content-Type': 'application/json'
         }
-      });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('OnlyFans API error:', response.status, errorText);
-        throw new Error(`API error: ${response.status}`);
       }
+    );
 
-      const data = await response.json();
-      
-      console.log('Page result:', {
-        count: data.data?.length || 0,
-        hasNextPage: !!data._meta?._pagination?.next_page,
-        totalSoFar: allMedias.length
-      });
+    if (!listsResponse.ok) {
+      throw new Error(`API error getting lists: ${listsResponse.status}`);
+    }
 
-      // Add current page medias
-      if (data.data && Array.isArray(data.data)) {
-        allMedias = allMedias.concat(data.data);
+    const listsData = await listsResponse.json();
+    const lists = listsData.data || [];
+
+    console.log('✅ Found vault lists:', lists.length);
+
+    // PASO 2: Obtener medias de cada lista
+    let allMedias = [];
+
+    for (const list of lists) {
+      console.log(`📂 Fetching list: ${list.name} (${list.id})`);
+
+      const listMediaResponse = await fetch(
+        `https://app.onlyfansapi.com/api/${accountId}/media/vault/lists/${list.id}`,
+        {
+          headers: { 
+            'Authorization': `Bearer ${API_KEY}`,
+            'Content-Type': 'application/json'
+          }
+        }
+      );
+
+      if (listMediaResponse.ok) {
+        const listMediaData = await listMediaResponse.json();
+        
+        // Las medias pueden estar en data.media o data.medias
+        const medias = listMediaData.data?.media || listMediaData.data?.medias || listMediaData.data || [];
+        
+        console.log(`  ├─ Found ${medias.length} medias`);
+        
+        // Agregar info de la lista a cada media
+        const mediasWithList = medias.map(media => ({
+          ...media,
+          list_name: list.name,
+          list_id: list.id
+        }));
+        
+        allMedias = allMedias.concat(mediasWithList);
       }
+    }
 
-      // Check if there's a next page
-      if (data._meta?._pagination?.next_page) {
-        url = data._meta._pagination.next_page;
-      } else {
-        hasMore = false;
+    // PASO 3: También intentar obtener medias sin lista (por si acaso)
+    console.log('📁 Fetching unlisted medias...');
+    const unlistedResponse = await fetch(
+      `https://app.onlyfansapi.com/api/${accountId}/media/vault`,
+      {
+        headers: { 
+          'Authorization': `Bearer ${API_KEY}`,
+          'Content-Type': 'application/json'
+        }
       }
+    );
+
+    if (unlistedResponse.ok) {
+      const unlistedData = await unlistedResponse.json();
+      const unlistedMedias = unlistedData.data || [];
+      console.log(`  ├─ Found ${unlistedMedias.length} unlisted medias`);
+      allMedias = allMedias.concat(unlistedMedias);
     }
 
     console.log('✅ Total vault medias loaded:', allMedias.length);
@@ -54,7 +86,8 @@ export default async function handler(req, res) {
     res.status(200).json({ 
       success: true,
       medias: allMedias,
-      total: allMedias.length
+      total: allMedias.length,
+      lists: lists.length
     });
     
   } catch (error) {
