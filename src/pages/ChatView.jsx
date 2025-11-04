@@ -54,14 +54,19 @@ export default function ChatView() {
     return () => clearInterval(interval);
   }, [fanId, user]);
 
-  // 🔥 NUEVO: Cargar notas cuando se carga el fan
+  // 🔥 FIX: Cargar notas cuando se carga el fan
   useEffect(() => {
     if (fan) {
+      console.log('🔄 Loading fan data into form:', {
+        display_name: fan.display_name,
+        notes: fan.notes,
+        chatter_notes: fan.chatter_notes
+      });
       setNicknameValue(fan.display_name || '');
       setNotesValue(fan.notes || '');
       setChatterNotesValue(fan.chatter_notes || '');
     }
-  }, [fan]);
+  }, [fan?.fan_id]); // 🔥 Trigger cuando cambia el fan_id
 
   // 🔥 NUEVO: Guardar nickname
   const handleSaveNickname = async () => {
@@ -75,12 +80,14 @@ export default function ChatView() {
       
       if (error) throw error
       
-      setFan({ ...fan, display_name: nicknameValue })
+      // 🔥 FIX: Actualizar el fan en memoria
+      const updatedFan = { ...fan, display_name: nicknameValue }
+      setFan(updatedFan)
       setEditingNickname(false)
-      alert('Nickname saved!')
+      alert('✅ Nickname saved!')
     } catch (error) {
       console.error('Error saving nickname:', error)
-      alert('Error saving nickname')
+      alert('❌ Error saving nickname')
     }
   }
 
@@ -97,11 +104,13 @@ export default function ChatView() {
       
       if (error) throw error
       
-      setFan({ ...fan, notes: notesValue })
-      alert('Notes saved!')
+      // 🔥 FIX: Actualizar el fan en memoria
+      const updatedFan = { ...fan, notes: notesValue }
+      setFan(updatedFan)
+      alert('✅ Notes saved!')
     } catch (error) {
       console.error('Error saving notes:', error)
-      alert('Error saving notes')
+      alert('❌ Error saving notes')
     } finally {
       setSavingNotes(false)
     }
@@ -120,11 +129,13 @@ export default function ChatView() {
       
       if (error) throw error
       
-      setFan({ ...fan, chatter_notes: chatterNotesValue })
-      alert('Chatter tips saved!')
+      // 🔥 FIX: Actualizar el fan en memoria
+      const updatedFan = { ...fan, chatter_notes: chatterNotesValue }
+      setFan(updatedFan)
+      alert('✅ Chatter tips saved!')
     } catch (error) {
       console.error('Error saving chatter notes:', error)
-      alert('Error saving chatter tips')
+      alert('❌ Error saving chatter tips')
     } finally {
       setSavingNotes(false)
     }
@@ -239,7 +250,7 @@ export default function ChatView() {
           message_type: 'text',
           ts: new Date().toISOString(),
           source: 'manual',
-          chatter_id: user?.id // 🔥 NUEVO: Track quien envió
+          chatter_id: user?.id
         });
 
       if (error) throw error;
@@ -473,10 +484,10 @@ export default function ChatView() {
               </div>
             </div>
 
-            {/* 🔥 NUEVO: Sidebar de Notas */}
+            {/* 🔥 SIDEBAR DE NOTAS */}
             {showNotesSidebar && (
-              <div className="bg-white rounded-xl shadow-lg p-6">
-                <div className="flex items-center justify-between mb-4 pb-3 border-b">
+              <div className="bg-white rounded-xl shadow-lg p-6 max-h-[700px] overflow-y-auto">
+                <div className="flex items-center justify-between mb-4 pb-3 border-b sticky top-0 bg-white">
                   <h3 className="font-bold text-lg">👤 Fan Profile</h3>
                   <button
                     onClick={() => setShowNotesSidebar(false)}
@@ -489,7 +500,7 @@ export default function ChatView() {
                 {/* OF Username */}
                 <div className="mb-4">
                   <p className="text-xs text-gray-500 mb-1">OnlyFans Username</p>
-                  <p className="text-sm font-mono bg-gray-50 px-3 py-2 rounded">
+                  <p className="text-sm font-mono bg-gray-50 px-3 py-2 rounded break-all">
                     {fan.of_username || fan.fan_id}
                   </p>
                 </div>
@@ -498,36 +509,39 @@ export default function ChatView() {
                 <div className="mb-4">
                   <p className="text-xs text-gray-500 mb-1">✏️ Nickname</p>
                   {editingNickname ? (
-                    <div className="flex gap-2">
+                    <div className="space-y-2">
                       <input
                         type="text"
                         value={nicknameValue}
                         onChange={(e) => setNicknameValue(e.target.value)}
-                        className="flex-1 px-3 py-2 border rounded text-sm"
+                        className="w-full px-3 py-2 border rounded text-sm"
                         placeholder="e.g., John VIP"
+                        autoFocus
                       />
-                      <button
-                        onClick={handleSaveNickname}
-                        className="px-3 py-2 bg-blue-500 text-white rounded text-sm hover:bg-blue-600"
-                      >
-                        💾
-                      </button>
-                      <button
-                        onClick={() => {
-                          setEditingNickname(false)
-                          setNicknameValue(fan.display_name || '')
-                        }}
-                        className="px-3 py-2 bg-gray-200 rounded text-sm hover:bg-gray-300"
-                      >
-                        ✕
-                      </button>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={handleSaveNickname}
+                          className="flex-1 px-3 py-2 bg-blue-500 text-white rounded text-sm hover:bg-blue-600"
+                        >
+                          💾 Save
+                        </button>
+                        <button
+                          onClick={() => {
+                            setEditingNickname(false)
+                            setNicknameValue(fan.display_name || '')
+                          }}
+                          className="px-3 py-2 bg-gray-200 rounded text-sm hover:bg-gray-300"
+                        >
+                          Cancel
+                        </button>
+                      </div>
                     </div>
                   ) : (
                     <div
                       onClick={() => setEditingNickname(true)}
-                      className="px-3 py-2 bg-gray-50 rounded cursor-pointer hover:bg-gray-100 text-sm"
+                      className="px-3 py-2 bg-gray-50 rounded cursor-pointer hover:bg-gray-100 text-sm border border-dashed border-gray-300"
                     >
-                      {fan.display_name || <span className="text-gray-400">Click to add nickname</span>}
+                      {fan.display_name || <span className="text-gray-400 italic">Click to add nickname</span>}
                     </div>
                   )}
                 </div>
@@ -567,16 +581,16 @@ export default function ChatView() {
                   <textarea
                     value={notesValue}
                     onChange={(e) => setNotesValue(e.target.value)}
-                    className="w-full px-3 py-2 border rounded text-sm resize-none"
+                    className="w-full px-3 py-2 border rounded text-sm resize-none focus:ring-2 focus:ring-blue-500 focus:outline-none"
                     rows="4"
-                    placeholder="Add notes about this fan (preferences, birthday, etc.)"
+                    placeholder="Preferences, birthday, family info, etc."
                   />
                   <button
                     onClick={handleSaveNotes}
                     disabled={savingNotes}
-                    className="mt-2 w-full px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 text-sm disabled:opacity-50"
+                    className="mt-2 w-full px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 text-sm disabled:opacity-50 font-semibold"
                   >
-                    {savingNotes ? 'Saving...' : 'Save Notes'}
+                    {savingNotes ? 'Saving...' : '💾 Save Notes'}
                   </button>
                 </div>
 
@@ -586,16 +600,16 @@ export default function ChatView() {
                   <textarea
                     value={chatterNotesValue}
                     onChange={(e) => setChatterNotesValue(e.target.value)}
-                    className="w-full px-3 py-2 border rounded text-sm resize-none"
+                    className="w-full px-3 py-2 border rounded text-sm resize-none focus:ring-2 focus:ring-purple-500 focus:outline-none"
                     rows="4"
-                    placeholder="Tips for selling (best time to message, what they like, etc.)"
+                    placeholder="Best time to message, what they like to buy, conversation style, etc."
                   />
                   <button
                     onClick={handleSaveChatterNotes}
                     disabled={savingNotes}
-                    className="mt-2 w-full px-4 py-2 bg-purple-500 text-white rounded hover:bg-purple-600 text-sm disabled:opacity-50"
+                    className="mt-2 w-full px-4 py-2 bg-purple-500 text-white rounded hover:bg-purple-600 text-sm disabled:opacity-50 font-semibold"
                   >
-                    {savingNotes ? 'Saving...' : 'Save Tips'}
+                    {savingNotes ? 'Saving...' : '💾 Save Tips'}
                   </button>
                 </div>
               </div>
@@ -606,7 +620,7 @@ export default function ChatView() {
           {!showNotesSidebar && (
             <button
               onClick={() => setShowNotesSidebar(true)}
-              className="fixed right-6 bottom-6 w-14 h-14 bg-blue-500 text-white rounded-full shadow-lg hover:bg-blue-600 flex items-center justify-center text-2xl"
+              className="fixed right-6 bottom-6 w-14 h-14 bg-blue-500 text-white rounded-full shadow-lg hover:bg-blue-600 flex items-center justify-center text-2xl z-50"
             >
               📝
             </button>
