@@ -499,6 +499,21 @@ export default function VaultTab({ modelId }) {
         />
       )}
 
+      {/* Media Preview Modal */}
+      {showPreviewModal && (
+        <MediaPreviewModal
+          show={showPreviewModal}
+          media={previewingMedia}
+          previewUrl={previewUrl}
+          loading={loadingPreview}
+          onClose={() => {
+            setShowPreviewModal(false)
+            setPreviewingMedia(null)
+            setPreviewUrl(null)
+          }}
+        />
+      )}
+
       {/* New Session Modal */}
       {showNewSessionModal && (
         <NewSessionModal
@@ -579,7 +594,7 @@ function SessionsView({
 }
 
 // Vault Media Grid
-function VaultMediaGrid({ medias, loading }) {
+function VaultMediaGrid({ medias, loading, onMediaClick }) {
   if (loading) {
     return <div className="text-center py-12">Loading vault...</div>
   }
@@ -597,7 +612,7 @@ function VaultMediaGrid({ medias, loading }) {
       {medias.map(media => (
         <div 
           key={media.id} 
-          onClick={() => onMediaClick(media)}
+          onClick={() => onMediaClick && onMediaClick(media)}
           className="border rounded-lg overflow-hidden hover:shadow-lg transition-all cursor-pointer hover:scale-105"
         >
           <div className="aspect-video bg-gray-100 relative flex items-center justify-center">
@@ -728,6 +743,80 @@ function NewSessionModal({ sessionForm, setSessionForm, handleCreateSession, set
             </button>
           </div>
         </form>
+
+// Media Preview Modal
+function MediaPreviewModal({ 
+  show, 
+  media, 
+  previewUrl, 
+  loading, 
+  onClose, 
+  onAssign 
+}) {
+  if (!show) return null
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-auto">
+        <div className="p-4 border-b flex items-center justify-between">
+          <h3 className="text-lg font-semibold">Media Preview</h3>
+          <button
+            onClick={onClose}
+            className="text-gray-400 hover:text-gray-600 text-2xl leading-none"
+          >
+            ×
+          </button>
+        </div>
+
+        <div className="p-6">
+          {loading ? (
+            <div className="aspect-video bg-gray-100 rounded-lg flex items-center justify-center">
+              <div className="text-center">
+                <div className="animate-spin text-4xl mb-2">⏳</div>
+                <p className="text-gray-600">Loading preview...</p>
+              </div>
+            </div>
+          ) : previewUrl ? (
+            <img
+              src={previewUrl}
+              alt="Media preview"
+              className="w-full rounded-lg"
+            />
+          ) : (
+            <div className="aspect-video bg-gray-100 rounded-lg flex items-center justify-center">
+              <div className="text-center">
+                <div className="text-6xl mb-4">
+                  {media?.type === 'video' ? '🎥' : media?.type === 'audio' ? '🎵' : '📷'}
+                </div>
+                <p className="text-gray-600">Preview not available</p>
+              </div>
+            </div>
+          )}
+
+          <div className="mt-4 p-4 bg-gray-50 rounded-lg">
+            <div className="grid grid-cols-2 gap-4 text-sm">
+              <div>
+                <span className="text-gray-600">Type:</span>
+                <span className="ml-2 font-medium">
+                  {media?.type === 'video' ? '🎥 Video' : media?.type === 'audio' ? '🎵 Audio' : '📷 Photo'}
+                </span>
+              </div>
+              <div>
+                <span className="text-gray-600">Likes:</span>
+                <span className="ml-2 font-medium">❤️ {media?.likesCount || 0}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="p-4 border-t flex justify-end gap-2">
+          <button
+            onClick={onClose}
+            className="px-6 py-2 border rounded-lg hover:bg-gray-50"
+          >
+            Close
+          </button>
+        </div>
       </div>
     </div>
   )
