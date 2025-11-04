@@ -15,9 +15,8 @@ export default function Dashboard() {
   const [stats, setStats] = useState({ hoy: 0, chats: 0, mensajes: 0, totalFans: 0 })
   const [searchQuery, setSearchQuery] = useState('')
   const [showActiveOnly, setShowActiveOnly] = useState(true)
-  const [selectedTier, setSelectedTier] = useState(null) // 🔥 NUEVO: Filtro por tier
+  const [selectedTier, setSelectedTier] = useState(null)
 
-  // 🎨 Helper: Get Tier Badge with emoji + color
   const getTierBadge = (tier) => {
     const tiers = {
       0: { emoji: '🆕', label: 'New Fan', color: 'bg-gray-100 text-gray-700' },
@@ -110,11 +109,12 @@ export default function Dashboard() {
 
   const filteredFans = fans
     .filter(fan => showActiveOnly ? fan.isActive : true)
-    .filter(fan => selectedTier === null ? true : fan.tier === selectedTier) // 🔥 NUEVO: Filtro por tier
+    .filter(fan => selectedTier === null ? true : fan.tier === selectedTier)
     .filter(fan => 
       fan.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
       fan.of_username?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      fan.fan_id?.toLowerCase().includes(searchQuery.toLowerCase())
+      fan.fan_id?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      fan.display_name?.toLowerCase().includes(searchQuery.toLowerCase())
     )
 
   const getTimeText = (fan) => {
@@ -169,7 +169,6 @@ export default function Dashboard() {
           <p style={{ color: '#6b7280' }}>Overview of all fans and activity</p>
         </div>
 
-        {/* Stats Cards */}
         <div style={{ 
           display: 'grid', 
           gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', 
@@ -221,7 +220,6 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* Fans List */}
         <div style={{ background: 'white', borderRadius: '12px', padding: '1.5rem', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
           <div style={{ marginBottom: '1.5rem' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
@@ -229,7 +227,6 @@ export default function Dashboard() {
               
               <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', flexWrap: 'wrap' }}>
                 
-                {/* 🔥 Toggle Activos/Todos */}
                 <div className="flex gap-2 bg-gray-100 rounded-lg p-1">
                   <button
                     onClick={() => setShowActiveOnly(true)}
@@ -253,7 +250,6 @@ export default function Dashboard() {
                   </button>
                 </div>
 
-                {/* 🔥 NUEVO: Filtros por Tier */}
                 <div className="flex gap-2 bg-gray-50 rounded-lg p-1 border">
                   <button
                     onClick={() => setSelectedTier(null)}
@@ -353,8 +349,14 @@ export default function Dashboard() {
                       )}
                       
                       <div>
+                        {/* 🔥 NUEVO: Muestra nickname si existe */}
                         <h3 className="font-bold text-gray-800">
-                          {fan.name || fan.of_username || 'Unknown'}
+                          {fan.display_name || fan.name || fan.of_username || 'Unknown'}
+                          {fan.display_name && (
+                            <span className="text-xs font-normal text-gray-500 ml-2">
+                              ({fan.of_username || fan.fan_id})
+                            </span>
+                          )}
                         </h3>
                         <div className="flex items-center gap-2 text-sm text-gray-600">
                           {(() => {

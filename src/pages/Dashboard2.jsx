@@ -15,14 +15,14 @@ export default function Dashboard() {
   const [stats, setStats] = useState({ hoy: 0, chats: 0, mensajes: 0, totalFans: 0 })
   const [searchQuery, setSearchQuery] = useState('')
   const [showActiveOnly, setShowActiveOnly] = useState(true)
+  const [selectedTier, setSelectedTier] = useState(null) // 🔥 NUEVO: Filtro por tier
 
   // 🎨 Helper: Get Tier Badge with emoji + color
   const getTierBadge = (tier) => {
     const tiers = {
-      0: { emoji: '⚪', label: 'New Fan', color: 'bg-gray-100 text-gray-700' },
-      1: { emoji: '🟡', label: 'Regular', color: 'bg-yellow-100 text-yellow-700' },
-      2: { emoji: '🟢', label: 'VIP', color: 'bg-green-100 text-green-700' },
-      3: { emoji: '🟣', label: 'Whale', color: 'bg-purple-100 text-purple-700' }
+      0: { emoji: '🆕', label: 'New Fan', color: 'bg-gray-100 text-gray-700' },
+      1: { emoji: '💎', label: 'VIP', color: 'bg-blue-100 text-blue-700' },
+      2: { emoji: '🐋', label: 'Whale', color: 'bg-purple-100 text-purple-700' }
     }
     return tiers[tier] || tiers[0]
   }
@@ -53,72 +53,54 @@ export default function Dashboard() {
       const fanIds = fansData?.map(f => f.fan_id) || []
       
       let lastMessagesMap = {}
-      let messageCountMap = {} // 🔥 NUEVO: Contar mensajes por fan
       
       if (fanIds.length > 0) {
         const { data: allMessages } = await supabase
           .from('chat')
           .select('fan_id, message, ts, from')
+          .eq('model_id', actualModelId)
           .in('fan_id', fanIds)
           .order('ts', { ascending: false })
 
-        allMessages?.forEach(msg => {
-          // Último mensaje
-          if (!lastMessagesMap[msg.fan_id]) {
-            lastMessagesMap[msg.fan_id] = msg
+        if (allMessages) {
+          for (const msg of allMessages) {
+            if (!lastMessagesMap[msg.fan_id]) {
+              lastMessagesMap[msg.fan_id] = {
+                message: msg.message,
+                time: msg.ts,
+                from: msg.from
+              }
+            }
           }
-          // Conteo de mensajes
-          messageCountMap[msg.fan_id] = (messageCountMap[msg.fan_id] || 0) + 1
-        })
+        }
       }
 
-      const fansWithLastMessage = fansData.map(fan => {
+      const fansWithLastMessage = (fansData || []).map(fan => {
         const lastMsg = lastMessagesMap[fan.fan_id]
-        const messageCount = messageCountMap[fan.fan_id] || 0
+        const lastMsgTime = lastMsg?.time ? new Date(lastMsg.time) : null
+        const now = new Date()
+        const hoursSinceLastMsg = lastMsgTime ? (now - lastMsgTime) / (1000 * 60 * 60) : null
         
         return {
           ...fan,
-          lastMessage: lastMsg?.message || 'No messages yet',
-          lastMessageTime: lastMsg?.ts || null,
+          lastMessage: lastMsg?.message || 'No messages',
+          lastMessageTime: lastMsg?.time || null,
           lastMessageFrom: lastMsg?.from || null,
-          messageCount: messageCount, // 🔥 NUEVO: Cantidad de mensajes
-          isActive: messageCount > 1 // 🔥 NUEVO: Activo si tiene >1 mensaje
+          isActive: hoursSinceLastMsg !== null && hoursSinceLastMsg < 48
         }
       })
 
-      const sevenDaysAgo = new Date()
-      sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7)
-      
-      // 🔥 NUEVO: Contar solo fans activos (con >1 mensaje)
-      const fansActivos = fansWithLastMessage.filter(f => f.isActive).length
-      
-      const chatsActivos = fansWithLastMessage.filter(
-        f => f.last_message_date && new Date(f.last_message_date) > sevenDaysAgo
-      ).length
-
-      const { count: totalMensajes } = await supabase
-        .from('chat')
-        .select('*', { count: 'exact', head: true })
-        .eq('model_id', actualModelId)
-
-      const hoy = new Date()
-      hoy.setHours(0, 0, 0, 0)
-      
-      const { data: transaccionesHoy } = await supabase
-        .from('transactions')
-        .select('amount')
-        .eq('model_id', actualModelId)
-        .gte('ts', hoy.toISOString())
-
-      const totalHoy = transaccionesHoy?.reduce((sum, t) => sum + (t.amount || 0), 0) || 0
-
       setFans(fansWithLastMessage)
+
+      const activeFans = fansWithLastMessage.filter(f => f.isActive)
+
       setStats({
-        hoy: totalHoy,
-        chats: fansActivos, // 🔥 CAMBIADO: Ahora es fans activos (>1 mensaje)
-        mensajes: totalMensajes || 0,
+        hoy: 0,
+        chats: activeFans.length,
+        mensajes: 0,
         totalFans: fansWithLastMessage.length
       })
+
       setLoading(false)
     } catch (error) {
       console.error('Error cargando datos:', error)
@@ -127,7 +109,8 @@ export default function Dashboard() {
   }
 
   const filteredFans = fans
-    .filter(fan => showActiveOnly ? fan.isActive : true) // 🔥 NUEVO: Filtrar por activos
+    .filter(fan => showActiveOnly ? fan.isActive : true)
+    .filter(fan => selectedTier === null ? true : fan.tier === selectedTier) // 🔥 NUEVO: Filtro por tier
     .filter(fan => 
       fan.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
       fan.of_username?.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -143,8 +126,10 @@ export default function Dashboard() {
     const diffHours = Math.floor(diffMs / 3600000)
     const diffDays = Math.floor(diffMs / 86400000)
 
+    if (diffMins < 1) return 'Just now'
     if (diffMins < 60) return `${diffMins}m ago`
     if (diffHours < 24) return `${diffHours}h ago`
+    if (diffDays === 1) return 'Yesterday'
     return `${diffDays}d ago`
   }
 
@@ -165,14 +150,8 @@ export default function Dashboard() {
         <Navbar />
         <div className="flex items-center justify-center h-screen">
           <div className="text-center">
-            <h2 className="text-2xl font-bold mb-4">⚠️ No Model ID Found</h2>
-            <p className="text-gray-600 mb-4">Please configure your account first</p>
-            <button 
-              onClick={() => navigate('/settings')}
-              className="px-4 py-2 bg-blue-500 text-white rounded"
-            >
-              Go to Settings
-            </button>
+            <h2 className="text-2xl font-bold mb-4">No Model Selected</h2>
+            <p className="text-gray-600 mb-4">Please select a model from the dropdown</p>
           </div>
         </div>
       </>
@@ -182,41 +161,75 @@ export default function Dashboard() {
   return (
     <>
       <Navbar />
-      <div className="min-h-screen bg-gradient-to-br from-purple-50 to-pink-50">
-        <div className="max-w-7xl mx-auto p-6">
-          <div className="mb-6">
-            <h1 className="text-3xl font-bold text-gray-800">📊 Dashboard</h1>
-            <p className="text-gray-600">Overview of all fans and activity</p>
+      <div style={{ maxWidth: '1400px', margin: '0 auto', padding: '2rem' }}>
+        <div style={{ marginBottom: '2rem' }}>
+          <h1 style={{ fontSize: '2rem', fontWeight: 'bold', marginBottom: '0.5rem' }}>
+            📊 Dashboard
+          </h1>
+          <p style={{ color: '#6b7280' }}>Overview of all fans and activity</p>
+        </div>
+
+        {/* Stats Cards */}
+        <div style={{ 
+          display: 'grid', 
+          gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', 
+          gap: '1.5rem',
+          marginBottom: '2rem'
+        }}>
+          <div style={{ 
+            background: 'white', 
+            padding: '1.5rem', 
+            borderRadius: '12px',
+            borderLeft: '4px solid #10b981',
+            boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
+          }}>
+            <p style={{ fontSize: '0.875rem', color: '#6b7280', marginBottom: '0.5rem' }}>Today's Revenue</p>
+            <p style={{ fontSize: '2rem', fontWeight: 'bold', color: '#10b981' }}>${stats.hoy.toFixed(2)}</p>
           </div>
 
-          <div className="grid grid-cols-4 gap-4 mb-8">
-            <div className="bg-white rounded-xl shadow-lg p-6 border-l-4 border-green-500">
-              <p className="text-sm text-gray-600 font-semibold">Today's Revenue</p>
-              <p className="text-3xl font-bold text-green-600">${stats.hoy.toFixed(2)}</p>
-            </div>
-            
-            <div className="bg-white rounded-xl shadow-lg p-6 border-l-4 border-blue-500">
-              <p className="text-sm text-gray-600 font-semibold">Active Fans</p>
-              <p className="text-3xl font-bold text-blue-600">{stats.chats}</p>
-            </div>
-            
-            <div className="bg-white rounded-xl shadow-lg p-6 border-l-4 border-purple-500">
-              <p className="text-sm text-gray-600 font-semibold">Total Messages</p>
-              <p className="text-3xl font-bold text-purple-600">{stats.mensajes}</p>
-            </div>
-
-            <div className="bg-white rounded-xl shadow-lg p-6 border-l-4 border-pink-500">
-              <p className="text-sm text-gray-600 font-semibold">Total Fans</p>
-              <p className="text-3xl font-bold text-pink-600">{stats.totalFans}</p>
-            </div>
+          <div style={{ 
+            background: 'white', 
+            padding: '1.5rem', 
+            borderRadius: '12px',
+            borderLeft: '4px solid #3b82f6',
+            boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
+          }}>
+            <p style={{ fontSize: '0.875rem', color: '#6b7280', marginBottom: '0.5rem' }}>Active Fans</p>
+            <p style={{ fontSize: '2rem', fontWeight: 'bold', color: '#3b82f6' }}>{stats.chats}</p>
           </div>
 
-          <div className="bg-white rounded-xl shadow-lg p-6">
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-4">
-                <h2 className="text-xl font-bold">All Fans</h2>
+          <div style={{ 
+            background: 'white', 
+            padding: '1.5rem', 
+            borderRadius: '12px',
+            borderLeft: '4px solid #a855f7',
+            boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
+          }}>
+            <p style={{ fontSize: '0.875rem', color: '#6b7280', marginBottom: '0.5rem' }}>Total Messages</p>
+            <p style={{ fontSize: '2rem', fontWeight: 'bold', color: '#a855f7' }}>{stats.mensajes}</p>
+          </div>
+
+          <div style={{ 
+            background: 'white', 
+            padding: '1.5rem', 
+            borderRadius: '12px',
+            borderLeft: '4px solid #ec4899',
+            boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
+          }}>
+            <p style={{ fontSize: '0.875rem', color: '#6b7280', marginBottom: '0.5rem' }}>Total Fans</p>
+            <p style={{ fontSize: '2rem', fontWeight: 'bold', color: '#ec4899' }}>{stats.totalFans}</p>
+          </div>
+        </div>
+
+        {/* Fans List */}
+        <div style={{ background: 'white', borderRadius: '12px', padding: '1.5rem', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
+          <div style={{ marginBottom: '1.5rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+              <h2 style={{ fontSize: '1.25rem', fontWeight: 'bold' }}>All Fans</h2>
+              
+              <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', flexWrap: 'wrap' }}>
                 
-                {/* 🔥 NUEVO: Toggle Activos/Todos */}
+                {/* 🔥 Toggle Activos/Todos */}
                 <div className="flex gap-2 bg-gray-100 rounded-lg p-1">
                   <button
                     onClick={() => setShowActiveOnly(true)}
@@ -239,92 +252,142 @@ export default function Dashboard() {
                     👥 All ({stats.totalFans})
                   </button>
                 </div>
+
+                {/* 🔥 NUEVO: Filtros por Tier */}
+                <div className="flex gap-2 bg-gray-50 rounded-lg p-1 border">
+                  <button
+                    onClick={() => setSelectedTier(null)}
+                    className={`px-3 py-1.5 rounded-md text-sm font-medium transition ${
+                      selectedTier === null
+                        ? 'bg-white shadow text-blue-600 border border-blue-200' 
+                        : 'text-gray-600 hover:text-gray-900'
+                    }`}
+                  >
+                    All Tiers
+                  </button>
+                  <button
+                    onClick={() => setSelectedTier(0)}
+                    className={`px-3 py-1.5 rounded-md text-sm font-medium transition ${
+                      selectedTier === 0
+                        ? 'bg-white shadow text-gray-600 border border-gray-200' 
+                        : 'text-gray-600 hover:text-gray-900'
+                    }`}
+                  >
+                    🆕 New
+                  </button>
+                  <button
+                    onClick={() => setSelectedTier(1)}
+                    className={`px-3 py-1.5 rounded-md text-sm font-medium transition ${
+                      selectedTier === 1
+                        ? 'bg-white shadow text-blue-600 border border-blue-200' 
+                        : 'text-gray-600 hover:text-gray-900'
+                    }`}
+                  >
+                    💎 VIP
+                  </button>
+                  <button
+                    onClick={() => setSelectedTier(2)}
+                    className={`px-3 py-1.5 rounded-md text-sm font-medium transition ${
+                      selectedTier === 2
+                        ? 'bg-white shadow text-purple-600 border border-purple-200' 
+                        : 'text-gray-600 hover:text-gray-900'
+                    }`}
+                  >
+                    🐋 Whale
+                  </button>
+                </div>
               </div>
-              
-              <input
-                type="text"
-                placeholder="🔍 Search fans..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="px-4 py-2 border rounded-lg w-64"
-              />
             </div>
             
-            {filteredFans.length === 0 ? (
-              <div className="text-center py-12 bg-gray-50 rounded-lg">
-                <div className="text-6xl mb-4">👥</div>
-                <p className="text-gray-600 font-semibold">
-                  {searchQuery 
-                    ? 'No fans match your search' 
-                    : showActiveOnly 
-                      ? 'No active fans yet' 
-                      : 'No fans yet'}
-                </p>
-                <p className="text-sm text-gray-500 mt-2">
-                  {showActiveOnly 
-                    ? 'Fans appear here after they respond to your welcome message'
-                    : 'Fans will appear automatically when the extension detects messages'}
-                </p>
-              </div>
-            ) : (
-              <div className="grid gap-3">
-                {filteredFans.map(fan => (
-                  <div 
-                    key={fan.fan_id}
-                    className="border rounded-lg p-4 hover:shadow-lg hover:border-blue-300 transition cursor-pointer bg-gray-50"
-                    onClick={() => navigate(`/chat/${fan.fan_id}`)}
-                  >
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        {fan.of_avatar_url ? (
-                          <img 
-                            src={fan.of_avatar_url} 
-                            alt={fan.name}
-                            className="w-12 h-12 rounded-full object-cover"
-                          />
-                        ) : (
-                          <div className="w-12 h-12 rounded-full bg-gradient-to-br from-purple-400 to-pink-400 flex items-center justify-center text-white text-xl font-bold">
-                            {fan.name?.[0]?.toUpperCase() || '👤'}
-                          </div>
-                        )}
-                        
-                        <div>
-                          <h3 className="font-bold text-gray-800">
-                            {fan.name || fan.of_username || 'Unknown'}
-                          </h3>
-                          <div className="flex items-center gap-2 text-sm text-gray-600">
-                            {(() => {
-                              const tierBadge = getTierBadge(fan.tier || 0)
-                              return (
-                                <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${tierBadge.color}`}>
-                                  {tierBadge.emoji} {tierBadge.label}
-                                </span>
-                              )
-                            })()}
-                            <span className="font-semibold text-green-600">
-                              ${fan.spent_total || 0}
-                            </span>
-                            <span className="text-gray-400">•</span>
-                            <span>{getTimeText(fan)}</span>
-                          </div>
-                        </div>
-                      </div>
+            <input
+              type="text"
+              placeholder="🔍 Search fans..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              style={{
+                width: '100%',
+                padding: '0.75rem',
+                border: '1px solid #e5e7eb',
+                borderRadius: '8px',
+                fontSize: '0.875rem'
+              }}
+            />
+          </div>
 
-                      <div className="text-right">
-                        <div className="text-xs text-gray-500 mb-1">
-                          {fan.lastMessageFrom === 'fan' && '👤 Fan'}
-                          {fan.lastMessageFrom === 'model' && '💎 You'}
+          {filteredFans.length === 0 ? (
+            <div style={{ 
+              textAlign: 'center', 
+              padding: '3rem', 
+              color: '#9ca3af' 
+            }}>
+              <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>👥</div>
+              <p style={{ fontSize: '1.125rem', fontWeight: '600', marginBottom: '0.5rem' }}>
+                No fans found
+              </p>
+              <p style={{ fontSize: '0.875rem' }}>
+                {showActiveOnly 
+                  ? 'No active fans in the last 48 hours'
+                  : 'Fans will appear automatically when they send messages'}
+              </p>
+            </div>
+          ) : (
+            <div className="grid gap-3">
+              {filteredFans.map(fan => (
+                <div 
+                  key={fan.fan_id}
+                  className="border rounded-lg p-4 hover:shadow-lg hover:border-blue-300 transition cursor-pointer bg-gray-50"
+                  onClick={() => navigate(`/chat/${fan.fan_id}`)}
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      {fan.of_avatar_url ? (
+                        <img 
+                          src={fan.of_avatar_url} 
+                          alt={fan.name}
+                          className="w-12 h-12 rounded-full object-cover"
+                        />
+                      ) : (
+                        <div className="w-12 h-12 rounded-full bg-gradient-to-br from-purple-400 to-pink-400 flex items-center justify-center text-white text-xl font-bold">
+                          {fan.name?.[0]?.toUpperCase() || '👤'}
                         </div>
-                        <div className="text-sm text-gray-700 max-w-xs truncate">
-                          {fan.lastMessage}
+                      )}
+                      
+                      <div>
+                        <h3 className="font-bold text-gray-800">
+                          {fan.name || fan.of_username || 'Unknown'}
+                        </h3>
+                        <div className="flex items-center gap-2 text-sm text-gray-600">
+                          {(() => {
+                            const tierBadge = getTierBadge(fan.tier || 0)
+                            return (
+                              <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${tierBadge.color}`}>
+                                {tierBadge.emoji} {tierBadge.label}
+                              </span>
+                            )
+                          })()}
+                          <span className="font-semibold text-green-600">
+                            ${fan.spent_total || 0}
+                          </span>
+                          <span className="text-gray-400">•</span>
+                          <span>{getTimeText(fan)}</span>
                         </div>
                       </div>
                     </div>
+
+                    <div className="text-right">
+                      <div className="text-xs text-gray-500 mb-1">
+                        {fan.lastMessageFrom === 'fan' && '👤 Fan'}
+                        {fan.lastMessageFrom === 'model' && '💙 You'}
+                      </div>
+                      <div className="text-sm text-gray-700 max-w-xs truncate">
+                        {fan.lastMessage}
+                      </div>
+                    </div>
                   </div>
-                ))}
-              </div>
-            )}
-          </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
     </>
