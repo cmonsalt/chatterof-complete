@@ -364,8 +364,8 @@ export default function ChatterDashboard() {
                         </div>
 
                         <div className="text-xs text-gray-600 truncate">
-                          {chat.lastMessageFrom === 'fan' && 'ðŸ‘¤ '}
-                          {chat.lastMessageFrom === 'model' && 'ðŸ’Ž '}
+                          {chat.lastMessageFrom === 'fan' && '👤 '}
+                          {chat.lastMessageFrom === 'model' && '👩‍💼 '}
                           {chat.lastMessage}
                         </div>
                       </div>
