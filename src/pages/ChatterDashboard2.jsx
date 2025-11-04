@@ -31,10 +31,10 @@ export default function ChatterDashboard() {
   // ðŸŽ¨ Helper: Get Tier Badge with emoji + color
   const getTierBadge = (tier) => {
     const tiers = {
-      0: { emoji: 'âšª', label: 'New Fan', color: 'bg-gray-100 text-gray-700' },
-      1: { emoji: 'ðŸŸ¡', label: 'Regular', color: 'bg-yellow-100 text-yellow-700' },
-      2: { emoji: 'ðŸŸ¢', label: 'VIP', color: 'bg-green-100 text-green-700' },
-      3: { emoji: 'ðŸŸ£', label: 'Whale', color: 'bg-purple-100 text-purple-700' }
+      0: { emoji: '⚪', label: 'New Fan', color: 'bg-gray-100 text-gray-700' },
+      1: { emoji: '🟡', label: 'Regular', color: 'bg-yellow-100 text-yellow-700' },
+      2: { emoji: '🟢', label: 'VIP', color: 'bg-green-100 text-green-700' },
+      3: { emoji: '🟣', label: 'Whale', color: 'bg-purple-100 text-purple-700' }
     }
     return tiers[tier] || tiers[0]
   }
@@ -319,7 +319,7 @@ export default function ChatterDashboard() {
                   type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="ðŸ” Search fans..."
+                  placeholder="🔍 Search fans..."
                   className="w-full px-4 py-2 border rounded-lg"
                 />
               </div>
@@ -452,7 +452,7 @@ export default function ChatterDashboard() {
                       disabled={generating}
                       className="w-full bg-gradient-to-r from-purple-500 to-pink-500 text-white py-3 rounded-lg font-semibold disabled:opacity-50 mb-4 hover:shadow-lg transition"
                     >
-                      {generating ? 'ðŸ¤– Generating...' : 'ðŸ¤– Generate AI Response'}
+                      {generating ? '🤖– Generating...' : '🤖– Generate AI Response'}
                     </button>
                   )}
 
