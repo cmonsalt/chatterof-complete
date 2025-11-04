@@ -7,36 +7,54 @@ export default async function handler(req, res) {
   }
 
   try {
-    // ✅ Endpoint correcto: List Vault Media (no lists)
-    const response = await fetch(
-      `https://app.onlyfansapi.com/api/${accountId}/media/vault`,
-      {
+    let allMedias = [];
+    let url = `https://app.onlyfansapi.com/api/${accountId}/media/vault`;
+    let hasMore = true;
+
+    // Fetch all pages
+    while (hasMore && allMedias.length < 500) { // Límite de seguridad
+      console.log('Fetching:', url);
+      
+      const response = await fetch(url, {
         headers: { 
           'Authorization': `Bearer ${API_KEY}`,
           'Content-Type': 'application/json'
         }
-      }
-    );
+      });
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('OnlyFans API error:', response.status, errorText);
-      throw new Error(`API error: ${response.status}`);
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('OnlyFans API error:', response.status, errorText);
+        throw new Error(`API error: ${response.status}`);
+      }
+
+      const data = await response.json();
+      
+      console.log('Page result:', {
+        count: data.data?.length || 0,
+        hasNextPage: !!data._meta?._pagination?.next_page,
+        totalSoFar: allMedias.length
+      });
+
+      // Add current page medias
+      if (data.data && Array.isArray(data.data)) {
+        allMedias = allMedias.concat(data.data);
+      }
+
+      // Check if there's a next page
+      if (data._meta?._pagination?.next_page) {
+        url = data._meta._pagination.next_page;
+      } else {
+        hasMore = false;
+      }
     }
 
-    const data = await response.json();
-    
-    console.log('Vault API response:', {
-      hasData: !!data.data,
-      dataLength: data.data?.length || 0,
-      structure: Object.keys(data)
-    });
+    console.log('✅ Total vault medias loaded:', allMedias.length);
 
-    // La respuesta viene en data.data (array de medias)
     res.status(200).json({ 
       success: true,
-      medias: data.data || [],
-      _meta: data._meta
+      medias: allMedias,
+      total: allMedias.length
     });
     
   } catch (error) {
