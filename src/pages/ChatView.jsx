@@ -382,100 +382,109 @@ export default function ChatView() {
                   key={idx}
                   className={`mb-4 flex ${msg.from === 'model' ? 'justify-end' : 'justify-start'}`}
                 >
-                  <div
-                    className={`max-w-md px-4 py-2 rounded-lg ${
-                      msg.from === 'model'
-                        ? 'bg-blue-500 text-white'
-                        : 'bg-white border'
-                    }`}
-                  >
-                    {/* 🔥 SOLO MOSTRAR TEXTO SI NO ES "0" O VACÍO */}
-                    {msg.message && msg.message !== '0' && msg.message.trim() !== '' && (
-                      <p className="text-sm whitespace-pre-wrap">{msg.message}</p>
-                    )}
+                  <div className={`max-w-md ${msg.from === 'model' ? 'items-end' : 'items-start'} flex flex-col`}>
+                    {/* 🔥 ETIQUETA DE QUIÉN ESCRIBE */}
+                    <div className={`text-xs font-semibold mb-1 ${msg.from === 'model' ? 'text-blue-600' : 'text-gray-600'}`}>
+                      {msg.from === 'model' ? '👩‍💼 Modelo' : '👤 ' + (fan.name || fan.of_username || 'Fan')}
+                    </div>
                     
-                    {/* 🔥 MOSTRAR TIP/PPV/PPV LOCKED SOLO SI TIENE AMOUNT REAL (no "0" ni 0) */}
-                    {msg.amount && parseFloat(msg.amount) > 0 && (
-                      <div className={`mt-2 px-2 py-1 rounded text-xs font-bold ${
-                        msg.message_type === 'tip' ? 'bg-green-100 text-green-700' :
-                        msg.message_type === 'ppv_unlocked' ? 'bg-blue-100 text-blue-700' :
-                        msg.message_type === 'ppv_locked' ? 'bg-yellow-100 text-yellow-700' :
-                        'bg-gray-100'
-                      }`}>
-                        {msg.message_type === 'tip' && '💰 Tip: $' + msg.amount}
-                        {msg.message_type === 'ppv_unlocked' && '🔓 PPV Comprado: $' + msg.amount}
-                        {msg.message_type === 'ppv_locked' && '🔒 PPV Bloqueado: $' + msg.amount}
-                      </div>
-                    )}
-                    
-                    {/* 🔥 MOSTRAR IMÁGENES - FIX: media_urls es STRING separado por comas */}
-                    {(msg.media_url || msg.media_urls) && (() => {
-                      try {
-                        // 🔥 FIX: Obtener URLs desde media_url o media_urls
-                        let urls = [];
-                        
-                        if (msg.media_url) {
-                          urls.push(msg.media_url);
-                        }
-                        
-                        if (msg.media_urls) {
-                          // 🔥 CLAVE: Split por comas, NO JSON.parse
-                          const urlsFromString = msg.media_urls.split(',').map(u => u.trim()).filter(u => u);
-                          urls = [...urls, ...urlsFromString];
-                        }
-                        
-                        // 🔥 Filtrar solo imágenes (no videos)
-                        const imageUrls = urls.filter(url => {
-                          const lower = url.toLowerCase();
-                          return lower.includes('.jpg') || 
-                                 lower.includes('.jpeg') || 
-                                 lower.includes('.png') || 
-                                 lower.includes('.gif') || 
-                                 lower.includes('.webp') ||
-                                 lower.includes('/thumb/') ||
-                                 lower.includes('/image/');
-                        });
-                        
-                        // 🔥 Eliminar duplicados
-                        const uniqueUrls = [...new Set(imageUrls)];
-                        
-                        if (uniqueUrls.length === 0) return null;
-                        
-                        return (
-                          <div className="mt-2">
-                            {/* Grid de imágenes */}
-                            <div className="grid grid-cols-2 gap-2">
-                              {uniqueUrls.map((url, i) => (
-                                <a 
-                                  key={i} 
-                                  href={url} 
-                                  target="_blank" 
-                                  rel="noopener noreferrer"
-                                  className="block"
-                                >
-                                  <img 
-                                    src={url} 
-                                    alt={`Media ${i+1}`}
-                                    className="w-full h-24 object-cover rounded border hover:opacity-80 cursor-pointer"
-                                    onError={(e) => {
-                                      e.target.style.display = 'none';
-                                      console.log('❌ Error cargando imagen:', url);
-                                    }}
-                                  />
-                                </a>
-                              ))}
+                    {/* BURBUJA DEL MENSAJE */}
+                    <div
+                      className={`px-4 py-2 rounded-lg ${
+                        msg.from === 'model'
+                          ? 'bg-blue-500 text-white rounded-br-none'
+                          : 'bg-gray-100 text-gray-800 border rounded-bl-none'
+                      }`}
+                    >
+                      {/* 🔥 SOLO MOSTRAR TEXTO SI NO ES "0" O VACÍO */}
+                      {msg.message && msg.message !== '0' && msg.message.trim() !== '' && (
+                        <p className="text-sm whitespace-pre-wrap">{msg.message}</p>
+                      )}
+                      
+                      {/* 🔥 MOSTRAR TIP/PPV/PPV LOCKED SOLO SI TIENE AMOUNT REAL (no "0" ni 0) */}
+                      {msg.amount && parseFloat(msg.amount) > 0 && (
+                        <div className={`mt-2 px-2 py-1 rounded text-xs font-bold ${
+                          msg.message_type === 'tip' ? 'bg-green-100 text-green-700' :
+                          msg.message_type === 'ppv_unlocked' ? 'bg-blue-100 text-blue-700' :
+                          msg.message_type === 'ppv_locked' ? 'bg-yellow-100 text-yellow-700' :
+                          'bg-gray-100'
+                        }`}>
+                          {msg.message_type === 'tip' && '💰 Tip: $' + msg.amount}
+                          {msg.message_type === 'ppv_unlocked' && '🔓 PPV Comprado: $' + msg.amount}
+                          {msg.message_type === 'ppv_locked' && '🔒 PPV Bloqueado: $' + msg.amount}
+                        </div>
+                      )}
+                      
+                      {/* 🔥 MOSTRAR IMÁGENES - FIX: media_urls es STRING separado por comas */}
+                      {(msg.media_url || msg.media_urls) && (() => {
+                        try {
+                          // 🔥 FIX: Obtener URLs desde media_url o media_urls
+                          let urls = [];
+                          
+                          if (msg.media_url) {
+                            urls.push(msg.media_url);
+                          }
+                          
+                          if (msg.media_urls) {
+                            // 🔥 CLAVE: Split por comas, NO JSON.parse
+                            const urlsFromString = msg.media_urls.split(',').map(u => u.trim()).filter(u => u);
+                            urls = [...urls, ...urlsFromString];
+                          }
+                          
+                          // 🔥 Filtrar solo imágenes (no videos)
+                          const imageUrls = urls.filter(url => {
+                            const lower = url.toLowerCase();
+                            return lower.includes('.jpg') || 
+                                   lower.includes('.jpeg') || 
+                                   lower.includes('.png') || 
+                                   lower.includes('.gif') || 
+                                   lower.includes('.webp') ||
+                                   lower.includes('/thumb/') ||
+                                   lower.includes('/image/');
+                          });
+                          
+                          // 🔥 Eliminar duplicados
+                          const uniqueUrls = [...new Set(imageUrls)];
+                          
+                          if (uniqueUrls.length === 0) return null;
+                          
+                          return (
+                            <div className="mt-2">
+                              {/* Grid de imágenes */}
+                              <div className="grid grid-cols-2 gap-2">
+                                {uniqueUrls.map((url, i) => (
+                                  <a 
+                                    key={i} 
+                                    href={url} 
+                                    target="_blank" 
+                                    rel="noopener noreferrer"
+                                    className="block"
+                                  >
+                                    <img 
+                                      src={url} 
+                                      alt={`Media ${i+1}`}
+                                      className="w-full h-24 object-cover rounded border hover:opacity-80 cursor-pointer"
+                                      onError={(e) => {
+                                        e.target.style.display = 'none';
+                                        console.log('❌ Error cargando imagen:', url);
+                                      }}
+                                    />
+                                  </a>
+                                ))}
+                              </div>
                             </div>
-                          </div>
-                        );
-                      } catch (e) {
-                        console.error('❌ Error rendering media:', e, msg);
-                        return null;
-                      }
-                    })()}
-                    
-                    <p className="text-xs mt-1 opacity-75">
-                      {new Date(msg.ts).toLocaleString()}
-                    </p>
+                          );
+                        } catch (e) {
+                          console.error('❌ Error rendering media:', e, msg);
+                          return null;
+                        }
+                      })()}
+                      
+                      {/* TIMESTAMP */}
+                      <p className="text-xs mt-1 opacity-75">
+                        {new Date(msg.ts).toLocaleString()}
+                      </p>
+                    </div>
                   </div>
                 </div>
               ))
