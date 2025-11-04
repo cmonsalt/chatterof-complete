@@ -14,7 +14,18 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true)
   const [stats, setStats] = useState({ hoy: 0, chats: 0, mensajes: 0, totalFans: 0 })
   const [searchQuery, setSearchQuery] = useState('')
-  const [showActiveOnly, setShowActiveOnly] = useState(true) // 🔥 NUEVO: Toggle activos/todos
+  const [showActiveOnly, setShowActiveOnly] = useState(true)
+
+  // 🎨 Helper: Get Tier Badge with emoji + color
+  const getTierBadge = (tier) => {
+    const tiers = {
+      0: { emoji: '⚪', label: 'New Fan', color: 'bg-gray-100 text-gray-700' },
+      1: { emoji: '🟡', label: 'Regular', color: 'bg-yellow-100 text-yellow-700' },
+      2: { emoji: '🟢', label: 'VIP', color: 'bg-green-100 text-green-700' },
+      3: { emoji: '🟣', label: 'Whale', color: 'bg-purple-100 text-purple-700' }
+    }
+    return tiers[tier] || tiers[0]
+  }
 
   useEffect(() => {
     if (actualModelId) {
@@ -185,7 +196,7 @@ export default function Dashboard() {
             </div>
             
             <div className="bg-white rounded-xl shadow-lg p-6 border-l-4 border-blue-500">
-              <p className="text-sm text-gray-600 font-semibold">Active Chats (7d)</p>
+              <p className="text-sm text-gray-600 font-semibold">Active Fans</p>
               <p className="text-3xl font-bold text-blue-600">{stats.chats}</p>
             </div>
             
@@ -282,14 +293,14 @@ export default function Dashboard() {
                             {fan.name || fan.of_username || 'Unknown'}
                           </h3>
                           <div className="flex items-center gap-2 text-sm text-gray-600">
-                            <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${
-                              fan.tier === 3 ? 'bg-purple-100 text-purple-800' :
-                              fan.tier === 2 ? 'bg-blue-100 text-blue-800' :
-                              fan.tier === 1 ? 'bg-green-100 text-green-800' :
-                              'bg-gray-100 text-gray-600'
-                            }`}>
-                              Tier {fan.tier || 0}
-                            </span>
+                            {(() => {
+                              const tierBadge = getTierBadge(fan.tier || 0)
+                              return (
+                                <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${tierBadge.color}`}>
+                                  {tierBadge.emoji} {tierBadge.label}
+                                </span>
+                              )
+                            })()}
                             <span className="font-semibold text-green-600">
                               ${fan.spent_total || 0}
                             </span>
