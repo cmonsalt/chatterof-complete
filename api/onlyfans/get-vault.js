@@ -7,112 +7,69 @@ export default async function handler(req, res) {
   }
 
   try {
-    // PASO 1: Obtener todas las listas (categorías) del vault
-    console.log('📂 Fetching vault lists...');
-    
-    const listsResponse = await fetch(
-      `https://app.onlyfansapi.com/api/${accountId}/media/vault/lists`,
-      {
+    let allMedias = [];
+    let offset = 0;
+    const limit = 50; // Max por request
+    let hasMore = true;
+
+    console.log('📂 Fetching all vault media...');
+
+    // Fetch all pages
+    while (hasMore && allMedias.length < 1000) {
+      const url = `https://app.onlyfansapi.com/api/${accountId}/media/vault?limit=${limit}&offset=${offset}&sort=desc`;
+      
+      console.log(`  ├─ Fetching offset ${offset}...`);
+      
+      const response = await fetch(url, {
         headers: { 
           'Authorization': `Bearer ${API_KEY}`,
           'Content-Type': 'application/json'
         }
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('OnlyFans API error:', response.status, errorText);
+        throw new Error(`API error: ${response.status}`);
       }
-    );
 
-    if (!listsResponse.ok) {
-      throw new Error(`API error getting lists: ${listsResponse.status}`);
-    }
-
-    const listsData = await listsResponse.json();
-    
-    // La respuesta puede ser: { data: [...] } o directamente [...]
-    let lists = [];
-    if (Array.isArray(listsData)) {
-      lists = listsData;
-    } else if (Array.isArray(listsData.data)) {
-      lists = listsData.data;
-    } else {
-      console.log('⚠️ Unexpected lists structure:', Object.keys(listsData));
-    }
-
-    console.log('✅ Found vault lists:', lists.length);
-
-    // Si no hay listas, intentar obtener medias directamente
-    if (lists.length === 0) {
-      console.log('📁 No lists found, trying direct vault fetch...');
+      const data = await response.json();
       
-      const directResponse = await fetch(
-        `https://app.onlyfansapi.com/api/${accountId}/media/vault`,
-        {
-          headers: { 
-            'Authorization': `Bearer ${API_KEY}`,
-            'Content-Type': 'application/json'
-          }
-        }
-      );
-
-      if (directResponse.ok) {
-        const directData = await directResponse.json();
-        const medias = directData.data || [];
-        
-        console.log('✅ Found medias directly:', medias.length);
-        
-        return res.status(200).json({ 
-          success: true,
-          medias: medias,
-          total: medias.length,
-          lists: 0,
-          source: 'direct'
-        });
+      // La estructura correcta es: data.data.list
+      const medias = data.data?.list || [];
+      const hasMoreFlag = data.data?.hasMore || false;
+      
+      console.log(`  ├─ Got ${medias.length} medias, hasMore: ${hasMoreFlag}`);
+      
+      if (medias.length === 0) {
+        hasMore = false;
+        break;
       }
-    }
 
-    // PASO 2: Obtener medias de cada lista
-    let allMedias = [];
+      // Transform to simpler structure
+      const transformedMedias = medias.map(media => ({
+        id: media.id,
+        type: media.type,
+        thumb: media.files?.thumb?.url || media.files?.preview?.url,
+        preview: media.files?.preview?.url,
+        full: media.files?.full?.url,
+        width: media.files?.full?.width,
+        height: media.files?.full?.height,
+        duration: media.duration,
+        createdAt: media.createdAt,
+        likesCount: media.counters?.likesCount || 0,
+        tipsSumm: media.counters?.tipsSumm || 0,
+        canView: media.canView,
+        isReady: media.isReady
+      }));
 
-    for (const list of lists) {
-      console.log(`📂 Fetching list: ${list.name || list.id}`);
-
-      try {
-        const listMediaResponse = await fetch(
-          `https://app.onlyfansapi.com/api/${accountId}/media/vault/lists/${list.id}`,
-          {
-            headers: { 
-              'Authorization': `Bearer ${API_KEY}`,
-              'Content-Type': 'application/json'
-            }
-          }
-        );
-
-        if (listMediaResponse.ok) {
-          const listMediaData = await listMediaResponse.json();
-          
-          // Buscar medias en diferentes estructuras posibles
-          let medias = [];
-          if (Array.isArray(listMediaData)) {
-            medias = listMediaData;
-          } else if (Array.isArray(listMediaData.data)) {
-            medias = listMediaData.data;
-          } else if (listMediaData.data?.media) {
-            medias = listMediaData.data.media;
-          } else if (listMediaData.data?.medias) {
-            medias = listMediaData.data.medias;
-          }
-          
-          console.log(`  ├─ Found ${medias.length} medias`);
-          
-          // Agregar info de la lista a cada media
-          const mediasWithList = medias.map(media => ({
-            ...media,
-            list_name: list.name,
-            list_id: list.id
-          }));
-          
-          allMedias = allMedias.concat(mediasWithList);
-        }
-      } catch (err) {
-        console.error(`  ├─ Error fetching list ${list.id}:`, err.message);
+      allMedias = allMedias.concat(transformedMedias);
+      
+      // Check if there's more
+      if (!hasMoreFlag || medias.length < limit) {
+        hasMore = false;
+      } else {
+        offset += limit;
       }
     }
 
@@ -121,9 +78,7 @@ export default async function handler(req, res) {
     res.status(200).json({ 
       success: true,
       medias: allMedias,
-      total: allMedias.length,
-      lists: lists.length,
-      source: 'lists'
+      total: allMedias.length
     });
     
   } catch (error) {
