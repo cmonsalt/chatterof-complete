@@ -389,7 +389,10 @@ export default function ChatView() {
                         : 'bg-white border'
                     }`}
                   >
-                    <p className="text-sm whitespace-pre-wrap">{msg.message}</p>
+                    {/* 🔥 SOLO MOSTRAR TEXTO SI NO ES "0" O VACÍO */}
+                    {msg.message && msg.message !== '0' && msg.message.trim() !== '' && (
+                      <p className="text-sm whitespace-pre-wrap">{msg.message}</p>
+                    )}
                     
                     {/* 🔥 MOSTRAR TIP/PPV/PPV LOCKED SOLO SI TIENE AMOUNT */}
                     {msg.amount && msg.amount > 0 && (
