@@ -19,6 +19,12 @@ export default function VaultTab({ modelId }) {
   const [showMediaSelector, setShowMediaSelector] = useState(false)
   const [selectingForPart, setSelectingForPart] = useState(null)
   
+  // 🖼️ Media Preview Modal
+  const [showPreviewModal, setShowPreviewModal] = useState(false)
+  const [previewingMedia, setPreviewingMedia] = useState(null)
+  const [previewUrl, setPreviewUrl] = useState(null)
+  const [loadingPreview, setLoadingPreview] = useState(false)
+  
   // UI State
   const [expandedSessions, setExpandedSessions] = useState([])
   const [activeTab, setActiveTab] = useState('sessions')
@@ -282,6 +288,45 @@ export default function VaultTab({ modelId }) {
       showMessage('error', 'Error deleting session')
     } finally {
       setSaving(false)
+    }
+  }
+
+  // 🖼️ OPEN PREVIEW MODAL
+  const openPreviewModal = async (media) => {
+    setPreviewingMedia(media)
+    setShowPreviewModal(true)
+    setLoadingPreview(true)
+    setPreviewUrl(null)
+
+    try {
+      // Get OF account_id
+      const { data: model } = await supabase
+        .from('models')
+        .select('of_account_id')
+        .eq('model_id', modelId)
+        .single()
+
+      if (!model?.of_account_id) {
+        throw new Error('No OnlyFans account connected')
+      }
+
+      // Scrape media to get temporary URL
+      const response = await fetch(
+        `/api/onlyfans/scrape-media?accountId=${model.of_account_id}&mediaId=${media.id}`
+      )
+      const data = await response.json()
+
+      if (!data.success) {
+        throw new Error(data.error || 'Failed to scrape media')
+      }
+
+      setPreviewUrl(data.temporary_url)
+      
+    } catch (error) {
+      console.error('Error loading preview:', error)
+      showMessage('error', 'Error loading preview')
+    } finally {
+      setLoadingPreview(false)
     }
   }
 
@@ -549,43 +594,26 @@ function VaultMediaGrid({ medias, loading }) {
 
   return (
     <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-      {medias.map(media => {
-        // Usar Weserv proxy para las imágenes
-        const proxyUrl = media.thumb 
-          ? `https://images.weserv.nl/?url=${encodeURIComponent(media.thumb)}`
-          : null;
-        
-        return (
-          <div key={media.id} className="border rounded-lg overflow-hidden hover:shadow-md transition-shadow cursor-pointer">
-            <div className="aspect-video bg-gray-100 relative">
-              {proxyUrl ? (
-                <img 
-                  src={proxyUrl}
-                  alt={`Media ${media.id}`}
-                  className="w-full h-full object-cover"
-                  onError={(e) => {
-                    e.target.style.display = 'none';
-                    e.target.nextSibling.style.display = 'flex';
-                  }}
-                />
-              ) : null}
-              <div 
-                className="flex items-center justify-center h-full text-gray-400 text-4xl"
-                style={{ display: proxyUrl ? 'none' : 'flex' }}
-              >
-                {media.type === 'video' ? '🎥' : media.type === 'audio' ? '🎵' : '📷'}
-              </div>
-            </div>
-            <div className="p-2">
-              <p className="text-xs text-gray-600 truncate">
-                {media.type === 'video' ? '🎥' : media.type === 'audio' ? '🎵' : '📷'} 
-                {' '}
-                {media.type} • {media.likesCount || 0} ❤️
-              </p>
+      {medias.map(media => (
+        <div 
+          key={media.id} 
+          onClick={() => onMediaClick(media)}
+          className="border rounded-lg overflow-hidden hover:shadow-lg transition-all cursor-pointer hover:scale-105"
+        >
+          <div className="aspect-video bg-gray-100 relative flex items-center justify-center">
+            <div className="text-6xl">
+              {media.type === 'video' ? '🎥' : media.type === 'audio' ? '🎵' : '📷'}
             </div>
           </div>
-        );
-      })}
+          <div className="p-2">
+            <p className="text-xs text-gray-600 truncate">
+              {media.type === 'video' ? '🎥' : media.type === 'audio' ? '🎵' : '📷'} 
+              {' '}
+              {media.type} • {media.likesCount || 0} ❤️
+            </p>
+          </div>
+        </div>
+      ))}
     </div>
   )
 }
