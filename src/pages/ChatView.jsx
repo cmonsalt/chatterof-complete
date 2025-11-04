@@ -394,8 +394,8 @@ export default function ChatView() {
                       <p className="text-sm whitespace-pre-wrap">{msg.message}</p>
                     )}
                     
-                    {/* 🔥 MOSTRAR TIP/PPV/PPV LOCKED SOLO SI TIENE AMOUNT */}
-                    {msg.amount && msg.amount > 0 && (
+                    {/* 🔥 MOSTRAR TIP/PPV/PPV LOCKED SOLO SI TIENE AMOUNT REAL (no "0" ni 0) */}
+                    {msg.amount && parseFloat(msg.amount) > 0 && (
                       <div className={`mt-2 px-2 py-1 rounded text-xs font-bold ${
                         msg.message_type === 'tip' ? 'bg-green-100 text-green-700' :
                         msg.message_type === 'ppv_unlocked' ? 'bg-blue-100 text-blue-700' :
