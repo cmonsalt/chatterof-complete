@@ -157,9 +157,12 @@ export default function VaultTab({ modelId }) {
         if (listsData.success && listsData.lists) {
           console.log('✅ Vault lists loaded:', listsData.lists.length);
           setVaultLists(listsData.lists);
+        } else {
+          setVaultLists([]);
         }
       } catch (err) {
         console.log('⚠️ Error loading vault lists:', err);
+        setVaultLists([]);
       }
 
     } catch (error) {
