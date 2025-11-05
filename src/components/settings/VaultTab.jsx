@@ -741,7 +741,7 @@ function SinglesView({
   )
 }
 
-// Vault Media Grid
+// Vault Media Grid  
 function VaultMediaGrid({ medias, loading, onMediaClick }) {
   if (loading) {
     return <div className="text-center py-12">Loading vault...</div>
@@ -756,37 +756,40 @@ function VaultMediaGrid({ medias, loading, onMediaClick }) {
   }
 
   return (
-    <div className="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
-      {medias.map(media => {
-        return (
-          <div 
-            key={media.id} 
-            onClick={() => onMediaClick && onMediaClick(media)}
-            className="border rounded-lg overflow-hidden hover:shadow-lg hover:border-purple-500 transition-all cursor-pointer group"
-          >
-            <div className="aspect-square bg-gray-100 relative flex items-center justify-center overflow-hidden">
-              <div className="text-4xl">
-                {media.type === 'video' ? '🎥' : media.type === 'audio' ? '🎵' : '📷'}
-              </div>
-              
-              {/* Overlay on hover */}
-              <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-40 transition-all flex items-center justify-center">
-                <span className="text-white opacity-0 group-hover:opacity-100 text-sm font-medium">
-                  Click to assign
-                </span>
-              </div>
-            </div>
-            
-            <div className="p-1.5 bg-white">
-              <p className="text-[10px] text-gray-600 truncate flex items-center gap-1">
-                <span>{media.type === 'video' ? '🎥' : media.type === 'audio' ? '🎵' : '📷'}</span>
-                <span>❤️ {media.likesCount || 0}</span>
-                {media.duration > 0 && <span>⏱️ {media.duration}s</span>}
-              </p>
+    <div className="grid grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-2">
+      {medias.map(media => (
+        <div 
+          key={media.id} 
+          onClick={() => onMediaClick && onMediaClick(media)}
+          className="border rounded overflow-hidden hover:shadow-lg hover:border-purple-500 transition-all cursor-pointer"
+        >
+          <div className="aspect-square bg-gray-100 relative flex items-center justify-center overflow-hidden">
+            {media.thumb ? (
+              <img 
+                src={media.thumb}
+                alt={`Media ${media.id}`}
+                className="w-full h-full object-cover"
+                onError={(e) => {
+                  e.target.style.display = 'none'
+                  e.target.nextSibling.style.display = 'flex'
+                }}
+              />
+            ) : null}
+            <div 
+              className="text-3xl"
+              style={{ display: media.thumb ? 'none' : 'flex' }}
+            >
+              {media.type === 'video' ? '🎥' : media.type === 'audio' ? '🎵' : '📷'}
             </div>
           </div>
-        )
-      })}
+          
+          <div className="p-1 bg-white">
+            <p className="text-[9px] text-gray-600 truncate text-center">
+              {media.likesCount || 0}❤️
+            </p>
+          </div>
+        </div>
+      ))}
     </div>
   )
 }
