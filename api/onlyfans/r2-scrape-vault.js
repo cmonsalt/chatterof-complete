@@ -42,25 +42,48 @@ export default async function handler(req, res) {
 
     console.log(`📥 Starting vault scrape for model ${modelId}...`)
 
-    // Get vault media from OnlyFans
-    const vaultResponse = await fetch(
-      `https://app.onlyfansapi.com/api/${model.of_account_id}/media/vault`,
-      {
-        headers: { 
-          'Authorization': `Bearer ${API_KEY}`,
-          'Content-Type': 'application/json'
-        }
-      }
-    )
+    // Get ALL vault media with pagination
+    let allMedias = []
+    let offset = 0
+    const limit = 50
+    let hasMore = true
 
-    if (!vaultResponse.ok) {
-      throw new Error(`Vault API error: ${vaultResponse.status}`)
+    while (hasMore) {
+      const vaultResponse = await fetch(
+        `https://app.onlyfansapi.com/api/${model.of_account_id}/media/vault?limit=${limit}&offset=${offset}`,
+        {
+          headers: { 
+            'Authorization': `Bearer ${API_KEY}`,
+            'Content-Type': 'application/json'
+          }
+        }
+      )
+
+      if (!vaultResponse.ok) {
+        throw new Error(`Vault API error: ${vaultResponse.status}`)
+      }
+
+      const vaultData = await vaultResponse.json()
+      const medias = vaultData.data?.list || []
+      
+      console.log(`📦 Fetched ${medias.length} medias at offset ${offset}`)
+
+      if (medias.length === 0) {
+        break
+      }
+
+      allMedias = allMedias.concat(medias)
+      hasMore = vaultData.data?.hasMore || false
+      
+      if (!hasMore || medias.length < limit) {
+        break
+      }
+      
+      offset += limit
     }
 
-    const vaultData = await vaultResponse.json()
-    const medias = vaultData.data?.list || []
-
-    console.log(`📦 Found ${medias.length} media items in vault`)
+    console.log(`📦 Total media items in vault: ${allMedias.length}`)
+    const medias = allMedias
 
     let scrapedCount = 0
     let errorCount = 0
@@ -68,6 +91,28 @@ export default async function handler(req, res) {
     // Scrape cada media
     for (const media of medias) {
       try {
+        // Get file info
+        const fileType = media.type || 'photo'
+        const extension = fileType === 'video' ? 'mp4' : 'jpg'
+        const fileName = `${media.id}.${extension}`
+        const r2Path = `model_${modelId}/scraped/${fileName}`
+
+        // Check if already exists in R2
+        try {
+          const { HeadObjectCommand } = require('@aws-sdk/client-s3')
+          const headCommand = new HeadObjectCommand({
+            Bucket: process.env.R2_BUCKET_NAME,
+            Key: r2Path
+          })
+          await s3Client.send(headCommand)
+          
+          console.log(`⏭️ Skip ${media.id} (already exists)`)
+          scrapedCount++ // Count as scraped
+          continue
+        } catch (err) {
+          // File doesn't exist, proceed with download
+        }
+
         // Scrape media URL
         const scrapeResponse = await fetch(
           `https://app.onlyfansapi.com/api/${model.of_account_id}/media/scrape`,
@@ -102,13 +147,7 @@ export default async function handler(req, res) {
         const mediaResponse = await fetch(temporaryUrl)
         const mediaBuffer = await mediaResponse.arrayBuffer()
 
-        // Get file extension
-        const fileType = media.type || 'photo'
-        const extension = fileType === 'video' ? 'mp4' : 'jpg'
-        const fileName = `${media.id}.${extension}`
-
         // Upload to R2
-        const r2Path = `model_${modelId}/scraped/${fileName}`
 
         const command = new PutObjectCommand({
           Bucket: process.env.R2_BUCKET_NAME,
