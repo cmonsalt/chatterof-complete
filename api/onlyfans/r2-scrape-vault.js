@@ -127,6 +127,7 @@ export default async function handler(req, res) {
 
       } catch (error) {
         console.error(`❌ Error scraping media ${media.id}:`, error.message)
+        console.error(`   Full error:`, error)
         errorCount++
       }
     }
