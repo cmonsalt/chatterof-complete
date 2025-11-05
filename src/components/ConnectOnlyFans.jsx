@@ -45,7 +45,13 @@ export default function ConnectOnlyFans({ modelId, onSuccess }) {
         setAttemptId(data.attempt_id)
         setStep('polling')
         pollAuthStatus(data.attempt_id)
+      } else if (data.state === 'authenticated' && data.account?.id) {
+        // Already authenticated
+        setAccountId(data.account.id)
+        await saveAccountId(data.account.id)
+        setLoading(false)
       } else if (data.account_id) {
+        // Old format
         setAccountId(data.account_id)
         await saveAccountId(data.account_id)
         setLoading(false)
@@ -85,8 +91,17 @@ export default function ConnectOnlyFans({ modelId, onSuccess }) {
       }
 
       // Check if completed successfully
+      if (data.state === 'authenticated' && data.account?.id) {
+        console.log('Authentication completed:', data.account.id)
+        setAccountId(data.account.id)
+        await saveAccountId(data.account.id)
+        setLoading(false)
+        return
+      }
+      
+      // Also check old format (backward compatibility)
       if (data.completed && data.account_id) {
-        console.log('Authentication completed:', data.account_id)
+        console.log('Authentication completed (old format):', data.account_id)
         setAccountId(data.account_id)
         await saveAccountId(data.account_id)
         setLoading(false)
