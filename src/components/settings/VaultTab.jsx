@@ -697,7 +697,8 @@ export default function VaultTab({ modelId }) {
             setSelectingForPart(null)
           }}
           partTitle={selectingForPart?.title}
-          currentMediaId={selectingForPart?.of_media_ids?.[0]}
+          currentMediaIds={selectingForPart?.of_media_ids || []}
+          isSingle={selectingForPart?.parent_type === 'single'}
           allParts={selectingForPart?.parent_type === 'session' 
             ? sessions.find(s => s.session_id === selectingForPart.session_id)?.parts 
             : []
@@ -1036,7 +1037,7 @@ function VaultMediaGrid({ medias, loading, onMediaClick }) {
 }
 
 // Media Selector Modal
-function MediaSelectorModal({ medias, onSelect, onClose, partTitle, currentMediaId, allParts = [], currentPartId }) {
+function MediaSelectorModal({ medias, onSelect, onClose, partTitle, currentMediaIds = [], isSingle = false, allParts = [], currentPartId }) {
   const [selectedMedias, setSelectedMedias] = useState([])
   const [previewingMedia, setPreviewingMedia] = useState(null)
   const [previewUrl, setPreviewUrl] = useState(null)
@@ -1048,16 +1049,18 @@ function MediaSelectorModal({ medias, onSelect, onClose, partTitle, currentMedia
     .flatMap(p => p.of_media_ids || [])
     .map(id => id.toString())
 
-  // Auto-select current media on mount
+  // Auto-select current medias on mount
   useEffect(() => {
-    if (currentMediaId) {
-      const currentMedia = medias.find(m => m.id.toString() === currentMediaId.toString())
-      if (currentMedia) {
-        setSelectedMedias([currentMedia])
-        loadPreview(currentMedia)
+    if (currentMediaIds.length > 0) {
+      const currentMediasToSelect = medias.filter(m => 
+        currentMediaIds.some(id => m.id.toString() === id.toString())
+      )
+      if (currentMediasToSelect.length > 0) {
+        setSelectedMedias(currentMediasToSelect)
+        loadPreview(currentMediasToSelect[0])
       }
     }
-  }, [currentMediaId])
+  }, [currentMediaIds.join(',')])
 
   const toggleMediaSelection = (media) => {
     setSelectedMedias(prev => {
@@ -1065,6 +1068,10 @@ function MediaSelectorModal({ medias, onSelect, onClose, partTitle, currentMedia
       if (isSelected) {
         return prev.filter(m => m.id !== media.id)
       } else {
+        // Si es Single, solo permite 1
+        if (isSingle) {
+          return [media]
+        }
         return [...prev, media]
       }
     })
@@ -1088,15 +1095,22 @@ function MediaSelectorModal({ medias, onSelect, onClose, partTitle, currentMedia
         .single()
 
       if (!model?.of_account_id) {
-        throw new Error('No OF account')
+        console.error('No OF account')
+        setLoadingPreview(false)
+        return
       }
 
-      // Use media ID for scraping
+      // Just pass the media ID - API accepts it
+      console.log('Scraping media ID:', media.id)
       const response = await fetch(`/api/onlyfans/scrape-media?accountId=${model.of_account_id}&mediaId=${media.id}`)
       const data = await response.json()
 
-      if (data.success) {
+      console.log('Scrape response:', data)
+
+      if (data.success && data.temporary_url) {
         setPreviewUrl(data.temporary_url)
+      } else {
+        console.error('No temporary_url in response:', data)
       }
     } catch (error) {
       console.error('Preview error:', error)
