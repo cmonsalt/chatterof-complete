@@ -697,6 +697,12 @@ export default function VaultTab({ modelId }) {
             setSelectingForPart(null)
           }}
           partTitle={selectingForPart?.title}
+          currentMediaId={selectingForPart?.of_media_ids?.[0]}
+          allParts={selectingForPart?.parent_type === 'session' 
+            ? sessions.find(s => s.session_id === selectingForPart.session_id)?.parts 
+            : []
+          }
+          currentPartId={selectingForPart?.id}
         />
       )}
 
@@ -803,33 +809,45 @@ function SessionsView({
             <div className="p-4 space-y-3">
               {session.parts.map(part => {
                 const hasMedia = part.of_media_ids && part.of_media_ids.length > 0
+                const mediaId = hasMedia ? part.of_media_ids[0] : null
+                const thumbnail = hasMedia && part.media_thumbnails ? part.media_thumbnails[mediaId] : null
                 
                 return (
-                  <div key={part.id} className="border p-4 rounded-lg">
-                    <div className="flex justify-between items-start">
-                      <div className="flex-1">
-                        <h4 className="font-medium">{part.title || `Part ${part.step_number}`}</h4>
+                  <div key={part.id} className="border p-3 rounded-lg">
+                    <div className="flex gap-3 items-start">
+                      {/* Thumbnail */}
+                      {hasMedia && (
+                        <div className="w-16 h-16 bg-gray-100 rounded flex-shrink-0 flex items-center justify-center overflow-hidden">
+                          {thumbnail ? (
+                            <img src={thumbnail} alt="" className="w-full h-full object-cover" />
+                          ) : (
+                            <span className="text-2xl">{part.file_type === 'video' ? '🎥' : '📷'}</span>
+                          )}
+                        </div>
+                      )}
+                      
+                      <div className="flex-1 min-w-0">
+                        <h4 className="font-medium text-sm">{part.title || `Part ${part.step_number}`}</h4>
                         {hasMedia ? (
-                          <p className="text-xs text-green-600 mt-1 flex items-center gap-1">
-                            ✓ Media assigned
-                          </p>
+                          <p className="text-xs text-green-600 mt-1">✓ {part.file_type || 'Media'} assigned</p>
                         ) : (
                           <p className="text-xs text-gray-500 mt-1">No media assigned</p>
                         )}
                       </div>
-                      <div className="flex gap-2">
+                      
+                      <div className="flex gap-2 flex-shrink-0">
                         {hasMedia ? (
                           <>
                             <button
                               onClick={() => openMediaSelectorForPart(part)}
-                              className="px-3 py-1 text-sm bg-blue-50 text-blue-600 rounded hover:bg-blue-100"
+                              className="px-2 py-1 text-xs bg-blue-50 text-blue-600 rounded hover:bg-blue-100"
                               disabled={saving}
                             >
                               Change
                             </button>
                             <button
                               onClick={() => handleRemoveMediaFromPart(part)}
-                              className="px-3 py-1 text-sm bg-red-50 text-red-600 rounded hover:bg-red-100"
+                              className="px-2 py-1 text-xs bg-red-50 text-red-600 rounded hover:bg-red-100"
                               disabled={saving}
                             >
                               Remove
@@ -841,7 +859,7 @@ function SessionsView({
                             className="px-3 py-1 text-sm bg-purple-50 text-purple-600 rounded hover:bg-purple-100"
                             disabled={saving}
                           >
-                            + Assign Media
+                            + Assign
                           </button>
                         )}
                       </div>
@@ -881,6 +899,8 @@ function SinglesView({
       {singles.map(single => {
         const nivelLabel = getNivelLabel(single.nivel)
         const hasMedia = single.of_media_ids && single.of_media_ids.length > 0
+        const mediaId = hasMedia ? single.of_media_ids[0] : null
+        const thumbnail = hasMedia && single.media_thumbnails ? single.media_thumbnails[mediaId] : null
         
         return (
           <div key={single.id} className="border border-gray-200 rounded-lg p-4">
@@ -895,6 +915,13 @@ function SinglesView({
               </button>
             </div>
 
+            {/* Thumbnail preview */}
+            {hasMedia && thumbnail && (
+              <div className="mb-3">
+                <img src={thumbnail} alt="" className="w-full h-32 object-cover rounded" />
+              </div>
+            )}
+
             {single.description && (
               <p className="text-sm text-gray-600 mb-3">{single.description}</p>
             )}
@@ -904,7 +931,7 @@ function SinglesView({
                 {nivelLabel.text}
               </span>
               <span className="text-xs text-gray-500">Nivel {single.nivel}</span>
-              {hasMedia && <span className="text-xs text-green-600">✓ Media</span>}
+              {hasMedia && <span className="text-xs text-green-600">✓ {single.file_type || 'Media'}</span>}
             </div>
 
             {/* Pricing Tiers */}
@@ -1009,11 +1036,58 @@ function VaultMediaGrid({ medias, loading, onMediaClick }) {
 }
 
 // Media Selector Modal
-function MediaSelectorModal({ medias, onSelect, onClose, partTitle }) {
+function MediaSelectorModal({ medias, onSelect, onClose, partTitle, currentMediaId, allParts = [], currentPartId }) {
   const [selectedMedia, setSelectedMedia] = useState(null)
+  const [previewUrl, setPreviewUrl] = useState(null)
+  const [loadingPreview, setLoadingPreview] = useState(false)
 
-  const handleMediaClick = (media) => {
+  // Get media IDs already used in other parts
+  const usedMediaIds = allParts
+    .filter(p => p.id !== currentPartId)
+    .flatMap(p => p.of_media_ids || [])
+    .map(id => id.toString())
+
+  // Auto-select current media on mount
+  useEffect(() => {
+    if (currentMediaId) {
+      const currentMedia = medias.find(m => m.id.toString() === currentMediaId.toString())
+      if (currentMedia) {
+        handleMediaClick(currentMedia)
+      }
+    }
+  }, [currentMediaId])
+
+  const handleMediaClick = async (media) => {
     setSelectedMedia(media)
+    setLoadingPreview(true)
+    setPreviewUrl(null)
+
+    try {
+      // Get model's OF account for scraping
+      const modelId = window.location.pathname.split('/').pop()
+      const { data: model } = await supabase
+        .from('models')
+        .select('of_account_id')
+        .eq('model_id', modelId)
+        .single()
+
+      if (!model?.of_account_id) {
+        throw new Error('No OF account')
+      }
+
+      // Scrape preview
+      const urlToScrape = media.type === 'video' ? (media.preview || media.thumb) : (media.full || media.preview || media.thumb)
+      const response = await fetch(`/api/onlyfans/scrape-media?accountId=${model.of_account_id}&mediaId=${encodeURIComponent(urlToScrape)}`)
+      const data = await response.json()
+
+      if (data.success) {
+        setPreviewUrl(data.temporary_url)
+      }
+    } catch (error) {
+      console.error('Preview error:', error)
+    } finally {
+      setLoadingPreview(false)
+    }
   }
 
   const handleConfirmAssign = () => {
@@ -1026,87 +1100,86 @@ function MediaSelectorModal({ medias, onSelect, onClose, partTitle }) {
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-lg max-w-6xl w-full max-h-[85vh] overflow-hidden flex flex-col">
-        <div className="p-6 border-b flex items-center justify-between">
-          <h3 className="text-xl font-bold">Select Media for: {partTitle}</h3>
-          <button
-            onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 text-2xl"
-          >
-            ×
-          </button>
+        <div className="p-4 border-b flex items-center justify-between">
+          <h3 className="text-lg font-bold">Select Media for: {partTitle}</h3>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-2xl">×</button>
         </div>
         
         <div className="flex-1 overflow-hidden flex">
           {/* Grid de medias */}
-          <div className="flex-1 p-6 overflow-y-auto">
-            <div className="grid grid-cols-4 md:grid-cols-5 gap-3">
-              {medias.map(media => (
-                <div
-                  key={media.id}
-                  onClick={() => handleMediaClick(media)}
-                  className={`border rounded-lg overflow-hidden hover:shadow-lg transition-all cursor-pointer ${
-                    selectedMedia?.id === media.id ? 'border-purple-500 border-2' : 'border-gray-200'
-                  }`}
-                >
-                  <div className="aspect-square bg-gray-100 relative flex items-center justify-center">
-                    {media.thumb ? (
-                      <img 
-                        src={media.thumb}
-                        alt={`Media ${media.id}`}
-                        className="w-full h-full object-cover"
-                      />
-                    ) : (
-                      <div className="text-3xl">
-                        {media.type === 'video' ? '🎥' : media.type === 'audio' ? '🎵' : '📷'}
-                      </div>
-                    )}
-                    {selectedMedia?.id === media.id && (
-                      <div className="absolute inset-0 bg-purple-500 bg-opacity-20 flex items-center justify-center">
-                        <span className="text-white text-2xl">✓</span>
-                      </div>
-                    )}
+          <div className="flex-1 p-4 overflow-y-auto">
+            <div className="grid grid-cols-5 md:grid-cols-6 gap-2">
+              {medias.map(media => {
+                const isUsed = usedMediaIds.includes(media.id.toString())
+                const isDisabled = isUsed
+                
+                return (
+                  <div
+                    key={media.id}
+                    onClick={() => !isDisabled && handleMediaClick(media)}
+                    className={`border rounded overflow-hidden transition-all ${
+                      isDisabled 
+                        ? 'opacity-50 cursor-not-allowed' 
+                        : 'hover:shadow-lg cursor-pointer'
+                    } ${
+                      selectedMedia?.id === media.id ? 'border-purple-500 ring-2 ring-purple-500' : 'border-gray-200'
+                    }`}
+                  >
+                    <div className="aspect-square bg-gray-100 relative flex items-center justify-center">
+                      {media.thumb ? (
+                        <img src={media.thumb} alt="" className="w-full h-full object-cover" />
+                      ) : (
+                        <div className="text-2xl">{media.type === 'video' ? '🎥' : '📷'}</div>
+                      )}
+                      {selectedMedia?.id === media.id && !isDisabled && (
+                        <div className="absolute inset-0 bg-purple-500 bg-opacity-30 flex items-center justify-center">
+                          <span className="text-white text-2xl font-bold">✓</span>
+                        </div>
+                      )}
+                      {isUsed && (
+                        <div className="absolute inset-0 bg-red-500 bg-opacity-40 flex items-center justify-center">
+                          <span className="text-white text-xs font-bold">USED</span>
+                        </div>
+                      )}
+                    </div>
+                    <div className="p-1 bg-white">
+                      <p className="text-[8px] text-gray-600 text-center">{media.type === 'video' ? '🎥' : '📷'}</p>
+                    </div>
                   </div>
-                  
-                  <div className="p-1 bg-white">
-                    <p className="text-[9px] text-gray-600 truncate text-center">
-                      {media.type === 'video' ? '🎥' : '📷'} {media.likesCount || 0}❤️
-                    </p>
-                  </div>
-                </div>
-              ))}
+                )
+              })}
             </div>
           </div>
 
           {/* Preview panel */}
           {selectedMedia && (
-            <div className="w-96 border-l p-6 overflow-y-auto bg-gray-50">
-              <h4 className="font-semibold mb-3">Preview</h4>
-              <div className="aspect-video bg-gray-200 rounded-lg flex items-center justify-center mb-4">
-                {selectedMedia.thumb ? (
-                  <img 
-                    src={selectedMedia.thumb}
-                    alt="Preview"
-                    className="w-full h-full object-contain"
-                  />
-                ) : (
-                  <div className="text-6xl">
-                    {selectedMedia.type === 'video' ? '🎥' : selectedMedia.type === 'audio' ? '🎵' : '📷'}
+            <div className="w-80 border-l p-4 overflow-y-auto bg-gray-50">
+              <h4 className="font-semibold mb-2 text-sm">Preview</h4>
+              <div className="aspect-video bg-gray-200 rounded mb-3 flex items-center justify-center overflow-hidden">
+                {loadingPreview ? (
+                  <div className="text-center">
+                    <div className="animate-spin text-2xl mb-1">⏳</div>
+                    <p className="text-xs text-gray-600">Loading...</p>
                   </div>
+                ) : previewUrl ? (
+                  <img src={previewUrl} alt="Preview" className="w-full h-full object-contain" />
+                ) : (
+                  <div className="text-4xl">{selectedMedia.type === 'video' ? '🎥' : '📷'}</div>
                 )}
               </div>
-              <div className="space-y-2 text-sm">
-                <div>
+              <div className="space-y-1 text-xs">
+                <div className="flex justify-between">
                   <span className="text-gray-600">Type:</span>
-                  <span className="ml-2 font-medium">{selectedMedia.type}</span>
+                  <span className="font-medium">{selectedMedia.type}</span>
                 </div>
-                <div>
+                <div className="flex justify-between">
                   <span className="text-gray-600">Likes:</span>
-                  <span className="ml-2 font-medium">❤️ {selectedMedia.likesCount || 0}</span>
+                  <span className="font-medium">❤️ {selectedMedia.likesCount || 0}</span>
                 </div>
-                {selectedMedia.duration && (
-                  <div>
+                {selectedMedia.duration > 0 && (
+                  <div className="flex justify-between">
                     <span className="text-gray-600">Duration:</span>
-                    <span className="ml-2 font-medium">{selectedMedia.duration}s</span>
+                    <span className="font-medium">{selectedMedia.duration}s</span>
                   </div>
                 )}
               </div>
@@ -1114,17 +1187,14 @@ function MediaSelectorModal({ medias, onSelect, onClose, partTitle }) {
           )}
         </div>
 
-        <div className="p-4 border-t flex justify-between">
-          <button
-            onClick={onClose}
-            className="px-6 py-2 bg-gray-200 rounded-lg hover:bg-gray-300"
-          >
+        <div className="p-3 border-t flex justify-between">
+          <button onClick={onClose} className="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300 text-sm">
             Cancel
           </button>
           <button
             onClick={handleConfirmAssign}
             disabled={!selectedMedia}
-            className="px-6 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="px-6 py-2 bg-purple-600 text-white rounded hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium"
           >
             Assign to {partTitle}
           </button>
