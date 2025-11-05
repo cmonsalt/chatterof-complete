@@ -12,6 +12,7 @@ export default function Settings() {
   const [activeTab, setActiveTab] = useState('connect')
   const [isConnected, setIsConnected] = useState(false)
   const [accountId, setAccountId] = useState(null)
+  const [connectionStatus, setConnectionStatus] = useState('connected')
   const [checkingConnection, setCheckingConnection] = useState(true)
 
   useEffect(() => {
@@ -24,13 +25,14 @@ export default function Settings() {
     try {
       const { data } = await supabase
         .from('models')
-        .select('of_account_id')
+        .select('of_account_id, connection_status')
         .eq('model_id', modelId)
         .single()
       
       if (data?.of_account_id) {
         setIsConnected(true)
         setAccountId(data.of_account_id)
+        setConnectionStatus(data.connection_status || 'connected')
       }
     } catch (error) {
       console.log('No OF connection')
@@ -45,14 +47,24 @@ export default function Settings() {
     try {
       await supabase
         .from('models')
-        .update({ of_account_id: null })
+        .update({ 
+          of_account_id: null,
+          connection_status: 'disconnected'
+        })
         .eq('model_id', modelId)
       
       setIsConnected(false)
       setAccountId(null)
+      setConnectionStatus('disconnected')
     } catch (error) {
       console.error('Error disconnecting:', error)
     }
+  }
+
+  const handleReconnect = () => {
+    // Reset state to show connection form
+    setIsConnected(false)
+    setConnectionStatus('disconnected')
   }
 
   return (
@@ -107,7 +119,7 @@ export default function Settings() {
                   <div className="flex items-center justify-center py-12">
                     <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
                   </div>
-                ) : isConnected ? (
+                ) : isConnected && connectionStatus === 'connected' ? (
                   <div>
                     <h2 className="text-2xl font-bold text-gray-900 mb-6">🔗 OnlyFans Connection</h2>
                     <div className="flex items-center gap-4">
@@ -127,12 +139,33 @@ export default function Settings() {
                       </button>
                     </div>
                   </div>
+                ) : isConnected && connectionStatus === 'disconnected' ? (
+                  <div>
+                    <h2 className="text-2xl font-bold text-gray-900 mb-6">🔗 OnlyFans Connection</h2>
+                    <div className="flex items-center gap-4">
+                      <div className="flex-1 bg-red-50 border-2 border-red-500 rounded-lg p-6">
+                        <p className="text-lg font-semibold text-red-900 mb-2">
+                          ❌ Connection Lost
+                        </p>
+                        <p className="text-sm text-red-700">
+                          Your OnlyFans account needs re-authorization. This usually happens when you change your password.
+                        </p>
+                      </div>
+                      <button 
+                        onClick={handleReconnect}
+                        className="px-6 py-3 bg-indigo-600 text-white rounded-lg font-semibold hover:bg-indigo-700 transition-colors"
+                      >
+                        Reconnect
+                      </button>
+                    </div>
+                  </div>
                 ) : (
                   <ConnectOnlyFans 
                     modelId={modelId}
                     onSuccess={(accId) => {
                       setIsConnected(true)
                       setAccountId(accId)
+                      setConnectionStatus('connected')
                     }}
                   />
                 )

@@ -1,10 +1,9 @@
 // src/components/ConnectOnlyFans.jsx
 import { useState } from 'react'
 import { supabase } from '../lib/supabase'
-import SetupProgress from './SetupProgress'
 
 export default function ConnectOnlyFans({ modelId, onSuccess }) {
-  const [step, setStep] = useState('email') // email, polling, twofa, setup, success
+  const [step, setStep] = useState('email') // email, polling, twofa, success
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
   const [attemptId, setAttemptId] = useState(null)
@@ -43,13 +42,18 @@ export default function ConnectOnlyFans({ modelId, onSuccess }) {
         throw new Error(data.message || 'Authentication failed')
       }
 
+      console.log('Auth response:', data)
+
+      // Verificar qué devuelve la API
       if (data.attempt_id) {
         setAttemptId(data.attempt_id)
         setStep('polling')
         pollAuthStatus(data.attempt_id)
       } else if (data.account_id) {
+        // Si devuelve account_id directamente
         setAccountId(data.account_id)
         await saveAccountId(data.account_id)
+        setStep('success')
         setLoading(false)
       } else {
         throw new Error('No attempt_id or account_id in response')
@@ -72,6 +76,8 @@ export default function ConnectOnlyFans({ modelId, onSuccess }) {
       })
 
       const data = await response.json()
+      
+      console.log('Poll status:', data)
 
       if (data.twoFactorPending) {
         setStep('twofa')
@@ -82,11 +88,13 @@ export default function ConnectOnlyFans({ modelId, onSuccess }) {
       if (data.completed && data.account_id) {
         setAccountId(data.account_id)
         await saveAccountId(data.account_id)
+        setStep('success')
         setLoading(false)
         return
       }
 
       if (data.status === 'pending' || data.status === 'authenticating') {
+        // Continue polling
         setTimeout(() => pollAuthStatus(id), 2000)
         return
       }
@@ -95,6 +103,7 @@ export default function ConnectOnlyFans({ modelId, onSuccess }) {
         throw new Error(data.error)
       }
 
+      // Si no hay error pero tampoco está completado, seguir esperando
       setTimeout(() => pollAuthStatus(id), 2000)
 
     } catch (err) {
@@ -128,6 +137,7 @@ export default function ConnectOnlyFans({ modelId, onSuccess }) {
         throw new Error(data.message || 'Invalid 2FA code')
       }
 
+      // Resume polling
       setStep('polling')
       pollAuthStatus(attemptId)
 
@@ -137,34 +147,25 @@ export default function ConnectOnlyFans({ modelId, onSuccess }) {
     }
   }
 
-  // Step 4: Save account_id and trigger setup
+  // Step 4: Save account_id to database
   const saveAccountId = async (accId) => {
     try {
       const { error } = await supabase
         .from('models')
-        .update({ 
-          of_account_id: accId,
-          connection_status: 'connected'
-        })
+        .update({ of_account_id: accId })
         .eq('model_id', modelId)
 
       if (error) throw error
 
-      setAccountId(accId)
-      setStep('setup')
+      if (onSuccess) onSuccess(accId)
 
     } catch (err) {
       setError('Error saving connection: ' + err.message)
     }
   }
 
-  const handleSetupComplete = () => {
-    setStep('success')
-    if (onSuccess) onSuccess(accountId)
-  }
-
   return (
-    <div style={{ maxWidth: '800px' }}>
+    <div style={{ maxWidth: '500px' }}>
       {error && (
         <div style={{
           padding: '1rem',
@@ -312,24 +313,15 @@ export default function ConnectOnlyFans({ modelId, onSuccess }) {
         </form>
       )}
 
-      {/* Step 4: Setup Progress */}
-      {step === 'setup' && (
-        <SetupProgress 
-          modelId={modelId}
-          accountId={accountId}
-          onComplete={handleSetupComplete}
-        />
-      )}
-
-      {/* Step 5: Success */}
+      {/* Step 4: Success */}
       {step === 'success' && (
         <div style={{ textAlign: 'center', padding: '2rem' }}>
           <div style={{ fontSize: '4rem', marginBottom: '1rem' }}>✅</div>
           <h3 style={{ fontSize: '1.5rem', fontWeight: 600, marginBottom: '0.5rem' }}>
-            Setup Complete!
+            Connected Successfully!
           </h3>
           <p style={{ fontSize: '0.875rem', color: '#6b7280' }}>
-            Your account is ready to use
+            Account ID: {accountId}
           </p>
         </div>
       )}
