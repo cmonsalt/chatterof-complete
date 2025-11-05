@@ -13,6 +13,7 @@ export default function VaultTab({ modelId }) {
   
   // 🎬 OnlyFans Vault Media
   const [vaultMedias, setVaultMedias] = useState([])
+  const [vaultLists, setVaultLists] = useState([])  // Carpetas/categorías de OF
   const [loadingVault, setLoadingVault] = useState(false)
   const [vaultCache, setVaultCache] = useState(null)
   const [vaultCacheTime, setVaultCacheTime] = useState(null)
@@ -28,7 +29,7 @@ export default function VaultTab({ modelId }) {
   // UI State
   const [expandedSessions, setExpandedSessions] = useState([])
   const [activeTab, setActiveTab] = useState('sessions')
-  const [vaultFilter, setVaultFilter] = useState({ type: '', sortBy: 'newest' })
+  const [vaultFilter, setVaultFilter] = useState({ type: '', sortBy: 'newest', listId: '' })
   
   // Modals
   const [showNewSessionModal, setShowNewSessionModal] = useState(false)
@@ -147,6 +148,19 @@ export default function VaultTab({ modelId }) {
       setVaultMedias(medias);
       setVaultCache(medias);
       setVaultCacheTime(Date.now());
+
+      // 📁 Load Vault Lists (carpetas)
+      try {
+        const listsResponse = await fetch(`/api/onlyfans/get-vault-lists?accountId=${model.of_account_id}`);
+        const listsData = await listsResponse.json();
+        
+        if (listsData.success && listsData.lists) {
+          console.log('✅ Vault lists loaded:', listsData.lists.length);
+          setVaultLists(listsData.lists);
+        }
+      } catch (err) {
+        console.log('⚠️ Error loading vault lists:', err);
+      }
 
     } catch (error) {
       console.error('Error loading OnlyFans vault:', error);
@@ -568,6 +582,19 @@ export default function VaultTab({ modelId }) {
             
             <select
               className="px-3 py-1 border rounded text-sm"
+              onChange={(e) => setVaultFilter({ ...vaultFilter, listId: e.target.value })}
+              value={vaultFilter.listId}
+            >
+              <option value="">All Folders</option>
+              {vaultLists.map(list => (
+                <option key={list.id} value={list.id}>
+                  📁 {list.name} ({list.count || 0})
+                </option>
+              ))}
+            </select>
+            
+            <select
+              className="px-3 py-1 border rounded text-sm"
               onChange={(e) => setVaultFilter({ ...vaultFilter, sortBy: e.target.value })}
               value={vaultFilter.sortBy}
             >
@@ -606,6 +633,7 @@ export default function VaultTab({ modelId }) {
         <VaultMediaGrid
           medias={vaultMedias
             .filter(m => !vaultFilter.type || m.type === vaultFilter.type)
+            .filter(m => !vaultFilter.listId || (m.lists && m.lists.includes(parseInt(vaultFilter.listId))))
             .sort((a, b) => {
               if (vaultFilter.sortBy === 'newest') return new Date(b.createdAt) - new Date(a.createdAt)
               if (vaultFilter.sortBy === 'oldest') return new Date(a.createdAt) - new Date(b.createdAt)
