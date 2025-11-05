@@ -58,7 +58,7 @@ export default async function handler(req, res) {
     }
 
     const vaultData = await vaultResponse.json()
-    const medias = vaultData.list || []
+    const medias = vaultData.data?.list || []
 
     console.log(`📦 Found ${medias.length} media items in vault`)
 
