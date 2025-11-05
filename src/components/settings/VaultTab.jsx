@@ -699,6 +699,7 @@ export default function VaultTab({ modelId }) {
       {showMediaSelector && (
         <MediaSelectorModal
           medias={vaultMedias}
+          modelId={modelId}
           onSelect={handleAssignMediaToPart}
           onClose={() => {
             setShowMediaSelector(false)
@@ -1045,7 +1046,7 @@ function VaultMediaGrid({ medias, loading, onMediaClick }) {
 }
 
 // Media Selector Modal
-function MediaSelectorModal({ medias, onSelect, onClose, partTitle, currentMediaIds = [], isSingle = false, allParts = [], currentPartId }) {
+function MediaSelectorModal({ medias, modelId, onSelect, onClose, partTitle, currentMediaIds = [], isSingle = false, allParts = [], currentPartId }) {
   const [selectedMedias, setSelectedMedias] = useState([])
   const [previewingMedia, setPreviewingMedia] = useState(null)
   const [previewUrl, setPreviewUrl] = useState(null)
@@ -1095,7 +1096,6 @@ function MediaSelectorModal({ medias, onSelect, onClose, partTitle, currentMedia
     setPreviewUrl(null)
 
     try {
-      const modelId = window.location.pathname.split('/').pop()
       const { data: model } = await supabase
         .from('models')
         .select('of_account_id')
@@ -1103,13 +1103,13 @@ function MediaSelectorModal({ medias, onSelect, onClose, partTitle, currentMedia
         .single()
 
       if (!model?.of_account_id) {
-        console.error('No OF account')
+        console.error('No OF account for model:', modelId)
         setLoadingPreview(false)
         return
       }
 
       // Just pass the media ID - API accepts it
-      console.log('Scraping media ID:', media.id)
+      console.log('Scraping media ID:', media.id, 'for account:', model.of_account_id)
       const response = await fetch(`/api/onlyfans/scrape-media?accountId=${model.of_account_id}&mediaId=${media.id}`)
       const data = await response.json()
 
