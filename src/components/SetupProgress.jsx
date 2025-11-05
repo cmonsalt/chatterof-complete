@@ -127,12 +127,17 @@ export default function SetupProgress({ modelId, accountId, onComplete }) {
     
     let hasMore = true
     let totalMessages = 0
+    let currentOffset = 0
 
     while (hasMore) {
       const response = await fetch('/api/onlyfans/sync-chats', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ modelId, accountId })
+        body: JSON.stringify({ 
+          modelId, 
+          accountId,
+          offset: currentOffset 
+        })
       })
 
       const data = await response.json()
@@ -146,6 +151,9 @@ export default function SetupProgress({ modelId, accountId, onComplete }) {
 
       totalMessages += data.syncedMessages || 0
       hasMore = data.hasMore || false
+      currentOffset = data.nextOffset || (currentOffset + 10)
+
+      console.log(`[Setup] Chats progress: ${totalMessages} total, hasMore: ${hasMore}, nextOffset: ${currentOffset}`)
 
       setProgress(prev => ({
         ...prev,
