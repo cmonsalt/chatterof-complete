@@ -291,6 +291,29 @@ export default function VaultTab({ modelId }) {
     }
   }
 
+  const handleDeleteSingle = async (singleId) => {
+    if (!confirm('Delete this single?')) return
+
+    setSaving(true)
+    try {
+      const { error } = await supabase
+        .from('catalog')
+        .delete()
+        .eq('id', singleId)
+
+      if (error) throw error
+
+      showMessage('success', '✅ Single deleted!')
+      await loadSingles()
+      
+    } catch (error) {
+      console.error('Error deleting single:', error)
+      showMessage('error', 'Error deleting single')
+    } finally {
+      setSaving(false)
+    }
+  }
+
   // 🖼️ OPEN PREVIEW MODAL
   const openPreviewModal = async (media) => {
     setPreviewingMedia(media)
@@ -310,9 +333,12 @@ export default function VaultTab({ modelId }) {
         throw new Error('No OnlyFans account connected')
       }
 
+      // Use thumb URL for scraping (or full URL as fallback)
+      const urlToScrape = media.thumb || media.preview || media.full || media.id.toString()
+
       // Scrape media to get temporary URL
       const response = await fetch(
-        `/api/onlyfans/scrape-media?accountId=${model.of_account_id}&mediaId=${media.id}`
+        `/api/onlyfans/scrape-media?accountId=${model.of_account_id}&mediaId=${encodeURIComponent(urlToScrape)}`
       )
       const data = await response.json()
 
