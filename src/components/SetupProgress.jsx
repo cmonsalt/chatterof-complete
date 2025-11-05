@@ -11,7 +11,20 @@ export default function SetupProgress({ modelId, accountId, onComplete }) {
 
   useEffect(() => {
     if (modelId && accountId) {
+      // Bloquear navegación durante setup
+      const handleBeforeUnload = (e) => {
+        e.preventDefault()
+        e.returnValue = 'Setup in progress. Are you sure you want to leave?'
+        return e.returnValue
+      }
+
+      window.addEventListener('beforeunload', handleBeforeUnload)
+      
       startSetup()
+
+      return () => {
+        window.removeEventListener('beforeunload', handleBeforeUnload)
+      }
     }
   }, [modelId, accountId])
 
@@ -66,12 +79,17 @@ export default function SetupProgress({ modelId, accountId, onComplete }) {
     
     let hasMore = true
     let totalFans = 0
+    let currentOffset = 0
 
     while (hasMore) {
       const response = await fetch('/api/onlyfans/sync-fans', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ modelId, accountId })
+        body: JSON.stringify({ 
+          modelId, 
+          accountId,
+          offset: currentOffset 
+        })
       })
 
       const data = await response.json()
@@ -85,6 +103,9 @@ export default function SetupProgress({ modelId, accountId, onComplete }) {
 
       totalFans += data.synced || 0
       hasMore = data.hasMore || false
+      currentOffset = data.nextOffset || (currentOffset + 20)
+
+      console.log(`[Setup] Fans progress: ${totalFans} total, hasMore: ${hasMore}, nextOffset: ${currentOffset}`)
 
       setProgress(prev => ({
         ...prev,
