@@ -104,6 +104,7 @@ export default function VaultTab({ modelId }) {
             setVaultMedias(parsed);
             setVaultCache(parsed);
             setVaultCacheTime(parseInt(cachedTime));
+            setLoadingVault(false);  // ← FIX: Quitar loading
             return;
           }
         }
@@ -462,6 +463,38 @@ export default function VaultTab({ modelId }) {
     }
   }
 
+  // 🗑️ REMOVE MEDIA FROM PART
+  const handleRemoveMediaFromPart = async (part) => {
+    if (!confirm('Remove assigned media?')) return
+
+    setSaving(true)
+    try {
+      const { error } = await supabase
+        .from('catalog')
+        .update({
+          of_media_ids: [],
+          media_thumbnails: {}
+        })
+        .eq('id', part.id)
+
+      if (error) throw error
+
+      showMessage('success', '✅ Media removed!')
+      
+      if (part.parent_type === 'session') {
+        await loadSessions()
+      } else {
+        await loadSingles()
+      }
+
+    } catch (error) {
+      console.error('Error removing media:', error)
+      showMessage('error', 'Error removing media')
+    } finally {
+      setSaving(false)
+    }
+  }
+
   const toggleSession = (sessionId) => {
     setExpandedSessions(prev => 
       prev.includes(sessionId)
@@ -622,6 +655,7 @@ export default function VaultTab({ modelId }) {
           calculatePriceForTier={calculatePriceForTier}
           getNivelLabel={getNivelLabel}
           openMediaSelectorForPart={openMediaSelectorForPart}
+          handleRemoveMediaFromPart={handleRemoveMediaFromPart}
           handleDeleteSession={handleDeleteSession}
           saving={saving}
         />
@@ -632,6 +666,7 @@ export default function VaultTab({ modelId }) {
           calculatePriceForTier={calculatePriceForTier}
           getNivelLabel={getNivelLabel}
           openMediaSelectorForPart={openMediaSelectorForPart}
+          handleRemoveMediaFromPart={handleRemoveMediaFromPart}
           handleDeleteSingle={handleDeleteSingle}
           saving={saving}
         />
@@ -738,6 +773,7 @@ function SessionsView({
   calculatePriceForTier,
   getNivelLabel,
   openMediaSelectorForPart,
+  handleRemoveMediaFromPart,
   handleDeleteSession,
   saving
 }) {
@@ -766,26 +802,54 @@ function SessionsView({
 
           {expandedSessions.includes(session.session_id) && (
             <div className="p-4 space-y-3">
-              {session.parts.map(part => (
-                <div key={part.id} className="border p-4 rounded-lg">
-                  <div className="flex justify-between items-start">
-                    <div className="flex-1">
-                      <h4 className="font-medium">{part.title || `Part ${part.step_number}`}</h4>
-                      {part.of_media_ids?.length > 0 && (
-                        <p className="text-xs text-blue-600 mt-1">
-                          📎 {part.of_media_ids.length} media attached
-                        </p>
-                      )}
+              {session.parts.map(part => {
+                const hasMedia = part.of_media_ids && part.of_media_ids.length > 0
+                
+                return (
+                  <div key={part.id} className="border p-4 rounded-lg">
+                    <div className="flex justify-between items-start">
+                      <div className="flex-1">
+                        <h4 className="font-medium">{part.title || `Part ${part.step_number}`}</h4>
+                        {hasMedia ? (
+                          <p className="text-xs text-green-600 mt-1 flex items-center gap-1">
+                            ✓ Media assigned
+                          </p>
+                        ) : (
+                          <p className="text-xs text-gray-500 mt-1">No media assigned</p>
+                        )}
+                      </div>
+                      <div className="flex gap-2">
+                        {hasMedia ? (
+                          <>
+                            <button
+                              onClick={() => openMediaSelectorForPart(part)}
+                              className="px-3 py-1 text-sm bg-blue-50 text-blue-600 rounded hover:bg-blue-100"
+                              disabled={saving}
+                            >
+                              Change
+                            </button>
+                            <button
+                              onClick={() => handleRemoveMediaFromPart(part)}
+                              className="px-3 py-1 text-sm bg-red-50 text-red-600 rounded hover:bg-red-100"
+                              disabled={saving}
+                            >
+                              Remove
+                            </button>
+                          </>
+                        ) : (
+                          <button
+                            onClick={() => openMediaSelectorForPart(part)}
+                            className="px-3 py-1 text-sm bg-purple-50 text-purple-600 rounded hover:bg-purple-100"
+                            disabled={saving}
+                          >
+                            + Assign Media
+                          </button>
+                        )}
+                      </div>
                     </div>
-                    <button
-                      onClick={() => openMediaSelectorForPart(part)}
-                      className="px-3 py-1 text-sm bg-purple-50 text-purple-600 rounded hover:bg-purple-100"
-                    >
-                      📎 Attach Media
-                    </button>
                   </div>
-                </div>
-              ))}
+                )
+              })}
             </div>
           )}
         </div>
@@ -801,6 +865,7 @@ function SinglesView({
   calculatePriceForTier,
   getNivelLabel,
   openMediaSelectorForPart,
+  handleRemoveMediaFromPart,
   handleDeleteSingle,
   saving
 }) {
@@ -816,6 +881,7 @@ function SinglesView({
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
       {singles.map(single => {
         const nivelLabel = getNivelLabel(single.nivel)
+        const hasMedia = single.of_media_ids && single.of_media_ids.length > 0
         
         return (
           <div key={single.id} className="border border-gray-200 rounded-lg p-4">
@@ -839,6 +905,7 @@ function SinglesView({
                 {nivelLabel.text}
               </span>
               <span className="text-xs text-gray-500">Nivel {single.nivel}</span>
+              {hasMedia && <span className="text-xs text-green-600">✓ Media</span>}
             </div>
 
             {/* Pricing Tiers */}
@@ -851,12 +918,32 @@ function SinglesView({
               ))}
             </div>
 
-            <button
-              onClick={() => openMediaSelectorForPart(single)}
-              className="w-full px-3 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 text-sm"
-            >
-              {single.of_media_id ? '✓ Media Assigned' : '+ Assign Media'}
-            </button>
+            {hasMedia ? (
+              <div className="flex gap-2">
+                <button
+                  onClick={() => openMediaSelectorForPart(single)}
+                  className="flex-1 px-3 py-2 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 text-sm"
+                  disabled={saving}
+                >
+                  Change
+                </button>
+                <button
+                  onClick={() => handleRemoveMediaFromPart(single)}
+                  className="flex-1 px-3 py-2 bg-red-50 text-red-600 rounded-lg hover:bg-red-100 text-sm"
+                  disabled={saving}
+                >
+                  Remove
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={() => openMediaSelectorForPart(single)}
+                className="w-full px-3 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 text-sm"
+                disabled={saving}
+              >
+                + Assign Media
+              </button>
+            )}
           </div>
         )
       })}
