@@ -42,6 +42,21 @@ export default async function handler(req, res) {
 
     if (!response.ok) {
       const errorText = await response.text()
+      
+      // If auth error, mark as disconnected
+      if (response.status === 401 || response.status === 403) {
+        await supabase
+          .from('models')
+          .update({ connection_status: 'disconnected' })
+          .eq('model_id', modelId)
+        
+        return res.status(401).json({
+          error: 'Authentication failed',
+          needsReauth: true,
+          message: 'Account needs re-authorization'
+        })
+      }
+      
       throw new Error(`OnlyFans API error: ${response.status} - ${errorText}`)
     }
 
