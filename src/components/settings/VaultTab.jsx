@@ -809,13 +809,7 @@ function VaultMediaGrid({ medias, loading, onMediaClick }) {
   return (
     <div className="grid grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-3">
       {medias.map(media => {
-        // Para videos, usar proxy Weserv (más restricciones de IP)
-        // Para fotos, usar URL directa (menos restricciones)
-        const thumbUrl = media.thumb 
-          ? (media.type === 'video' 
-              ? `https://images.weserv.nl/?url=${encodeURIComponent(media.thumb)}&w=200&h=200&fit=cover`
-              : media.thumb)
-          : null
+        const thumbUrl = media.thumb
         
         return (
           <div 
