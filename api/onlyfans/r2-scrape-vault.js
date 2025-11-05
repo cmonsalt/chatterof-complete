@@ -78,7 +78,7 @@ export default async function handler(req, res) {
               'Content-Type': 'application/json'
             },
             body: JSON.stringify({
-              url: media.files?.source?.url || media.full
+              url: media.files?.full?.url || media.files?.preview?.url
             })
           }
         )
