@@ -48,7 +48,7 @@ export default async function handler(req, res) {
     const limit = 50
     let hasMore = true
 
-    while (hasMore) {
+    while (hasMore && allMedias.length < 500) { // Max 500 para evitar timeout
       const vaultResponse = await fetch(
         `https://app.onlyfansapi.com/api/${model.of_account_id}/media/vault?limit=${limit}&offset=${offset}`,
         {
@@ -68,21 +68,17 @@ export default async function handler(req, res) {
       
       console.log(`📦 Fetched ${medias.length} medias at offset ${offset}`)
 
-      if (medias.length === 0) {
-        break
-      }
+      if (medias.length === 0) break
 
       allMedias = allMedias.concat(medias)
       hasMore = vaultData.data?.hasMore || false
       
-      if (!hasMore || medias.length < limit) {
-        break
-      }
+      if (!hasMore || medias.length < limit) break
       
       offset += limit
     }
 
-    console.log(`📦 Total media items in vault: ${allMedias.length}`)
+    console.log(`📦 Total media items to scrape: ${allMedias.length}`)
     const medias = allMedias
 
     let scrapedCount = 0
