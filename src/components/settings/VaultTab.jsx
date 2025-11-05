@@ -154,10 +154,13 @@ export default function VaultTab({ modelId }) {
         const listsResponse = await fetch(`/api/onlyfans/get-vault-lists?accountId=${model.of_account_id}`);
         const listsData = await listsResponse.json();
         
+        console.log('📁 Vault lists response:', listsData);
+        
         if (listsData.success && listsData.lists) {
           console.log('✅ Vault lists loaded:', listsData.lists.length);
           setVaultLists(listsData.lists);
         } else {
+          console.log('⚠️ No lists in response');
           setVaultLists([]);
         }
       } catch (err) {
