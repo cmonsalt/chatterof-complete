@@ -373,8 +373,11 @@ export default function VaultTab({ modelId }) {
         throw new Error('No OnlyFans account connected')
       }
 
-      // Use FULL image for better quality (not thumb)
-      const urlToScrape = media.full || media.preview || media.thumb
+      // Para VIDEOS: usar preview o thumb (no full porque es muy pesado)
+      // Para FOTOS: usar full (mejor calidad)
+      const urlToScrape = media.type === 'video'
+        ? (media.preview || media.thumb)
+        : (media.full || media.preview || media.thumb)
 
       // Scrape media to get temporary URL
       const response = await fetch(
