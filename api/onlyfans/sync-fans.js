@@ -107,7 +107,10 @@ export default async function handler(req, res) {
 
       const { error } = await supabase
         .from('fans')
-        .upsert(fanData, { onConflict: 'fan_id' })
+        .upsert(fanData, { 
+          onConflict: 'fan_id,model_id',
+          ignoreDuplicates: false 
+        })
 
       if (!error) synced++
       else console.error('Error upserting fan:', sub.id, error)
