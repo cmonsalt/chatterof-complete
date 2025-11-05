@@ -589,7 +589,7 @@ export default function VaultTab({ modelId }) {
               value={vaultFilter.listId}
             >
               <option value="">All Folders</option>
-              {vaultLists.map(list => (
+              {Array.isArray(vaultLists) && vaultLists.map(list => (
                 <option key={list.id} value={list.id}>
                   📁 {list.name} ({list.count || 0})
                 </option>
