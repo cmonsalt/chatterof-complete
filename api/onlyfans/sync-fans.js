@@ -24,11 +24,11 @@ export default async function handler(req, res) {
     }
 
     let synced = 0
+    let totalFetched = 0
     const limit = 20
+    let creditsUsed = 0
 
-    console.log(`[Sync Fans] Fetching fans from offset ${offset}, limit ${limit}`)
-
-    // Fetch fans with pagination
+    // Fetch fans from OnlyFansAPI
     const response = await fetch(
       `https://app.onlyfansapi.com/api/${accountId}/fans/all?limit=${limit}&offset=${offset}`,
       {
@@ -40,8 +40,6 @@ export default async function handler(req, res) {
 
     if (!response.ok) {
       const errorText = await response.text()
-      
-      console.error(`[Sync Fans] API Error ${response.status}:`, errorText)
       
       // If auth error, mark as disconnected
       if (response.status === 401 || response.status === 403) {
@@ -57,47 +55,69 @@ export default async function handler(req, res) {
         })
       }
       
-      // If 404, assume no more fans (end of pagination)
-      if (response.status === 404) {
-        console.log(`[Sync Fans] 404 at offset ${offset} - end of data`)
-        return res.status(200).json({
-          success: true,
-          synced: 0,
-          hasMore: false,
-          nextOffset: null,
-          message: 'No more fans to sync'
-        })
-      }
-      
       throw new Error(`OnlyFans API error: ${response.status} - ${errorText}`)
     }
 
     const responseData = await response.json()
     
     const subscribers = responseData.data?.list || []
-    const hasMore = responseData._pagination?.next_page ? true : false
-    
-    console.log(`[Sync Fans] Fetched ${subscribers.length} fans, hasMore: ${hasMore}`)
-    
-    // Log first fan structure to debug
-    if (subscribers.length > 0 && offset === 0) {
-      console.log('[Sync Fans] Sample fan data:', JSON.stringify(subscribers[0], null, 2))
+    const hasMore = responseData.data?.hasMore || false
+    totalFetched = subscribers.length
+    creditsUsed = responseData._meta?._credits?.used || 1
+
+    console.log('='.repeat(80))
+    console.log('[DEBUG] SYNC FANS - API RESPONSE')
+    console.log('='.repeat(80))
+    console.log(`Fetched: ${subscribers.length} fans`)
+    console.log(`HasMore: ${hasMore}`)
+    console.log(`Offset: ${offset}`)
+    console.log(`Credits: ${creditsUsed}`)
+    console.log('-'.repeat(80))
+
+    // Log SAMPLE FAN (primer fan con datos completos)
+    if (subscribers.length > 0) {
+      const sampleFan = subscribers[0]
+      console.log('📋 SAMPLE FAN DATA (COMPLETE JSON):')
+      console.log(JSON.stringify(sampleFan, null, 2))
+      console.log('-'.repeat(80))
+      
+      // Analizar estructura de revenue
+      console.log('💰 REVENUE ANALYSIS:')
+      console.log('  sub.subscribedOnData:', sampleFan.subscribedOnData ? 'EXISTS' : 'NULL')
+      if (sampleFan.subscribedOnData) {
+        console.log('  - totalSumm:', sampleFan.subscribedOnData.totalSumm)
+        console.log('  - subscribes:', sampleFan.subscribedOnData.subscribes ? 'EXISTS' : 'NULL')
+        if (sampleFan.subscribedOnData.subscribes && sampleFan.subscribedOnData.subscribes.length > 0) {
+          console.log('  - subscribes[0]:', JSON.stringify(sampleFan.subscribedOnData.subscribes[0], null, 2))
+        }
+      }
+      console.log('  sub.subscribedByData:', sampleFan.subscribedByData ? 'EXISTS' : 'NULL')
+      if (sampleFan.subscribedByData) {
+        console.log('  - subscribeAt:', sampleFan.subscribedByData.subscribeAt)
+        console.log('  - expireAt:', sampleFan.subscribedByData.expireAt)
+        console.log('  - price:', sampleFan.subscribedByData.price)
+      }
+      console.log('  sub.subscribedBy:', sampleFan.subscribedBy)
+      console.log('  sub.subscribedByAutoprolong:', sampleFan.subscribedByAutoprolong)
+      console.log('-'.repeat(80))
     }
 
-    // Process each fan
+    // Process fans
     for (const sub of subscribers) {
-      const grossRevenue = parseFloat(sub.spentTotal || 0)
-      const netRevenue = grossRevenue * 0.8
-      const lastSubscribe = sub.subscribedByData?.subscribeAt 
-        ? { ...sub.subscribedByData, expireDate: sub.subscribedByExpireDate }
-        : null
+      const subData = sub.subscribedOnData
+      const lastSubscribe = subData?.subscribes?.[0]
+
+      const netRevenue = parseFloat(subData?.totalSumm || 0)
+      const grossRevenue = netRevenue > 0 ? netRevenue / 0.8 : 0
+
+      console.log(`  Fan ID ${sub.id}: netRevenue=${netRevenue}, grossRevenue=${grossRevenue}`)
 
       const fanData = {
-        fan_id: sub.id.toString(),
-        name: sub.name || `u${sub.id}`,
+        fan_id: sub.id?.toString(),
+        name: sub.name || sub.username || 'Unknown',
         model_id: modelId,
-        of_username: sub.username || null,
-        of_avatar_url: sub.avatar || null,
+        of_username: sub.username,
+        of_avatar_url: sub.avatar,
         is_subscribed: sub.subscribedBy || false,
         subscription_date: sub.subscribedByData?.subscribeAt,
         spent_total: grossRevenue,
@@ -112,30 +132,31 @@ export default async function handler(req, res) {
 
       const { error } = await supabase
         .from('fans')
-        .upsert(fanData, { 
-          onConflict: 'fan_id,model_id',
-          ignoreDuplicates: false 
-        })
+        .upsert(fanData, { onConflict: 'fan_id,model_id' })
 
       if (!error) synced++
-      else console.error('Error upserting fan:', sub.id, error)
+      else console.error('❌ Error upserting fan:', sub.id, error)
     }
 
-    console.log(`[Sync Fans] Synced ${synced} fans`)
+    console.log('='.repeat(80))
+    console.log(`✅ SYNC COMPLETE: ${synced}/${totalFetched} fans synced`)
+    console.log('='.repeat(80))
 
     return res.status(200).json({
       success: true,
       synced,
+      total: totalFetched,
       hasMore,
       nextOffset: hasMore ? offset + limit : null,
-      message: `Synced ${synced} fans`
+      creditsUsed,
+      message: `Synced ${synced} fans (${creditsUsed} credits)`
     })
 
   } catch (error) {
-    console.error('Sync fans error:', error)
-    return res.status(500).json({ 
-      error: 'Sync failed',
-      message: error.message 
+    console.error('💥 Sync fans error:', error)
+    return res.status(500).json({
+      error: 'Failed to sync fans',
+      details: error.message
     })
   }
 }
