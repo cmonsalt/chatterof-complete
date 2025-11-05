@@ -1037,7 +1037,8 @@ function VaultMediaGrid({ medias, loading, onMediaClick }) {
 
 // Media Selector Modal
 function MediaSelectorModal({ medias, onSelect, onClose, partTitle, currentMediaId, allParts = [], currentPartId }) {
-  const [selectedMedia, setSelectedMedia] = useState(null)
+  const [selectedMedias, setSelectedMedias] = useState([])
+  const [previewingMedia, setPreviewingMedia] = useState(null)
   const [previewUrl, setPreviewUrl] = useState(null)
   const [loadingPreview, setLoadingPreview] = useState(false)
 
@@ -1052,18 +1053,33 @@ function MediaSelectorModal({ medias, onSelect, onClose, partTitle, currentMedia
     if (currentMediaId) {
       const currentMedia = medias.find(m => m.id.toString() === currentMediaId.toString())
       if (currentMedia) {
-        handleMediaClick(currentMedia)
+        setSelectedMedias([currentMedia])
+        loadPreview(currentMedia)
       }
     }
   }, [currentMediaId])
 
-  const handleMediaClick = async (media) => {
-    setSelectedMedia(media)
+  const toggleMediaSelection = (media) => {
+    setSelectedMedias(prev => {
+      const isSelected = prev.some(m => m.id === media.id)
+      if (isSelected) {
+        return prev.filter(m => m.id !== media.id)
+      } else {
+        return [...prev, media]
+      }
+    })
+  }
+
+  const handleMediaClick = (media) => {
+    setPreviewingMedia(media)
+    loadPreview(media)
+  }
+
+  const loadPreview = async (media) => {
     setLoadingPreview(true)
     setPreviewUrl(null)
 
     try {
-      // Get model's OF account for scraping
       const modelId = window.location.pathname.split('/').pop()
       const { data: model } = await supabase
         .from('models')
@@ -1075,9 +1091,8 @@ function MediaSelectorModal({ medias, onSelect, onClose, partTitle, currentMedia
         throw new Error('No OF account')
       }
 
-      // Scrape preview
-      const urlToScrape = media.type === 'video' ? (media.preview || media.thumb) : (media.full || media.preview || media.thumb)
-      const response = await fetch(`/api/onlyfans/scrape-media?accountId=${model.of_account_id}&mediaId=${encodeURIComponent(urlToScrape)}`)
+      // Use media ID for scraping
+      const response = await fetch(`/api/onlyfans/scrape-media?accountId=${model.of_account_id}&mediaId=${media.id}`)
       const data = await response.json()
 
       if (data.success) {
@@ -1091,8 +1106,9 @@ function MediaSelectorModal({ medias, onSelect, onClose, partTitle, currentMedia
   }
 
   const handleConfirmAssign = () => {
-    if (selectedMedia) {
-      onSelect(selectedMedia)
+    if (selectedMedias.length > 0) {
+      // For now, only assign first media (DB structure supports array but let's keep it simple)
+      onSelect(selectedMedias[0])
       onClose()
     }
   }
@@ -1112,29 +1128,45 @@ function MediaSelectorModal({ medias, onSelect, onClose, partTitle, currentMedia
               {medias.map(media => {
                 const isUsed = usedMediaIds.includes(media.id.toString())
                 const isDisabled = isUsed
+                const isSelected = selectedMedias.some(m => m.id === media.id)
+                const isPreviewing = previewingMedia?.id === media.id
                 
                 return (
                   <div
                     key={media.id}
-                    onClick={() => !isDisabled && handleMediaClick(media)}
-                    className={`border rounded overflow-hidden transition-all ${
+                    className={`border rounded overflow-hidden transition-all relative ${
                       isDisabled 
                         ? 'opacity-50 cursor-not-allowed' 
                         : 'hover:shadow-lg cursor-pointer'
                     } ${
-                      selectedMedia?.id === media.id ? 'border-purple-500 ring-2 ring-purple-500' : 'border-gray-200'
+                      isPreviewing ? 'ring-2 ring-blue-400' : isSelected ? 'border-purple-500 border-2' : 'border-gray-200'
                     }`}
                   >
-                    <div className="aspect-square bg-gray-100 relative flex items-center justify-center">
+                    {/* Checkbox para selección */}
+                    {!isDisabled && (
+                      <div 
+                        className="absolute top-1 left-1 z-10"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          toggleMediaSelection(media)
+                        }}
+                      >
+                        <div className={`w-5 h-5 rounded border-2 flex items-center justify-center ${
+                          isSelected ? 'bg-purple-600 border-purple-600' : 'bg-white border-gray-300'
+                        }`}>
+                          {isSelected && <span className="text-white text-xs font-bold">✓</span>}
+                        </div>
+                      </div>
+                    )}
+                    
+                    <div 
+                      onClick={() => !isDisabled && handleMediaClick(media)}
+                      className="aspect-square bg-gray-100 relative flex items-center justify-center"
+                    >
                       {media.thumb ? (
                         <img src={media.thumb} alt="" className="w-full h-full object-cover" />
                       ) : (
                         <div className="text-2xl">{media.type === 'video' ? '🎥' : '📷'}</div>
-                      )}
-                      {selectedMedia?.id === media.id && !isDisabled && (
-                        <div className="absolute inset-0 bg-purple-500 bg-opacity-30 flex items-center justify-center">
-                          <span className="text-white text-2xl font-bold">✓</span>
-                        </div>
                       )}
                       {isUsed && (
                         <div className="absolute inset-0 bg-red-500 bg-opacity-40 flex items-center justify-center">
@@ -1152,7 +1184,7 @@ function MediaSelectorModal({ medias, onSelect, onClose, partTitle, currentMedia
           </div>
 
           {/* Preview panel */}
-          {selectedMedia && (
+          {previewingMedia && (
             <div className="w-80 border-l p-4 overflow-y-auto bg-gray-50">
               <h4 className="font-semibold mb-2 text-sm">Preview</h4>
               <div className="aspect-video bg-gray-200 rounded mb-3 flex items-center justify-center overflow-hidden">
@@ -1162,27 +1194,46 @@ function MediaSelectorModal({ medias, onSelect, onClose, partTitle, currentMedia
                     <p className="text-xs text-gray-600">Loading...</p>
                   </div>
                 ) : previewUrl ? (
-                  <img src={previewUrl} alt="Preview" className="w-full h-full object-contain" />
+                  previewingMedia.type === 'video' ? (
+                    <video src={previewUrl} controls className="w-full h-full" />
+                  ) : (
+                    <img src={previewUrl} alt="Preview" className="w-full h-full object-contain" />
+                  )
                 ) : (
-                  <div className="text-4xl">{selectedMedia.type === 'video' ? '🎥' : '📷'}</div>
+                  <div className="text-4xl">{previewingMedia.type === 'video' ? '🎥' : '📷'}</div>
                 )}
               </div>
-              <div className="space-y-1 text-xs">
+              <div className="space-y-1 text-xs mb-3">
                 <div className="flex justify-between">
                   <span className="text-gray-600">Type:</span>
-                  <span className="font-medium">{selectedMedia.type}</span>
+                  <span className="font-medium">{previewingMedia.type}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-600">Likes:</span>
-                  <span className="font-medium">❤️ {selectedMedia.likesCount || 0}</span>
+                  <span className="font-medium">❤️ {previewingMedia.likesCount || 0}</span>
                 </div>
-                {selectedMedia.duration > 0 && (
+                {previewingMedia.duration > 0 && (
                   <div className="flex justify-between">
                     <span className="text-gray-600">Duration:</span>
-                    <span className="font-medium">{selectedMedia.duration}s</span>
+                    <span className="font-medium">{previewingMedia.duration}s</span>
                   </div>
                 )}
               </div>
+              
+              {selectedMedias.length > 0 && (
+                <div className="mt-4 p-2 bg-purple-50 rounded text-xs">
+                  <p className="font-semibold text-purple-900 mb-1">Selected: {selectedMedias.length}</p>
+                  <div className="space-y-1">
+                    {selectedMedias.map((m, i) => (
+                      <div key={m.id} className="flex items-center gap-1 text-purple-700">
+                        <span>{i + 1}.</span>
+                        <span>{m.type === 'video' ? '🎥' : '📷'}</span>
+                        <span className="text-[10px]">ID: {m.id}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -1193,10 +1244,10 @@ function MediaSelectorModal({ medias, onSelect, onClose, partTitle, currentMedia
           </button>
           <button
             onClick={handleConfirmAssign}
-            disabled={!selectedMedia}
+            disabled={selectedMedias.length === 0}
             className="px-6 py-2 bg-purple-600 text-white rounded hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium"
           >
-            Assign to {partTitle}
+            Assign {selectedMedias.length > 0 ? `(${selectedMedias.length})` : ''} to {partTitle}
           </button>
         </div>
       </div>
