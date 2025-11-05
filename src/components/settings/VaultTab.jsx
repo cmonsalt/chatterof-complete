@@ -719,8 +719,6 @@ function SinglesView({
 
 // Vault Media Grid
 function VaultMediaGrid({ medias, loading, onMediaClick }) {
-  const [loadedImages, setLoadedImages] = React.useState({})
-
   if (loading) {
     return <div className="text-center py-12">Loading vault...</div>
   }
@@ -736,8 +734,6 @@ function VaultMediaGrid({ medias, loading, onMediaClick }) {
   return (
     <div className="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
       {medias.map(media => {
-        const hasImage = loadedImages[media.id]
-        
         return (
           <div 
             key={media.id} 
@@ -745,17 +741,9 @@ function VaultMediaGrid({ medias, loading, onMediaClick }) {
             className="border rounded-lg overflow-hidden hover:shadow-lg hover:border-purple-500 transition-all cursor-pointer group"
           >
             <div className="aspect-square bg-gray-100 relative flex items-center justify-center overflow-hidden">
-              {hasImage ? (
-                <img 
-                  src={hasImage}
-                  alt={`Media ${media.id}`}
-                  className="w-full h-full object-cover"
-                />
-              ) : (
-                <div className="text-4xl">
-                  {media.type === 'video' ? '🎥' : media.type === 'audio' ? '🎵' : '📷'}
-                </div>
-              )}
+              <div className="text-4xl">
+                {media.type === 'video' ? '🎥' : media.type === 'audio' ? '🎵' : '📷'}
+              </div>
               
               {/* Overlay on hover */}
               <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-40 transition-all flex items-center justify-center">
