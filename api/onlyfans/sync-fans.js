@@ -78,6 +78,11 @@ export default async function handler(req, res) {
     const hasMore = responseData._pagination?.next_page ? true : false
     
     console.log(`[Sync Fans] Fetched ${subscribers.length} fans, hasMore: ${hasMore}`)
+    
+    // Log first fan structure to debug
+    if (subscribers.length > 0 && offset === 0) {
+      console.log('[Sync Fans] Sample fan data:', JSON.stringify(subscribers[0], null, 2))
+    }
 
     // Process each fan
     for (const sub of subscribers) {

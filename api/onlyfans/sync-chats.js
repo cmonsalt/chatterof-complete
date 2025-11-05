@@ -124,6 +124,11 @@ export default async function handler(req, res) {
           source: 'onlyfans_api'
         }
 
+        // If no of_message_id, generate unique one
+        if (!messageData.of_message_id) {
+          messageData.of_message_id = `msg_${fanId}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+        }
+
         const { error } = await supabase
           .from('chat')
           .upsert(messageData, { 
