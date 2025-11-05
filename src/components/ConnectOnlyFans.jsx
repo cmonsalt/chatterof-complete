@@ -16,20 +16,17 @@ export default function ConnectOnlyFans({ modelId, onSuccess }) {
     twoFactorCode: ''
   })
 
-  const API_KEY = import.meta.env.VITE_ONLYFANS_API_KEY
-
-  // Step 1: Start authentication
+  // Step 1: Start authentication (via backend)
   const handleSubmitCredentials = async (e) => {
     e.preventDefault()
     setLoading(true)
     setError(null)
 
     try {
-      const response = await fetch('https://app.onlyfansapi.com/api/authenticate', {
+      const response = await fetch('/api/onlyfans/authenticate', {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${API_KEY}`
+          'Content-Type': 'application/json'
         },
         body: JSON.stringify({
           email: formData.email,
@@ -40,7 +37,7 @@ export default function ConnectOnlyFans({ modelId, onSuccess }) {
       const data = await response.json()
 
       if (!response.ok) {
-        throw new Error(data.message || 'Authentication failed')
+        throw new Error(data.error || 'Authentication failed')
       }
 
       if (data.attempt_id) {
@@ -62,15 +59,10 @@ export default function ConnectOnlyFans({ modelId, onSuccess }) {
     }
   }
 
-  // Step 2: Poll authentication status
+  // Step 2: Poll authentication status (via backend)
   const pollAuthStatus = async (id) => {
     try {
-      const response = await fetch(`https://app.onlyfansapi.com/api/authenticate/${id}`, {
-        headers: {
-          'Authorization': `Bearer ${API_KEY}`
-        }
-      })
-
+      const response = await fetch(`/api/onlyfans/check-auth-status?attemptId=${id}`)
       const data = await response.json()
 
       if (data.twoFactorPending) {
@@ -104,20 +96,20 @@ export default function ConnectOnlyFans({ modelId, onSuccess }) {
     }
   }
 
-  // Step 3: Submit 2FA code
+  // Step 3: Submit 2FA code (via backend)
   const handleSubmit2FA = async (e) => {
     e.preventDefault()
     setLoading(true)
     setError(null)
 
     try {
-      const response = await fetch(`https://app.onlyfansapi.com/api/authenticate/${attemptId}`, {
-        method: 'PUT',
+      const response = await fetch('/api/onlyfans/submit-2fa', {
+        method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${API_KEY}`
+          'Content-Type': 'application/json'
         },
         body: JSON.stringify({
+          attemptId: attemptId,
           code: formData.twoFactorCode
         })
       })
@@ -125,7 +117,7 @@ export default function ConnectOnlyFans({ modelId, onSuccess }) {
       const data = await response.json()
 
       if (!response.ok) {
-        throw new Error(data.message || 'Invalid 2FA code')
+        throw new Error(data.error || 'Invalid 2FA code')
       }
 
       setStep('polling')
