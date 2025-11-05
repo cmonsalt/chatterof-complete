@@ -28,6 +28,7 @@ export default function VaultTab({ modelId }) {
   // UI State
   const [expandedSessions, setExpandedSessions] = useState([])
   const [activeTab, setActiveTab] = useState('sessions')
+  const [vaultFilter, setVaultFilter] = useState({ type: '', sortBy: 'newest' })
   
   // Modals
   const [showNewSessionModal, setShowNewSessionModal] = useState(false)
@@ -550,6 +551,32 @@ export default function VaultTab({ modelId }) {
             🎬 OnlyFans Vault ({vaultMedias.length})
           </button>
         </nav>
+        
+        {/* Filters for Vault tab */}
+        {activeTab === 'vault' && (
+          <div className="py-2 px-4 bg-gray-50 flex gap-4 items-center">
+            <select
+              className="px-3 py-1 border rounded text-sm"
+              onChange={(e) => setVaultFilter({ ...vaultFilter, type: e.target.value })}
+              value={vaultFilter.type}
+            >
+              <option value="">All Types</option>
+              <option value="photo">📷 Photos</option>
+              <option value="video">🎥 Videos</option>
+              <option value="audio">🎵 Audio</option>
+            </select>
+            
+            <select
+              className="px-3 py-1 border rounded text-sm"
+              onChange={(e) => setVaultFilter({ ...vaultFilter, sortBy: e.target.value })}
+              value={vaultFilter.sortBy}
+            >
+              <option value="newest">Newest First</option>
+              <option value="oldest">Oldest First</option>
+              <option value="likes">Most Liked</option>
+            </select>
+          </div>
+        )}
       </div>
 
       {/* Content */}
@@ -577,7 +604,15 @@ export default function VaultTab({ modelId }) {
         />
       ) : (
         <VaultMediaGrid
-          medias={vaultMedias}
+          medias={vaultMedias
+            .filter(m => !vaultFilter.type || m.type === vaultFilter.type)
+            .sort((a, b) => {
+              if (vaultFilter.sortBy === 'newest') return new Date(b.createdAt) - new Date(a.createdAt)
+              if (vaultFilter.sortBy === 'oldest') return new Date(a.createdAt) - new Date(b.createdAt)
+              if (vaultFilter.sortBy === 'likes') return (b.likesCount || 0) - (a.likesCount || 0)
+              return 0
+            })
+          }
           loading={loadingVault}
           onMediaClick={openPreviewModal}
         />
