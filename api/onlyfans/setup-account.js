@@ -1,11 +1,10 @@
 import { createClient } from '@supabase/supabase-js'
 
 const supabase = createClient(
-  process.env.VITE_SUPABASE_URL,
-  process.env.VITE_SUPABASE_ANON_KEY
+  process.env.NEXT_PUBLIC_SUPABASE_URL,
+  process.env.SUPABASE_SERVICE_ROLE_KEY
 )
 
-// Helper to clean HTML
 function cleanHTML(text) {
   if (!text) return ''
   return text
@@ -17,14 +16,14 @@ function cleanHTML(text) {
 }
 
 export default async function handler(req, res) {
-  if (req.method !== 'GET') {
+  if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' })
   }
 
-  const { accountId } = req.query
+  const { accountId, modelId } = req.body
 
-  if (!accountId) {
-    return res.status(400).json({ error: 'accountId is required' })
+  if (!accountId || !modelId) {
+    return res.status(400).json({ error: 'accountId and modelId required' })
   }
 
   try {
@@ -34,102 +33,74 @@ export default async function handler(req, res) {
       throw new Error('ONLYFANS_API_KEY not configured')
     }
 
-    console.log(`[Setup] Starting account setup for ${accountId}`)
-
-    // Get model_id from account_id
-    const { data: model, error: modelError } = await supabase
-      .from('models')
-      .select('model_id')
-      .eq('of_account_id', accountId)
-      .single()
-
-    if (modelError || !model) {
-      throw new Error('Model not found for this account')
-    }
-
-    const modelId = model.model_id
+    console.log(`[Setup] Starting initial sync for ${accountId}`)
 
     let creditsUsed = 0
     let totalFans = 0
-    let fansWithSpending = 0
     let messagesSynced = 0
 
-    // STEP 1: Sync ALL fans (to have complete list with spending data)
-    console.log(`[Setup] Step 1: Syncing all fans...`)
+    // STEP 1: Sync first 20 fans only
+    console.log(`[Setup] Step 1: Syncing first 20 fans...`)
     
-    let offset = 0
-    let hasMore = true
-    const limit = 20
+    const fansResponse = await fetch(
+      `https://app.onlyfansapi.com/api/${accountId}/fans/all?limit=20&offset=0`,
+      {
+        headers: { 'Authorization': `Bearer ${API_KEY}` }
+      }
+    )
+
+    if (!fansResponse.ok) {
+      throw new Error(`Fans API error: ${fansResponse.status}`)
+    }
+
+    const fansData = await fansResponse.json()
+    const subscribers = fansData.data?.list || []
+    const hasMoreFans = fansData.data?.hasMore || false
+    creditsUsed += fansData._meta?._credits?.used || 1
+    totalFans = subscribers.length
+
     const fansWithMoney = []
 
-    while (hasMore) {
-      const response = await fetch(
-        `https://app.onlyfansapi.com/api/${accountId}/fans/all?limit=${limit}&offset=${offset}`,
-        {
-          headers: { 'Authorization': `Bearer ${API_KEY}` }
-        }
-      )
+    for (const sub of subscribers) {
+      const subData = sub.subscribedOnData
+      const lastSubscribe = subData?.subscribes?.[0]
 
-      if (!response.ok) {
-        const errorText = await response.text()
-        throw new Error(`OnlyFans API error: ${response.status} - ${errorText}`)
+      const netRevenue = parseFloat(subData?.totalSumm || 0)
+      const grossRevenue = netRevenue > 0 ? netRevenue / 0.8 : 0
+
+      const fanData = {
+        fan_id: sub.id?.toString(),
+        name: sub.name || sub.username || 'Unknown',
+        model_id: modelId,
+        of_username: sub.username,
+        of_avatar_url: sub.avatar,
+        is_subscribed: sub.subscribedBy || false,
+        subscription_date: sub.subscribedByData?.subscribeAt,
+        spent_total: grossRevenue,
+        gross_revenue: grossRevenue,
+        net_revenue: netRevenue,
+        last_update: new Date().toISOString(),
+        subscription_type: lastSubscribe?.type || null,
+        subscription_price: parseFloat(lastSubscribe?.price || 0),
+        is_renewal_enabled: sub.subscribedByAutoprolong || false,
+        subscription_expires_at: lastSubscribe?.expireDate || null
       }
 
-      const responseData = await response.json()
-      const subscribers = responseData.data?.list || []
-      hasMore = responseData.data?.hasMore || false
-      creditsUsed += responseData._meta?._credits?.used || 1
-      totalFans += subscribers.length
+      await supabase.from('fans').upsert(fanData, { onConflict: 'fan_id' })
 
-      for (const sub of subscribers) {
-        const subData = sub.subscribedOnData
-        const lastSubscribe = subData?.subscribes?.[0]
-
-        // Calculate revenues
-        const netRevenue = parseFloat(subData?.totalSumm || 0)
-        const grossRevenue = netRevenue > 0 ? netRevenue / 0.8 : 0
-
-        const fanData = {
-          fan_id: sub.id?.toString(),
-          name: sub.name || sub.username || 'Unknown',
-          model_id: modelId,
-          of_username: sub.username,
-          of_avatar_url: sub.avatar,
-          is_subscribed: sub.subscribedBy || false,
-          subscription_date: sub.subscribedByData?.subscribeAt,
-          spent_total: grossRevenue,
-          gross_revenue: grossRevenue,
-          net_revenue: netRevenue,
-          last_update: new Date().toISOString(),
-          subscription_type: lastSubscribe?.type || null,
-          subscription_price: parseFloat(lastSubscribe?.price || 0),
-          is_renewal_enabled: sub.subscribedByAutoprolong || false,
-          subscription_expires_at: lastSubscribe?.expireDate || null
-        }
-
-        await supabase.from('fans').upsert(fanData, { onConflict: 'fan_id' })
-
-        // Track fans with spending for step 2
-        if (netRevenue > 0) {
-          fansWithSpending++
-          fansWithMoney.push(sub.id?.toString())
-        }
-      }
-
-      offset += limit
-      
-      if (offset > 1000) {
-        console.log('[Setup] Reached safety limit of 1000 fans')
-        break
+      if (netRevenue > 0) {
+        fansWithMoney.push(sub.id?.toString())
       }
     }
 
-    console.log(`[Setup] Step 1 complete: ${totalFans} fans synced (${fansWithSpending} with spending > $0)`)
+    console.log(`[Setup] Step 1: ${totalFans} fans synced (${fansWithMoney.length} with spending)`)
 
-    // STEP 2: Fetch last 10 messages ONLY from fans with spending
-    console.log(`[Setup] Step 2: Syncing messages from paying fans...`)
+    // STEP 2: Sync last 10 messages from paying fans (max 10 fans)
+    console.log(`[Setup] Step 2: Syncing messages...`)
 
-    for (const fanId of fansWithMoney) {
+    const fansToSync = fansWithMoney.slice(0, 10) // Max 10 fans
+
+    for (const fanId of fansToSync) {
       try {
         const messagesResponse = await fetch(
           `https://app.onlyfansapi.com/api/${accountId}/chats/${fanId}/messages?limit=10`,
@@ -152,14 +123,12 @@ export default async function handler(req, res) {
               from: msg.isSentByMe ? 'model' : 'fan',
               message_type: msg.mediaCount > 0 ? 'media' : 'text',
               of_message_id: msg.id?.toString(),
-              media_url: msg.media?.[0]?.files?.full?.url || msg.media?.[0]?.files?.thumb?.url,
-              media_urls: msg.media?.map(m => m.files?.full?.url || m.files?.thumb?.url).filter(Boolean).join(','),
+              media_url: msg.media?.[0]?.files?.full?.url,
               amount: parseFloat(msg.price || 0),
               read: msg.isOpened || false,
               source: 'api_sync',
               is_locked: !msg.isFree,
-              is_purchased: msg.canPurchaseReason === 'purchased' || msg.canPurchaseReason === 'opened' || msg.isFree,
-              locked_text: msg.lockedText || false
+              is_purchased: msg.canPurchaseReason === 'purchased' || msg.isFree
             }
 
             const { error } = await supabase
@@ -170,27 +139,32 @@ export default async function handler(req, res) {
           }
         }
       } catch (msgError) {
-        console.error(`[Setup] Error fetching messages for fan ${fanId}:`, msgError)
+        console.error(`[Setup] Error for fan ${fanId}:`, msgError.message)
       }
     }
 
-    console.log(`[Setup] Step 2 complete: ${messagesSynced} messages synced`)
+    console.log(`[Setup] Step 2: ${messagesSynced} messages synced`)
 
-    // Update model sync timestamp
+    // STEP 3: Mark vault as NOT scraped yet (will be done separately)
     await supabase
       .from('models')
-      .update({ updated_at: new Date().toISOString() })
+      .update({ 
+        updated_at: new Date().toISOString(),
+        vault_scraped_at: null
+      })
       .eq('model_id', modelId)
 
-    console.log(`[Setup] Account setup complete!`)
+    console.log(`[Setup] Initial setup complete!`)
 
     return res.status(200).json({
       success: true,
       totalFans,
-      fansWithSpending,
       messagesSynced,
+      hasMoreFans,
+      hasMoreChats: fansWithMoney.length > 10,
+      needsVaultScrape: true,
       creditsUsed,
-      message: `Setup complete: ${totalFans} fans synced, ${messagesSynced} messages from ${fansWithSpending} paying fans (${creditsUsed} credits used)`
+      message: `Initial sync: ${totalFans} fans, ${messagesSynced} messages (${creditsUsed} credits)`
     })
 
   } catch (error) {
