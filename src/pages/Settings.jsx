@@ -3,6 +3,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
 import Navbar from '../components/Navbar'
 import ConnectOnlyFans from '../components/ConnectOnlyFans'
+import ReconnectAccount from '../components/ReconnectAccount'
 import ConfigTab from '../components/settings/ConfigTab'
 import TiersTab from '../components/settings/TiersTab'
 import VaultTab from '../components/settings/VaultTab'
@@ -59,12 +60,6 @@ export default function Settings() {
     } catch (error) {
       console.error('Error disconnecting:', error)
     }
-  }
-
-  const handleReconnect = () => {
-    // Reset state to show connection form
-    setIsConnected(false)
-    setConnectionStatus('disconnected')
   }
 
   return (
@@ -141,23 +136,14 @@ export default function Settings() {
                   </div>
                 ) : isConnected && connectionStatus === 'disconnected' ? (
                   <div>
-                    <h2 className="text-2xl font-bold text-gray-900 mb-6">🔗 OnlyFans Connection</h2>
-                    <div className="flex items-center gap-4">
-                      <div className="flex-1 bg-red-50 border-2 border-red-500 rounded-lg p-6">
-                        <p className="text-lg font-semibold text-red-900 mb-2">
-                          ❌ Connection Lost
-                        </p>
-                        <p className="text-sm text-red-700">
-                          Your OnlyFans account needs re-authorization. This usually happens when you change your password.
-                        </p>
-                      </div>
-                      <button 
-                        onClick={handleReconnect}
-                        className="px-6 py-3 bg-indigo-600 text-white rounded-lg font-semibold hover:bg-indigo-700 transition-colors"
-                      >
-                        Reconnect
-                      </button>
-                    </div>
+                    <ReconnectAccount 
+                      modelId={modelId}
+                      onSuccess={(accId) => {
+                        setAccountId(accId)
+                        setConnectionStatus('connected')
+                        checkConnection()
+                      }}
+                    />
                   </div>
                 ) : (
                   <ConnectOnlyFans 
