@@ -428,24 +428,32 @@ export default function VaultTab({ modelId }) {
   }
 
   // 🎬 ASSIGN MEDIA TO PART
-  const handleAssignMediaToPart = async (media) => {
+  const handleAssignMediaToPart = async (medias) => {
     if (!selectingForPart) return
+
+    // Asegurar que siempre sea array
+    const mediasArray = Array.isArray(medias) ? medias : [medias]
 
     setSaving(true)
     try {
+      // Preparar IDs y thumbnails
+      const mediaIds = mediasArray.map(m => m.id.toString())
+      const thumbnails = {}
+      mediasArray.forEach(m => {
+        thumbnails[m.id] = m.thumb || null
+      })
+
       const { error } = await supabase
         .from('catalog')
         .update({
-          of_media_ids: [media.id],
-          media_thumbnails: {
-            [media.id]: media.thumb?.url || media.preview?.url
-          }
+          of_media_ids: mediaIds,
+          media_thumbnails: thumbnails
         })
         .eq('id', selectingForPart.id)
 
       if (error) throw error
 
-      showMessage('success', '✅ Media assigned!')
+      showMessage('success', `✅ ${mediaIds.length} media(s) assigned!`)
       setShowMediaSelector(false)
       setSelectingForPart(null)
       
@@ -1121,8 +1129,8 @@ function MediaSelectorModal({ medias, onSelect, onClose, partTitle, currentMedia
 
   const handleConfirmAssign = () => {
     if (selectedMedias.length > 0) {
-      // For now, only assign first media (DB structure supports array but let's keep it simple)
-      onSelect(selectedMedias[0])
+      // Pass ALL selected medias
+      onSelect(selectedMedias)
       onClose()
     }
   }
