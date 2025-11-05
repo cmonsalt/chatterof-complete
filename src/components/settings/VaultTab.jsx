@@ -756,40 +756,48 @@ function VaultMediaGrid({ medias, loading, onMediaClick }) {
   }
 
   return (
-    <div className="grid grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-2">
-      {medias.map(media => (
-        <div 
-          key={media.id} 
-          onClick={() => onMediaClick && onMediaClick(media)}
-          className="border rounded overflow-hidden hover:shadow-lg hover:border-purple-500 transition-all cursor-pointer"
-        >
-          <div className="aspect-square bg-gray-100 relative flex items-center justify-center overflow-hidden">
-            {media.thumb ? (
-              <img 
-                src={media.thumb}
-                alt={`Media ${media.id}`}
-                className="w-full h-full object-cover"
-                onError={(e) => {
-                  e.target.style.display = 'none'
-                  e.target.nextSibling.style.display = 'flex'
-                }}
-              />
-            ) : null}
-            <div 
-              className="text-3xl"
-              style={{ display: media.thumb ? 'none' : 'flex' }}
-            >
-              {media.type === 'video' ? '🎥' : media.type === 'audio' ? '🎵' : '📷'}
+    <div className="grid grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-3">
+      {medias.map(media => {
+        // Usar proxy para cargar thumbnails
+        const thumbUrl = media.thumb 
+          ? `https://images.weserv.nl/?url=${encodeURIComponent(media.thumb)}&w=200&h=200&fit=cover`
+          : null
+        
+        return (
+          <div 
+            key={media.id} 
+            onClick={() => onMediaClick && onMediaClick(media)}
+            className="border rounded-lg overflow-hidden hover:shadow-lg hover:border-purple-500 transition-all cursor-pointer group"
+          >
+            <div className="aspect-square bg-gray-100 relative flex items-center justify-center overflow-hidden">
+              {thumbUrl ? (
+                <img 
+                  src={thumbUrl}
+                  alt={`Media ${media.id}`}
+                  className="w-full h-full object-cover"
+                  onError={(e) => {
+                    e.target.style.display = 'none'
+                    e.target.nextSibling.style.display = 'flex'
+                  }}
+                />
+              ) : null}
+              <div 
+                className="flex items-center justify-center w-full h-full text-4xl"
+                style={{ display: thumbUrl ? 'none' : 'flex' }}
+              >
+                {media.type === 'video' ? '🎥' : media.type === 'audio' ? '🎵' : '📷'}
+              </div>
+            </div>
+            
+            <div className="p-1.5 bg-white">
+              <p className="text-[10px] text-gray-600 truncate text-center flex items-center justify-center gap-1">
+                <span>{media.type === 'video' ? '🎥' : '📷'}</span>
+                <span>{media.likesCount || 0}❤️</span>
+              </p>
             </div>
           </div>
-          
-          <div className="p-1 bg-white">
-            <p className="text-[9px] text-gray-600 truncate text-center">
-              {media.likesCount || 0}❤️
-            </p>
-          </div>
-        </div>
-      ))}
+        )
+      })}
     </div>
   )
 }
