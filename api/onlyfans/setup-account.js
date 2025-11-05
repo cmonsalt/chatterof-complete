@@ -33,7 +33,38 @@ export default async function handler(req, res) {
       throw new Error('ONLYFANS_API_KEY not configured')
     }
 
-    console.log(`[Setup] Starting initial sync for ${accountId}`)
+    console.log(`[Setup] Starting setup for ${accountId}`)
+
+    // Check if model already exists
+    const { data: existingModel } = await supabase
+      .from('models')
+      .select('model_id, name, of_account_id')
+      .eq('model_id', modelId)
+      .single()
+
+    // If model exists, just update account_id (reconnect)
+    if (existingModel) {
+      console.log(`[Setup] Model ${modelId} already exists, reconnecting...`)
+      
+      await supabase
+        .from('models')
+        .update({ 
+          of_account_id: accountId,
+          updated_at: new Date().toISOString()
+        })
+        .eq('model_id', modelId)
+
+      return res.status(200).json({
+        success: true,
+        reconnected: true,
+        message: `Account reconnected for ${existingModel.name}`,
+        modelId,
+        accountId
+      })
+    }
+
+    // New model - do full setup
+    console.log(`[Setup] New model detected, starting initial sync...`)
 
     let creditsUsed = 0
     let totalFans = 0
