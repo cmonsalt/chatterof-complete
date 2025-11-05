@@ -17,6 +17,8 @@ export default async function handler(req, res) {
       throw new Error('ONLYFANS_API_KEY not configured')
     }
 
+    console.log(`[Authenticate] Starting authentication for: ${email}`)
+
     // Step 1: Start authentication
     const response = await fetch('https://app.onlyfansapi.com/api/authenticate', {
       method: 'POST',
@@ -29,6 +31,13 @@ export default async function handler(req, res) {
 
     const data = await response.json()
 
+    console.log(`[Authenticate] Response:`, {
+      status: response.status,
+      hasAttemptId: !!data.attempt_id,
+      hasAccountId: !!data.account_id,
+      dataKeys: Object.keys(data)
+    })
+
     if (!response.ok) {
       return res.status(response.status).json({
         error: data.message || 'Authentication failed',
@@ -40,7 +49,7 @@ export default async function handler(req, res) {
     return res.status(200).json(data)
 
   } catch (error) {
-    console.error('Authentication error:', error)
+    console.error('[Authenticate] Error:', error)
     return res.status(500).json({ 
       error: 'Authentication failed',
       message: error.message 

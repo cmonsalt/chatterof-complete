@@ -9,6 +9,7 @@ export default function ConnectOnlyFans({ modelId, onSuccess }) {
   const [error, setError] = useState(null)
   const [attemptId, setAttemptId] = useState(null)
   const [accountId, setAccountId] = useState(null)
+  const [pollingAttempts, setPollingAttempts] = useState(0)
   
   const [formData, setFormData] = useState({
     email: '',
@@ -59,35 +60,54 @@ export default function ConnectOnlyFans({ modelId, onSuccess }) {
     }
   }
 
-  // Step 2: Poll authentication status (via backend)
-  const pollAuthStatus = async (id) => {
+  // Step 2: Poll authentication status (via backend) with timeout
+  const pollAuthStatus = async (id, attempts = 0) => {
+    const MAX_ATTEMPTS = 30 // 30 intentos × 2s = 60 segundos max
+    
     try {
+      setPollingAttempts(attempts + 1)
+      
+      if (attempts >= MAX_ATTEMPTS) {
+        throw new Error('Authentication timeout. Please check OnlyFansAPI dashboard and try again.')
+      }
+
       const response = await fetch(`/api/onlyfans/check-auth-status?attemptId=${id}`)
       const data = await response.json()
 
-      if (data.twoFactorPending) {
+      console.log(`[Polling attempt ${attempts + 1}] Status:`, data)
+
+      // Check if 2FA is needed
+      if (data.twoFactorPending || data.requires2FA || data.status === 'awaiting_2fa') {
+        console.log('2FA required')
         setStep('twofa')
         setLoading(false)
         return
       }
 
+      // Check if completed successfully
       if (data.completed && data.account_id) {
+        console.log('Authentication completed:', data.account_id)
         setAccountId(data.account_id)
         await saveAccountId(data.account_id)
         setLoading(false)
         return
       }
 
-      if (data.status === 'pending' || data.status === 'authenticating') {
-        setTimeout(() => pollAuthStatus(id), 2000)
+      // Check if still pending
+      if (data.status === 'pending' || data.status === 'authenticating' || data.status === 'processing') {
+        console.log('Still processing, continue polling...')
+        setTimeout(() => pollAuthStatus(id, attempts + 1), 2000)
         return
       }
 
-      if (data.error) {
-        throw new Error(data.error)
+      // Check for errors
+      if (data.error || data.status === 'failed') {
+        throw new Error(data.error || data.message || 'Authentication failed')
       }
 
-      setTimeout(() => pollAuthStatus(id), 2000)
+      // If we don't know the status, keep trying
+      console.log('Unknown status, continue polling...')
+      setTimeout(() => pollAuthStatus(id, attempts + 1), 2000)
 
     } catch (err) {
       console.error('Poll error:', err)
@@ -166,7 +186,28 @@ export default function ConnectOnlyFans({ modelId, onSuccess }) {
           borderRadius: '0.5rem',
           color: '#991b1b'
         }}>
-          {error}
+          <div style={{ marginBottom: '0.5rem' }}>{error}</div>
+          {error.includes('timeout') && (
+            <button
+              onClick={() => {
+                setError(null)
+                setStep('email')
+                setLoading(false)
+              }}
+              style={{
+                marginTop: '0.5rem',
+                padding: '0.5rem 1rem',
+                background: '#dc2626',
+                color: 'white',
+                border: 'none',
+                borderRadius: '0.375rem',
+                fontSize: '0.875rem',
+                cursor: 'pointer'
+              }}
+            >
+              Try Again
+            </button>
+          )}
         </div>
       )}
 
@@ -248,7 +289,10 @@ export default function ConnectOnlyFans({ modelId, onSuccess }) {
             Authenticating...
           </p>
           <p style={{ fontSize: '0.875rem', color: '#6b7280', marginTop: '0.5rem' }}>
-            This may take a few seconds
+            Checking status ({pollingAttempts}/30)
+          </p>
+          <p style={{ fontSize: '0.75rem', color: '#9ca3af', marginTop: '0.25rem' }}>
+            This may take up to 60 seconds
           </p>
         </div>
       )}
