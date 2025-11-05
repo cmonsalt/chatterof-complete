@@ -449,10 +449,17 @@ export default function VaultTab({ modelId }) {
             {loadingVault ? '🔄 Syncing...' : '🔄 Refresh Vault'}
           </button>
           <button
-            onClick={() => setShowNewSessionModal(true)}
-            className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
+            onClick={() => {
+              if (activeTab === 'sessions') {
+                setShowNewSessionModal(true)
+              } else if (activeTab === 'singles') {
+                setShowNewSingleModal(true)
+              }
+            }}
+            disabled={activeTab === 'vault'}
+            className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            + Create Session
+            + {activeTab === 'sessions' ? 'Create Session' : activeTab === 'singles' ? 'Create Single' : 'Create'}
           </button>
         </div>
       </div>
@@ -712,6 +719,8 @@ function SinglesView({
 
 // Vault Media Grid
 function VaultMediaGrid({ medias, loading, onMediaClick }) {
+  const [loadedImages, setLoadedImages] = React.useState({})
+
   if (loading) {
     return <div className="text-center py-12">Loading vault...</div>
   }
@@ -725,27 +734,47 @@ function VaultMediaGrid({ medias, loading, onMediaClick }) {
   }
 
   return (
-    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-      {medias.map(media => (
-        <div 
-          key={media.id} 
-          onClick={() => onMediaClick && onMediaClick(media)}
-          className="border rounded-lg overflow-hidden hover:shadow-lg transition-all cursor-pointer hover:scale-105"
-        >
-          <div className="aspect-video bg-gray-100 relative flex items-center justify-center">
-            <div className="text-6xl">
-              {media.type === 'video' ? '🎥' : media.type === 'audio' ? '🎵' : '📷'}
+    <div className="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
+      {medias.map(media => {
+        const hasImage = loadedImages[media.id]
+        
+        return (
+          <div 
+            key={media.id} 
+            onClick={() => onMediaClick && onMediaClick(media)}
+            className="border rounded-lg overflow-hidden hover:shadow-lg hover:border-purple-500 transition-all cursor-pointer group"
+          >
+            <div className="aspect-square bg-gray-100 relative flex items-center justify-center overflow-hidden">
+              {hasImage ? (
+                <img 
+                  src={hasImage}
+                  alt={`Media ${media.id}`}
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <div className="text-4xl">
+                  {media.type === 'video' ? '🎥' : media.type === 'audio' ? '🎵' : '📷'}
+                </div>
+              )}
+              
+              {/* Overlay on hover */}
+              <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-40 transition-all flex items-center justify-center">
+                <span className="text-white opacity-0 group-hover:opacity-100 text-sm font-medium">
+                  Click to assign
+                </span>
+              </div>
+            </div>
+            
+            <div className="p-1.5 bg-white">
+              <p className="text-[10px] text-gray-600 truncate flex items-center gap-1">
+                <span>{media.type === 'video' ? '🎥' : media.type === 'audio' ? '🎵' : '📷'}</span>
+                <span>❤️ {media.likesCount || 0}</span>
+                {media.duration > 0 && <span>⏱️ {media.duration}s</span>}
+              </p>
             </div>
           </div>
-          <div className="p-2">
-            <p className="text-xs text-gray-600 truncate">
-              {media.type === 'video' ? '🎥' : media.type === 'audio' ? '🎵' : '📷'} 
-              {' '}
-              {media.type} • {media.likesCount || 0} ❤️
-            </p>
-          </div>
-        </div>
-      ))}
+        )
+      })}
     </div>
   )
 }
