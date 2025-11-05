@@ -48,7 +48,7 @@ export default async function handler(req, res) {
     const limit = 50
     let hasMore = true
 
-    while (hasMore && allMedias.length < 500) { // Max 500 para evitar timeout
+    while (hasMore && allMedias.length < 20) { // Max 20 para asegurar timeout
       const vaultResponse = await fetch(
         `https://app.onlyfansapi.com/api/${model.of_account_id}/media/vault?limit=${limit}&offset=${offset}`,
         {
@@ -167,7 +167,7 @@ export default async function handler(req, res) {
       }
     }
 
-    // Mark model as scraped
+    // Mark as scraped
     await supabase
       .from('models')
       .update({ 
@@ -178,11 +178,27 @@ export default async function handler(req, res) {
 
     console.log(`🎉 Scrape complete: ${scrapedCount} success, ${errorCount} errors`)
 
+    // Check if there's more to scrape
+    const totalVaultResponse = await fetch(
+      `https://app.onlyfansapi.com/api/${model.of_account_id}/media/vault?limit=1&offset=${offset}`,
+      {
+        headers: { 
+          'Authorization': `Bearer ${API_KEY}`,
+          'Content-Type': 'application/json'
+        }
+      }
+    )
+    
+    const totalVaultData = await totalVaultResponse.json()
+    const stillHasMore = totalVaultData.data?.hasMore || false
+
     res.status(200).json({
       success: true,
       scraped: scrapedCount,
       errors: errorCount,
-      total: medias.length
+      total: medias.length,
+      hasMore: stillHasMore,
+      nextOffset: stillHasMore ? offset : null
     })
 
   } catch (error) {
