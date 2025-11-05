@@ -291,6 +291,46 @@ export default function VaultTab({ modelId }) {
     }
   }
 
+  const handleCreateSingle = async (e) => {
+    e.preventDefault()
+    
+    if (!singleForm.title || singleForm.base_price <= 0) {
+      showMessage('error', 'Please fill title and price')
+      return
+    }
+
+    setSaving(true)
+    try {
+      const { error } = await supabase
+        .from('catalog')
+        .insert({
+          model_id: modelId,
+          offer_id: `single_${Date.now()}`,
+          parent_type: 'single',
+          title: singleForm.title,
+          description: singleForm.description,
+          base_price: parseFloat(singleForm.base_price),
+          nivel: parseInt(singleForm.nivel),
+          tags: singleForm.tags,
+          of_media_ids: [],
+          media_thumbnails: {}
+        })
+
+      if (error) throw error
+
+      showMessage('success', `✅ Single "${singleForm.title}" created!`)
+      setSingleForm({ title: '', description: '', base_price: 0, nivel: 5, tags: '', of_media_ids: [] })
+      setShowNewSingleModal(false)
+      await loadSingles()
+      
+    } catch (error) {
+      console.error('Error creating single:', error)
+      showMessage('error', 'Error creating single')
+    } finally {
+      setSaving(false)
+    }
+  }
+
   const handleDeleteSingle = async (singleId) => {
     if (!confirm('Delete this single?')) return
 
@@ -333,8 +373,8 @@ export default function VaultTab({ modelId }) {
         throw new Error('No OnlyFans account connected')
       }
 
-      // Use thumb URL for scraping (or full URL as fallback)
-      const urlToScrape = media.thumb || media.preview || media.full || media.id.toString()
+      // Use FULL image for better quality (not thumb)
+      const urlToScrape = media.full || media.preview || media.thumb
 
       // Scrape media to get temporary URL
       const response = await fetch(
@@ -599,6 +639,17 @@ export default function VaultTab({ modelId }) {
           setSessionForm={setSessionForm}
           handleCreateSession={handleCreateSession}
           setShowNewSessionModal={setShowNewSessionModal}
+          saving={saving}
+        />
+      )}
+
+      {/* New Single Modal */}
+      {showNewSingleModal && (
+        <NewSingleModal
+          singleForm={singleForm}
+          setSingleForm={setSingleForm}
+          handleCreateSingle={handleCreateSingle}
+          setShowNewSingleModal={setShowNewSingleModal}
           saving={saving}
         />
       )}
@@ -977,38 +1028,90 @@ function MediaPreviewModal({
             </div>
           )}
 
-          <div className="mt-4 p-4 bg-gray-50 rounded-lg">
-            <div className="grid grid-cols-2 gap-4 text-sm">
-              <div>
-                <span className="text-gray-600">Type:</span>
-                <span className="ml-2 font-medium">
-                  {media?.type === 'video' ? '🎥 Video' : media?.type === 'audio' ? '🎵 Audio' : '📷 Photo'}
-                </span>
-              </div>
-              <div>
-                <span className="text-gray-600">Likes:</span>
-                <span className="ml-2 font-medium">❤️ {media?.likesCount || 0}</span>
-              </div>
-            </div>
+          <
+// New Single Modal
+function NewSingleModal({ singleForm, setSingleForm, handleCreateSingle, setShowNewSingleModal, saving }) {
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div className="bg-white rounded-lg p-6 max-w-md w-full">
+        <h3 className="text-xl font-bold mb-4">Create Single PPV</h3>
+        
+        <form onSubmit={handleCreateSingle} className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium mb-1">Title *</label>
+            <input
+              type="text"
+              value={singleForm.title}
+              onChange={(e) => setSingleForm({ ...singleForm, title: e.target.value })}
+              className="w-full px-3 py-2 border rounded-lg"
+              required
+            />
           </div>
-        </div>
 
-        <div className="p-4 border-t flex justify-end gap-2">
-          <button
-            onClick={onClose}
-            className="px-6 py-2 border rounded-lg hover:bg-gray-50"
-          >
-            Close
-          </button>
-          {onAssign && (
+          <div>
+            <label className="block text-sm font-medium mb-1">Description</label>
+            <textarea
+              value={singleForm.description}
+              onChange={(e) => setSingleForm({ ...singleForm, description: e.target.value })}
+              className="w-full px-3 py-2 border rounded-lg"
+              rows="3"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium mb-1">Base Price ($) *</label>
+            <input
+              type="number"
+              min="0"
+              step="0.01"
+              value={singleForm.base_price}
+              onChange={(e) => setSingleForm({ ...singleForm, base_price: parseFloat(e.target.value) || 0 })}
+              className="w-full px-3 py-2 border rounded-lg"
+              required
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium mb-1">Nivel (1-10)</label>
+            <input
+              type="number"
+              min="1"
+              max="10"
+              value={singleForm.nivel}
+              onChange={(e) => setSingleForm({ ...singleForm, nivel: parseInt(e.target.value) || 5 })}
+              className="w-full px-3 py-2 border rounded-lg"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium mb-1">Tags</label>
+            <input
+              type="text"
+              value={singleForm.tags}
+              onChange={(e) => setSingleForm({ ...singleForm, tags: e.target.value })}
+              className="w-full px-3 py-2 border rounded-lg"
+              placeholder="lingerie, solo, etc"
+            />
+          </div>
+
+          <div className="flex gap-2 pt-4">
             <button
-              onClick={onAssign}
-              className="px-6 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700"
+              type="button"
+              onClick={() => setShowNewSingleModal(false)}
+              className="flex-1 px-4 py-2 border rounded-lg hover:bg-gray-50"
+              disabled={saving}
             >
-              Assign to Part
+              Cancel
             </button>
-          )}
-        </div>
+            <button
+              type="submit"
+              className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50"
+              disabled={saving}
+            >
+              {saving ? 'Creating...' : 'Create Single'}
+            </button>
+          </div>
+        </form>
       </div>
     </div>
   )
