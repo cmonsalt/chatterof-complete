@@ -1028,7 +1028,43 @@ function MediaPreviewModal({
             </div>
           )}
 
-          <
+          <div className="mt-4 p-4 bg-gray-50 rounded-lg">
+            <div className="grid grid-cols-2 gap-4 text-sm">
+              <div>
+                <span className="text-gray-600">Type:</span>
+                <span className="ml-2 font-medium">
+                  {media?.type === 'video' ? '🎥 Video' : media?.type === 'audio' ? '🎵 Audio' : '📷 Photo'}
+                </span>
+              </div>
+              <div>
+                <span className="text-gray-600">Likes:</span>
+                <span className="ml-2 font-medium">❤️ {media?.likesCount || 0}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="p-4 border-t flex justify-end gap-2">
+          <button
+            onClick={onClose}
+            className="px-6 py-2 border rounded-lg hover:bg-gray-50"
+          >
+            Close
+          </button>
+          {onAssign && (
+            <button
+              onClick={onAssign}
+              className="px-6 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700"
+            >
+              Assign to Part
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // New Single Modal
 function NewSingleModal({ singleForm, setSingleForm, handleCreateSingle, setShowNewSingleModal, saving }) {
   return (
