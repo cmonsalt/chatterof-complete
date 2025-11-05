@@ -692,7 +692,6 @@ export default function VaultTab({ modelId }) {
         <MediaSelectorModal
           medias={vaultMedias}
           onSelect={handleAssignMediaToPart}
-          onMediaClick={openPreviewModal}
           onClose={() => {
             setShowMediaSelector(false)
             setSelectingForPart(null)
@@ -1010,10 +1009,23 @@ function VaultMediaGrid({ medias, loading, onMediaClick }) {
 }
 
 // Media Selector Modal
-function MediaSelectorModal({ medias, onSelect, onClose, partTitle, onMediaClick }) {
+function MediaSelectorModal({ medias, onSelect, onClose, partTitle }) {
+  const [selectedMedia, setSelectedMedia] = useState(null)
+
+  const handleMediaClick = (media) => {
+    setSelectedMedia(media)
+  }
+
+  const handleConfirmAssign = () => {
+    if (selectedMedia) {
+      onSelect(selectedMedia)
+      onClose()
+    }
+  }
+
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg max-w-6xl w-full max-h-[85vh] overflow-hidden">
+      <div className="bg-white rounded-lg max-w-6xl w-full max-h-[85vh] overflow-hidden flex flex-col">
         <div className="p-6 border-b flex items-center justify-between">
           <h3 className="text-xl font-bold">Select Media for: {partTitle}</h3>
           <button
@@ -1024,42 +1036,97 @@ function MediaSelectorModal({ medias, onSelect, onClose, partTitle, onMediaClick
           </button>
         </div>
         
-        <div className="p-6 overflow-y-auto max-h-[65vh]">
-          <div className="grid grid-cols-4 md:grid-cols-6 gap-3">
-            {medias.map(media => (
-              <div
-                key={media.id}
-                onClick={() => onMediaClick(media)}
-                className="border rounded-lg overflow-hidden hover:shadow-lg hover:border-purple-500 transition-all cursor-pointer group"
-              >
-                <div className="aspect-square bg-gray-100 relative flex items-center justify-center">
-                  <div className="text-4xl">
-                    {media.type === 'video' ? '🎥' : media.type === 'audio' ? '🎵' : '📷'}
+        <div className="flex-1 overflow-hidden flex">
+          {/* Grid de medias */}
+          <div className="flex-1 p-6 overflow-y-auto">
+            <div className="grid grid-cols-4 md:grid-cols-5 gap-3">
+              {medias.map(media => (
+                <div
+                  key={media.id}
+                  onClick={() => handleMediaClick(media)}
+                  className={`border rounded-lg overflow-hidden hover:shadow-lg transition-all cursor-pointer ${
+                    selectedMedia?.id === media.id ? 'border-purple-500 border-2' : 'border-gray-200'
+                  }`}
+                >
+                  <div className="aspect-square bg-gray-100 relative flex items-center justify-center">
+                    {media.thumb ? (
+                      <img 
+                        src={media.thumb}
+                        alt={`Media ${media.id}`}
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <div className="text-3xl">
+                        {media.type === 'video' ? '🎥' : media.type === 'audio' ? '🎵' : '📷'}
+                      </div>
+                    )}
+                    {selectedMedia?.id === media.id && (
+                      <div className="absolute inset-0 bg-purple-500 bg-opacity-20 flex items-center justify-center">
+                        <span className="text-white text-2xl">✓</span>
+                      </div>
+                    )}
                   </div>
                   
-                  <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-40 transition-all flex items-center justify-center">
-                    <span className="text-white opacity-0 group-hover:opacity-100 text-xs font-medium">
-                      Preview
-                    </span>
+                  <div className="p-1 bg-white">
+                    <p className="text-[9px] text-gray-600 truncate text-center">
+                      {media.type === 'video' ? '🎥' : '📷'} {media.likesCount || 0}❤️
+                    </p>
                   </div>
                 </div>
-                
-                <div className="p-1 bg-white">
-                  <p className="text-[9px] text-gray-600 truncate text-center">
-                    {media.type === 'video' ? '🎥' : '📷'} {media.likesCount || 0}❤️
-                  </p>
-                </div>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
+
+          {/* Preview panel */}
+          {selectedMedia && (
+            <div className="w-96 border-l p-6 overflow-y-auto bg-gray-50">
+              <h4 className="font-semibold mb-3">Preview</h4>
+              <div className="aspect-video bg-gray-200 rounded-lg flex items-center justify-center mb-4">
+                {selectedMedia.thumb ? (
+                  <img 
+                    src={selectedMedia.thumb}
+                    alt="Preview"
+                    className="w-full h-full object-contain"
+                  />
+                ) : (
+                  <div className="text-6xl">
+                    {selectedMedia.type === 'video' ? '🎥' : selectedMedia.type === 'audio' ? '🎵' : '📷'}
+                  </div>
+                )}
+              </div>
+              <div className="space-y-2 text-sm">
+                <div>
+                  <span className="text-gray-600">Type:</span>
+                  <span className="ml-2 font-medium">{selectedMedia.type}</span>
+                </div>
+                <div>
+                  <span className="text-gray-600">Likes:</span>
+                  <span className="ml-2 font-medium">❤️ {selectedMedia.likesCount || 0}</span>
+                </div>
+                {selectedMedia.duration && (
+                  <div>
+                    <span className="text-gray-600">Duration:</span>
+                    <span className="ml-2 font-medium">{selectedMedia.duration}s</span>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
         </div>
 
-        <div className="p-4 border-t flex justify-end">
+        <div className="p-4 border-t flex justify-between">
           <button
             onClick={onClose}
             className="px-6 py-2 bg-gray-200 rounded-lg hover:bg-gray-300"
           >
             Cancel
+          </button>
+          <button
+            onClick={handleConfirmAssign}
+            disabled={!selectedMedia}
+            className="px-6 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            Assign to {partTitle}
           </button>
         </div>
       </div>
