@@ -96,21 +96,43 @@ export default function SessionManager({ isOpen, onClose, modelId, editingSessio
         .from('catalog')
         .select('*')
         .eq('session_id', sessionId)
+        .not('step_number', 'is', null) // Solo cargar items con step_number (parts principales)
         .order('step_number', { ascending: true })
 
       if (error) throw error
       
-      const loadedParts = data.map(part => ({
-        id: part.id,
-        step_number: part.step_number,
-        title: part.title,
-        base_price: part.base_price,
-        nivel: part.nivel,
-        keywords: part.keywords || [],
-        selectedMedias: part.of_media_ids ? 
-          part.of_media_ids.map(id => ({ of_media_id: id })) : [],
-        keywordInput: ''
-      }))
+      // También necesitamos cargar info de los medias seleccionados
+      const { data: allSessionMedias } = await supabase
+        .from('catalog')
+        .select('*')
+        .eq('session_id', sessionId)
+      
+      const loadedParts = data.map(part => {
+        // Obtener todos los IDs de medias de este part
+        // Incluir of_media_id principal y los del array of_media_ids
+        let mediaIds = []
+        if (part.of_media_ids && part.of_media_ids.length > 0) {
+          mediaIds = part.of_media_ids
+        } else if (part.of_media_id) {
+          mediaIds = [part.of_media_id]
+        }
+        
+        // Buscar info completa de cada media
+        const mediasWithInfo = mediaIds
+          .map(id => allSessionMedias.find(m => m.of_media_id === id))
+          .filter(Boolean)
+        
+        return {
+          id: part.id,
+          step_number: part.step_number,
+          title: part.title,
+          base_price: part.base_price,
+          nivel: part.nivel,
+          keywords: part.keywords || [],
+          selectedMedias: mediasWithInfo,
+          keywordInput: ''
+        }
+      })
 
       setParts(loadedParts)
       setNumParts(loadedParts.length)
@@ -121,6 +143,7 @@ export default function SessionManager({ isOpen, onClose, modelId, editingSessio
 
   const handleNumPartsChange = (count) => {
     setNumParts(count)
+    // Solo inicializar parts si NO estamos editando
     if (!editingSession) {
       initializeParts(count)
     }

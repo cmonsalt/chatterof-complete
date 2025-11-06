@@ -39,7 +39,8 @@ export default function CatalogView({ modelId }) {
       const singlesArray = []
 
       data.forEach(item => {
-        // Sessions: items que tienen session_id
+        // Sessions: items que tienen session_id Y step_number (son parts principales)
+        // Los medias secundarios tienen session_id pero NO tienen step_number
         if (item.session_id && item.step_number != null) {
           if (!sessionsMap.has(item.session_id)) {
             sessionsMap.set(item.session_id, {
