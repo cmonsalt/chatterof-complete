@@ -61,28 +61,30 @@ export default function ChatView({ embedded = false }) {  // ✅ Agregar prop
     
     const lastMessage = messages[0]; // Más reciente
     
-    // Si el último mensaje es del fan, marcar todos los mensajes del modelo como leídos
+    // Si el último mensaje es del fan, marcar todos los mensajes anteriores del modelo como leídos
     if (lastMessage?.from === 'fan') {
-      markModelMessagesAsRead();
+      markPreviousModelMessagesAsRead(lastMessage.ts);
     }
   }, [messages]);
 
-  async function markModelMessagesAsRead() {
+  async function markPreviousModelMessagesAsRead(fanMessageTime) {
     if (!fanId || !modelId) return;
     
     try {
+      // Marcar como leídos solo los mensajes del modelo que son ANTERIORES al mensaje del fan
       const { error } = await supabase
         .from('chat')
         .update({ read: true })
         .eq('fan_id', fanId)
         .eq('model_id', modelId)
         .eq('from', 'model')
-        .eq('read', false);
+        .eq('read', false)
+        .lt('ts', fanMessageTime); // Solo mensajes anteriores al del fan
       
       if (error) {
         console.error('Error marking messages as read:', error);
       } else {
-        console.log('✅ Messages marked as read');
+        console.log('✅ Previous messages marked as read');
       }
     } catch (err) {
       console.error('Error:', err);
