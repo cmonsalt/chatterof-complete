@@ -21,8 +21,8 @@ export default async function handler(req, res) {
   }
 
   const { accountId, modelId, offset = 0 } = req.body
-  const messagesLimit = 50 // Increased from 20
-  const chatsLimit = 20 // Increased from 10
+  const messagesLimit = 50 // Últimos 50 mensajes por chat
+  const chatsLimit = 20 // 20 chats por request
 
   if (!accountId || !modelId) {
     return res.status(400).json({ error: 'accountId and modelId required' })
@@ -37,15 +37,15 @@ export default async function handler(req, res) {
 
     let syncedMessages = 0
     let totalChats = 0
+    let skippedInactive = 0
     let skippedNoConversation = 0
     let creditsUsed = 0
 
+    // Fetch chats
     const response = await fetch(
       `https://app.onlyfansapi.com/api/${accountId}/chats?limit=${chatsLimit}&offset=${offset}`,
       {
-        headers: {
-          'Authorization': `Bearer ${API_KEY}`
-        }
+        headers: { 'Authorization': `Bearer ${API_KEY}` }
       }
     )
 
@@ -60,8 +60,7 @@ export default async function handler(req, res) {
         
         return res.status(401).json({
           error: 'Authentication failed',
-          needsReauth: true,
-          message: 'Account needs re-authorization'
+          needsReauth: true
         })
       }
       
@@ -69,13 +68,16 @@ export default async function handler(req, res) {
     }
 
     const responseData = await response.json()
-    
     const chats = responseData.data || []
     const hasMore = responseData._pagination?.next_page ? true : false
     totalChats = chats.length
     creditsUsed = responseData._meta?._credits?.used || 1
 
-    console.log(`📨 Fetched ${chats.length} chats at offset ${offset}`)
+    console.log(`💬 Fetched ${chats.length} chats at offset ${offset}`)
+
+    // Calculate 30 days ago
+    const thirtyDaysAgo = new Date()
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
 
     for (const chat of chats) {
       const fanData = chat.fan
@@ -83,31 +85,21 @@ export default async function handler(req, res) {
       
       if (!fanId) continue
 
-      const subData = fanData.subscribedOnData
-      const lastSubscribe = subData?.subscribes?.[0]
+      // FILTER 1: Skip if inactive (>30 days)
+      if (chat.lastMessage?.createdAt) {
+        const lastMessageDate = new Date(chat.lastMessage.createdAt)
+        if (lastMessageDate < thirtyDaysAgo) {
+          console.log(`  ⏭️ Skip fan ${fanId}: inactive >30 days`)
+          skippedInactive++
+          continue
+        }
+      }
 
-      // Ensure fan exists
-      await supabase.from('fans').upsert({
-        fan_id: fanId,
-        name: fanData.name || fanData.username || 'Unknown',
-        model_id: modelId,
-        of_username: fanData.username,
-        of_avatar_url: fanData.avatar,
-        last_message_date: chat.lastMessage?.createdAt,
-        spent_total: parseFloat(subData?.totalSumm || 0),
-        subscription_type: lastSubscribe?.type || null,
-        subscription_price: parseFloat(lastSubscribe?.price || 0),
-        is_renewal_enabled: fanData.subscribedByAutoprolong || false,
-        subscription_expires_at: lastSubscribe?.expireDate || null
-      }, { onConflict: 'fan_id,model_id' })
-
-      // Fetch messages for this chat
+      // Fetch messages
       try {
         const messagesResponse = await fetch(
           `https://app.onlyfansapi.com/api/${accountId}/chats/${fanId}/messages?limit=${messagesLimit}`,
-          {
-            headers: { 'Authorization': `Bearer ${API_KEY}` }
-          }
+          { headers: { 'Authorization': `Bearer ${API_KEY}` } }
         )
 
         if (messagesResponse.ok) {
@@ -115,7 +107,7 @@ export default async function handler(req, res) {
           const messages = messagesData.data || []
           creditsUsed += messagesData._meta?._credits?.used || 1
 
-          // CRITICAL FILTER: Only sync if fan has replied
+          // FILTER 2: Skip if no fan messages (only model spam)
           const hasFanMessages = messages.some(msg => !msg.isSentByMe)
 
           if (!hasFanMessages) {
@@ -124,7 +116,7 @@ export default async function handler(req, res) {
             continue
           }
 
-          console.log(`  ✅ Fan ${fanId}: ${messages.length} messages (has real conversation)`)
+          console.log(`  ✅ Fan ${fanId}: ${messages.length} messages (real conversation)`)
 
           for (const msg of messages) {
             // Generate messageId if null
@@ -154,28 +146,30 @@ export default async function handler(req, res) {
               .upsert(chatData, { onConflict: 'of_message_id,model_id' })
 
             if (!error) syncedMessages++
+            else console.error('❌ Error saving message:', msg.id, error)
           }
         }
       } catch (msgError) {
-        console.error(`Error fetching messages for fan ${fanId}:`, msgError)
+        console.error(`💥 Error for fan ${fanId}:`, msgError)
       }
     }
 
-    console.log(`✅ Sync complete: ${syncedMessages} messages, skipped ${skippedNoConversation} spam-only chats`)
+    console.log(`✅ Complete: ${syncedMessages} msgs, skipped ${skippedInactive} inactive + ${skippedNoConversation} no-conversation`)
 
     return res.status(200).json({
       success: true,
       syncedMessages,
       totalChats,
+      skippedInactive,
       skippedNoConversation,
       hasMore,
       nextOffset: hasMore ? offset + chatsLimit : null,
       creditsUsed,
-      message: `Synced ${syncedMessages} messages from ${totalChats} chats (skipped ${skippedNoConversation} spam-only)`
+      message: `Synced ${syncedMessages} messages from ${totalChats - skippedInactive - skippedNoConversation} active chats`
     })
 
   } catch (error) {
-    console.error('Sync chats error:', error)
+    console.error('💥 Sync chats error:', error)
     return res.status(500).json({
       error: 'Failed to sync chats',
       details: error.message

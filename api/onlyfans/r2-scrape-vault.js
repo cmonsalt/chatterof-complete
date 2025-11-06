@@ -29,10 +29,10 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'modelId required' })
     }
 
-    // Get OF account ID
+    // Get model info
     const { data: model } = await supabase
       .from('models')
-      .select('of_account_id, vault_media_count, vault_scraped_at')
+      .select('of_account_id, vault_media_count, vault_total_count')
       .eq('model_id', modelId)
       .single()
 
@@ -42,12 +42,12 @@ export default async function handler(req, res) {
 
     console.log(`📥 Vault scrape for ${modelId} at offset ${offset}`)
 
-    // CRITICAL: Only scrape 20 medias per request to avoid timeout
+    // CRITICAL: Process only 20 medias per request (avoid 5min timeout)
     const BATCH_SIZE = 20
-    const limit = 50 // Fetch 50 but only process 20
+    const fetchLimit = 50
 
     const vaultResponse = await fetch(
-      `https://app.onlyfansapi.com/api/${model.of_account_id}/media/vault?limit=${limit}&offset=${offset}`,
+      `https://app.onlyfansapi.com/api/${model.of_account_id}/media/vault?limit=${fetchLimit}&offset=${offset}`,
       {
         headers: { 
           'Authorization': `Bearer ${API_KEY}`,
@@ -63,13 +63,24 @@ export default async function handler(req, res) {
     const vaultData = await vaultResponse.json()
     const allMedias = vaultData.data?.list || []
     const hasMoreFromAPI = vaultData.data?.hasMore || false
+    const creditsUsed = vaultData._meta?._credits?.used || 1
     
+    // On first call, save total count
+    if (offset === 0 && !model.vault_total_count) {
+      // Estimate total (OnlyFans doesn't give exact count)
+      const estimatedTotal = hasMoreFromAPI ? 700 : allMedias.length
+      await supabase
+        .from('models')
+        .update({ vault_total_count: estimatedTotal })
+        .eq('model_id', modelId)
+    }
+
     console.log(`📦 Fetched ${allMedias.length} medias from API`)
 
-    // Only process BATCH_SIZE to stay under 5min limit
+    // Only process BATCH_SIZE to stay under timeout
     const mediasToProcess = allMedias.slice(0, BATCH_SIZE)
     
-    console.log(`🔄 Processing ${mediasToProcess.length} medias (batch size: ${BATCH_SIZE})`)
+    console.log(`🔄 Processing ${mediasToProcess.length} medias`)
 
     let scrapedCount = 0
     let errorCount = 0
@@ -105,10 +116,22 @@ export default async function handler(req, res) {
 
         await s3Client.send(command)
 
+        // Save to catalog
+        await supabase.from('catalog').upsert({
+          media_id: media.id?.toString(),
+          model_id: modelId,
+          media_type: fileType,
+          file_name: fileName,
+          of_url: mediaUrl,
+          of_thumb_url: media.files?.thumb?.url,
+          created_at: media.createdAt || new Date().toISOString(),
+          source: 'vault_sync'
+        }, { onConflict: 'media_id,model_id' })
+
         console.log(`✅ Scraped: ${fileName}`)
         scrapedCount++
 
-        // Small delay to avoid rate limits
+        // Small delay
         await new Promise(resolve => setTimeout(resolve, 100))
 
       } catch (error) {
@@ -123,13 +146,19 @@ export default async function handler(req, res) {
     const nextOffset = hasMore ? offset + BATCH_SIZE : null
 
     // Update model with progress
+    const updateData = {
+      vault_media_count: currentTotal,
+      updated_at: new Date().toISOString()
+    }
+
+    // Mark as complete when done
+    if (!hasMore) {
+      updateData.vault_scraped_at = new Date().toISOString()
+    }
+
     await supabase
       .from('models')
-      .update({ 
-        vault_media_count: currentTotal,
-        vault_scraped_at: hasMore ? null : new Date().toISOString(),
-        updated_at: new Date().toISOString()
-      })
+      .update(updateData)
       .eq('model_id', modelId)
 
     console.log(`🎉 Batch complete: ${scrapedCount} success, ${errorCount} errors`)
@@ -140,8 +169,10 @@ export default async function handler(req, res) {
       scraped: scrapedCount,
       errors: errorCount,
       totalScraped: currentTotal,
+      estimatedTotal: model.vault_total_count || 700,
       hasMore,
       nextOffset,
+      creditsUsed,
       batchSize: BATCH_SIZE,
       message: `Scraped ${scrapedCount}/${mediasToProcess.length} medias. Total: ${currentTotal}`
     })

@@ -24,17 +24,14 @@ export default async function handler(req, res) {
     }
 
     let synced = 0
-    let totalFetched = 0
     const limit = 20
     let creditsUsed = 0
 
-    // Fetch fans from OnlyFansAPI
+    // Fetch fans from OnlyFans
     const response = await fetch(
       `https://app.onlyfansapi.com/api/${accountId}/fans/all?limit=${limit}&offset=${offset}`,
       {
-        headers: {
-          'Authorization': `Bearer ${API_KEY}`
-        }
+        headers: { 'Authorization': `Bearer ${API_KEY}` }
       }
     )
 
@@ -62,55 +59,18 @@ export default async function handler(req, res) {
     
     const subscribers = responseData.data?.list || []
     const hasMore = responseData.data?.hasMore || false
-    totalFetched = subscribers.length
+    const totalFetched = subscribers.length
     creditsUsed = responseData._meta?._credits?.used || 1
 
-    console.log('='.repeat(80))
-    console.log('[DEBUG] SYNC FANS - API RESPONSE')
-    console.log('='.repeat(80))
-    console.log(`Fetched: ${subscribers.length} fans`)
-    console.log(`HasMore: ${hasMore}`)
-    console.log(`Offset: ${offset}`)
-    console.log(`Credits: ${creditsUsed}`)
-    console.log('-'.repeat(80))
+    console.log(`📊 Fetched ${subscribers.length} fans at offset ${offset}, hasMore: ${hasMore}`)
 
-    // Log SAMPLE FAN (primer fan con datos completos)
-    if (subscribers.length > 0) {
-      const sampleFan = subscribers[0]
-      console.log('📋 SAMPLE FAN DATA (COMPLETE JSON):')
-      console.log(JSON.stringify(sampleFan, null, 2))
-      console.log('-'.repeat(80))
-      
-      // Analizar estructura de revenue
-      console.log('💰 REVENUE ANALYSIS:')
-      console.log('  sub.subscribedOnData:', sampleFan.subscribedOnData ? 'EXISTS' : 'NULL')
-      if (sampleFan.subscribedOnData) {
-        console.log('  - totalSumm:', sampleFan.subscribedOnData.totalSumm)
-        console.log('  - subscribes:', sampleFan.subscribedOnData.subscribes ? 'EXISTS' : 'NULL')
-        if (sampleFan.subscribedOnData.subscribes && sampleFan.subscribedOnData.subscribes.length > 0) {
-          console.log('  - subscribes[0]:', JSON.stringify(sampleFan.subscribedOnData.subscribes[0], null, 2))
-        }
-      }
-      console.log('  sub.subscribedByData:', sampleFan.subscribedByData ? 'EXISTS' : 'NULL')
-      if (sampleFan.subscribedByData) {
-        console.log('  - subscribeAt:', sampleFan.subscribedByData.subscribeAt)
-        console.log('  - expireAt:', sampleFan.subscribedByData.expireAt)
-        console.log('  - price:', sampleFan.subscribedByData.price)
-      }
-      console.log('  sub.subscribedBy:', sampleFan.subscribedBy)
-      console.log('  sub.subscribedByAutoprolong:', sampleFan.subscribedByAutoprolong)
-      console.log('-'.repeat(80))
-    }
-
-    // Process fans
     for (const sub of subscribers) {
       const subData = sub.subscribedOnData
       const lastSubscribe = subData?.subscribes?.[0]
 
+      // Calculate revenue
       const netRevenue = parseFloat(subData?.totalSumm || 0)
       const grossRevenue = netRevenue > 0 ? netRevenue / 0.8 : 0
-
-      console.log(`  Fan ID ${sub.id}: netRevenue=${netRevenue}, grossRevenue=${grossRevenue}`)
 
       const fanData = {
         fan_id: sub.id?.toString(),
@@ -138,9 +98,7 @@ export default async function handler(req, res) {
       else console.error('❌ Error upserting fan:', sub.id, error)
     }
 
-    console.log('='.repeat(80))
-    console.log(`✅ SYNC COMPLETE: ${synced}/${totalFetched} fans synced`)
-    console.log('='.repeat(80))
+    console.log(`✅ Synced ${synced}/${totalFetched} fans`)
 
     return res.status(200).json({
       success: true,
