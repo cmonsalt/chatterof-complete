@@ -21,7 +21,8 @@ export default async function handler(req, res) {
   }
 
   const { accountId, modelId, offset = 0 } = req.body
-  const messagesLimit = 20 // Últimos 20 mensajes por chat
+  const messagesLimit = 50 // Increased from 20
+  const chatsLimit = 20 // Increased from 10
 
   if (!accountId || !modelId) {
     return res.status(400).json({ error: 'accountId and modelId required' })
@@ -36,7 +37,7 @@ export default async function handler(req, res) {
 
     let syncedMessages = 0
     let totalChats = 0
-    const chatsLimit = 10 // Solo 10 chats por llamada
+    let skippedNoConversation = 0
     let creditsUsed = 0
 
     const response = await fetch(
@@ -51,7 +52,6 @@ export default async function handler(req, res) {
     if (!response.ok) {
       const errorText = await response.text()
       
-      // If auth error, mark as disconnected
       if (response.status === 401 || response.status === 403) {
         await supabase
           .from('models')
@@ -75,33 +75,13 @@ export default async function handler(req, res) {
     totalChats = chats.length
     creditsUsed = responseData._meta?._credits?.used || 1
 
-    console.log('='.repeat(80))
-    console.log('[DEBUG] SYNC CHATS - API RESPONSE')
-    console.log('='.repeat(80))
-    console.log(`Fetched: ${chats.length} chats`)
-    console.log(`HasMore: ${hasMore}`)
-    console.log(`Offset: ${offset}`)
-    console.log(`Credits: ${creditsUsed}`)
-    console.log('-'.repeat(80))
-
-    // Log SAMPLE CHAT
-    if (chats.length > 0) {
-      const sampleChat = chats[0]
-      console.log('💬 SAMPLE CHAT DATA (COMPLETE JSON):')
-      console.log(JSON.stringify(sampleChat, null, 2))
-      console.log('-'.repeat(80))
-    }
+    console.log(`📨 Fetched ${chats.length} chats at offset ${offset}`)
 
     for (const chat of chats) {
       const fanData = chat.fan
       const fanId = fanData?.id?.toString()
       
-      if (!fanId) {
-        console.log('⚠️ Skipping chat without fanId')
-        continue
-      }
-
-      console.log(`\n📋 Processing chat for fan: ${fanId}`)
+      if (!fanId) continue
 
       const subData = fanData.subscribedOnData
       const lastSubscribe = subData?.subscribes?.[0]
@@ -123,8 +103,6 @@ export default async function handler(req, res) {
 
       // Fetch messages for this chat
       try {
-        console.log(`  📨 Fetching messages for fan ${fanId}...`)
-        
         const messagesResponse = await fetch(
           `https://app.onlyfansapi.com/api/${accountId}/chats/${fanId}/messages?limit=${messagesLimit}`,
           {
@@ -137,20 +115,21 @@ export default async function handler(req, res) {
           const messages = messagesData.data || []
           creditsUsed += messagesData._meta?._credits?.used || 1
 
-          console.log(`  ✅ Got ${messages.length} messages`)
+          // CRITICAL FILTER: Only sync if fan has replied
+          const hasFanMessages = messages.some(msg => !msg.isSentByMe)
 
-          // Log SAMPLE MESSAGE (solo del primer chat)
-          if (offset === 0 && chat === chats[0] && messages.length > 0) {
-            const sampleMsg = messages[0]
-            console.log('\n' + '='.repeat(80))
-            console.log('📨 SAMPLE MESSAGE DATA (COMPLETE JSON):')
-            console.log(JSON.stringify(sampleMsg, null, 2))
-            console.log('='.repeat(80) + '\n')
+          if (!hasFanMessages) {
+            console.log(`  ⏭️ Skip fan ${fanId}: no conversation (only model spam)`)
+            skippedNoConversation++
+            continue
           }
 
+          console.log(`  ✅ Fan ${fanId}: ${messages.length} messages (has real conversation)`)
+
           for (const msg of messages) {
-            // Generate of_message_id if null
-            const messageId = msg.id?.toString() || `temp_${fanId}_${Date.now()}_${Math.random()}`
+            // Generate messageId if null
+            const messageId = msg.id?.toString() || 
+              `generated_${fanId}_${msg.createdAt}_${Math.random().toString(36).substr(2, 9)}`
             
             const chatData = {
               fan_id: fanId,
@@ -170,43 +149,33 @@ export default async function handler(req, res) {
               locked_text: msg.lockedText || false
             }
 
-            console.log(`    - Message ${messageId}: "${chatData.message.substring(0, 50)}..."`)
-
             const { error } = await supabase
               .from('chat')
-              .upsert(chatData, { onConflict: 'of_message_id' })
+              .upsert(chatData, { onConflict: 'of_message_id,model_id' })
 
-            if (!error) {
-              syncedMessages++
-              console.log(`      ✅ Saved`)
-            } else {
-              console.error(`      ❌ Error:`, error)
-            }
+            if (!error) syncedMessages++
           }
-        } else {
-          console.log(`  ❌ Messages response not OK: ${messagesResponse.status}`)
         }
       } catch (msgError) {
-        console.error(`  💥 Error fetching messages for fan ${fanId}:`, msgError)
+        console.error(`Error fetching messages for fan ${fanId}:`, msgError)
       }
     }
 
-    console.log('\n' + '='.repeat(80))
-    console.log(`✅ SYNC COMPLETE: ${syncedMessages} messages from ${totalChats} chats`)
-    console.log('='.repeat(80))
+    console.log(`✅ Sync complete: ${syncedMessages} messages, skipped ${skippedNoConversation} spam-only chats`)
 
     return res.status(200).json({
       success: true,
       syncedMessages,
       totalChats,
+      skippedNoConversation,
       hasMore,
       nextOffset: hasMore ? offset + chatsLimit : null,
       creditsUsed,
-      message: `Synced ${syncedMessages} messages from ${totalChats} chats (${creditsUsed} credits)`
+      message: `Synced ${syncedMessages} messages from ${totalChats} chats (skipped ${skippedNoConversation} spam-only)`
     })
 
   } catch (error) {
-    console.error('💥 Sync chats error:', error)
+    console.error('Sync chats error:', error)
     return res.status(500).json({
       error: 'Failed to sync chats',
       details: error.message
