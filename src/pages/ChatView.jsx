@@ -37,11 +37,19 @@ export default function ChatView({ embedded = false }) {
   const [catalog, setCatalog] = useState([]);
   const [selectedContent, setSelectedContent] = useState(null);
   
-  // ✅ Refs para evitar comportamiento duplicado
   const lastCheckedMessageId = useRef(null);
-  const justSentMessage = useRef(false);  // 🔥 NUEVO: Flag para evitar marcar inmediatamente después de enviar
+  const justSentMessage = useRef(false);
+  const messagesEndRef = useRef(null);  // 🔥 Para scroll automático
 
-  // Helper para tier badge
+  // 🔥 Scroll automático al final
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  };
+
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages]);
+
   const getTierBadge = (tier) => {
     const tiers = {
       0: { emoji: '🆕', label: 'New Fan', color: 'bg-gray-100 text-gray-700' },
@@ -58,20 +66,18 @@ export default function ChatView({ embedded = false }) {
     return () => clearInterval(interval);
   }, [fanId, user]);
 
-  // ✅ Marcar mensajes como leídos cuando fan responde
   useEffect(() => {
     if (messages.length === 0) return;
     
-    // 🔥 Si acabamos de enviar un mensaje, NO marcar nada todavía
     if (justSentMessage.current) {
       console.log('⏭️ Skipping read marking - just sent a message');
-      justSentMessage.current = false;  // Reset flag
+      justSentMessage.current = false;
       return;
     }
     
-    const lastMessage = messages[0]; // Más reciente
+    // 🔥 Último mensaje = el del FINAL del array (más reciente)
+    const lastMessage = messages[messages.length - 1];
     
-    // Si el último mensaje es del fan Y no lo hemos procesado antes
     if (lastMessage?.from === 'fan' && lastMessage.id !== lastCheckedMessageId.current) {
       console.log('📖 Fan responded! Marking previous model messages as read');
       lastCheckedMessageId.current = lastMessage.id;
@@ -84,7 +90,6 @@ export default function ChatView({ embedded = false }) {
     if (!fanId || !currentModelId) return;
     
     try {
-      // Marcar como leídos solo los mensajes del modelo que son ANTERIORES al mensaje del fan
       const { data, error } = await supabase
         .from('chat')
         .update({ read: true })
@@ -92,7 +97,7 @@ export default function ChatView({ embedded = false }) {
         .eq('model_id', currentModelId)
         .eq('from', 'model')
         .eq('read', false)
-        .lt('ts', fanMessageTime)  // Solo mensajes anteriores al del fan
+        .lt('ts', fanMessageTime)
         .select();
       
       if (error) {
@@ -105,7 +110,6 @@ export default function ChatView({ embedded = false }) {
     }
   }
 
-  // Cargar notas cuando se carga el fan
   useEffect(() => {
     if (fan) {
       setNicknameValue(fan.display_name || '');
@@ -186,7 +190,6 @@ export default function ChatView({ embedded = false }) {
     if (!currentModelId) return;
 
     try {
-      // Cargar fan
       const { data: fanData, error: fanError } = await supabase
         .from('fans')
         .select('*')
@@ -208,22 +211,21 @@ export default function ChatView({ embedded = false }) {
 
       setFan(fanData);
 
-      // Cargar mensajes
+      // 🔥 Traer en orden ASCENDENTE (viejos primero)
       const { data: messagesData, error: messagesError } = await supabase
         .from('chat')
         .select('*')
         .eq('fan_id', fanId)
         .eq('model_id', currentModelId)
-        .order('ts', { ascending: false })
+        .order('ts', { ascending: true })  // 🔥 Cambio clave: true = viejos primero
         .limit(50);
 
       if (messagesError) {
         console.error('❌ Messages error:', messagesError);
       } else {
-        setMessages(messagesData || []);
+        setMessages(messagesData || []);  // 🔥 Sin reverse, ya vienen ordenados
       }
 
-      // Calcular estadísticas
       calculateFanStats(messagesData || []);
       setLoading(false);
     } catch (error) {
@@ -235,7 +237,7 @@ export default function ChatView({ embedded = false }) {
   function calculateFanStats(msgs) {
     const tips = msgs.filter(m => m.from === 'fan' && m.amount > 0 && !m.media_url);
     const ppvs = msgs.filter(m => m.from === 'fan' && m.amount > 0 && m.media_url);
-    const lastMsg = msgs[0];
+    const lastMsg = msgs[msgs.length - 1];
     
     const totalTips = tips.reduce((sum, t) => {
       const amount = parseFloat(t.amount);
@@ -281,10 +283,9 @@ export default function ChatView({ embedded = false }) {
     if (!currentModelId) return;
 
     setSending(true);
-    justSentMessage.current = true;  // 🔥 Activar flag ANTES de enviar
+    justSentMessage.current = true;
 
     try {
-      // Obtener of_account_id del modelo
       const { data: model } = await supabase
         .from('models')
         .select('of_account_id')
@@ -297,20 +298,12 @@ export default function ChatView({ embedded = false }) {
         return;
       }
 
-      console.log('📤 Sending message:', {
-        accountId: model.of_account_id,
-        modelId: currentModelId,
-        fanId: fanId,
-        text: newMessage
-      });
-
-      // Enviar a OnlyFans API
       const response = await fetch('/api/onlyfans/send-message', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          accountId: model.of_account_id,  // ✅ of_account_id para la API
-          modelId: currentModelId,         // ✅ model_id para la BD
+          accountId: model.of_account_id,
+          modelId: currentModelId,
           chatId: fanId,
           text: newMessage,
           mediaFiles: selectedContent ? [selectedContent] : [],
@@ -323,20 +316,16 @@ export default function ChatView({ embedded = false }) {
         throw new Error(error.error || 'Failed to send message');
       }
 
-      console.log('✅ Message sent successfully');
-
-      // Limpiar input y recargar mensajes
       setNewMessage('');
       setSelectedContent(null);
       
-      // Esperar un poco antes de recargar para dar tiempo al servidor
       await new Promise(resolve => setTimeout(resolve, 500));
       await loadFanAndMessages();
       
     } catch (error) {
       console.error('❌ Error enviando mensaje:', error);
       alert('Error al enviar mensaje: ' + error.message);
-      justSentMessage.current = false;  // Reset flag en caso de error
+      justSentMessage.current = false;
     } finally {
       setSending(false);
     }
@@ -352,7 +341,7 @@ export default function ChatView({ embedded = false }) {
       const conversacion = messages.map(m => ({
         role: m.from === 'fan' ? 'user' : 'assistant',
         content: m.message
-      })).reverse();
+      }));
 
       const response = await fetch('https://api.anthropic.com/v1/messages', {
         method: 'POST',
@@ -432,7 +421,6 @@ Conversación:\n${JSON.stringify(conversacion, null, 2)}`
       {!embedded && <Navbar />}
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-purple-50">
         <div className="max-w-7xl mx-auto px-4 py-8">
-          {/* Header con info del fan */}
           <div className="bg-white rounded-xl shadow-lg p-6 mb-6">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-4">
@@ -467,12 +455,9 @@ Conversación:\n${JSON.stringify(conversacion, null, 2)}`
             </div>
           </div>
 
-          {/* Main Grid */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {/* Chat Area */}
             <div className={showNotesSidebar ? 'lg:col-span-2' : 'lg:col-span-3'}>
               <div className="bg-white rounded-xl shadow-lg p-6 flex flex-col h-[600px]">
-                {/* Botón IA */}
                 <button
                   onClick={analizarConIA}
                   disabled={iaLoading}
@@ -481,7 +466,6 @@ Conversación:\n${JSON.stringify(conversacion, null, 2)}`
                   {iaLoading ? '🤖 Analyzing...' : '🤖 Analyze with AI'}
                 </button>
 
-                {/* Panel IA */}
                 {iaAnalisis && showIaPanel && (
                   <div className="mb-4 p-4 bg-purple-50 rounded-lg border-2 border-purple-200">
                     <div className="flex justify-between items-start mb-2">
@@ -497,7 +481,7 @@ Conversación:\n${JSON.stringify(conversacion, null, 2)}`
                   </div>
                 )}
 
-                {/* Mensajes */}
+                {/* 🔥 Contenedor de mensajes con scroll */}
                 <div className="flex-1 overflow-y-auto mb-4 space-y-4">
                   {messages.map((msg) => (
                     <div
@@ -518,8 +502,14 @@ Conversación:\n${JSON.stringify(conversacion, null, 2)}`
                               : 'bg-gray-100 text-gray-800'
                           }`}
                         >
+                          {/* 🔥 Renderizar imagen si existe */}
                           {msg.media_url && (
-                            <img src={msg.media_url} alt="media" className="rounded mb-2 max-w-full" />
+                            <img 
+                              src={msg.media_url} 
+                              alt="media" 
+                              className="rounded mb-2 max-w-full max-h-64 object-cover cursor-pointer hover:opacity-90"
+                              onClick={() => window.open(msg.media_url, '_blank')}
+                            />
                           )}
                           <p className="text-sm">{msg.message}</p>
                           <div className="flex items-center justify-end gap-2 text-xs opacity-70 mt-1">
@@ -534,9 +524,10 @@ Conversación:\n${JSON.stringify(conversacion, null, 2)}`
                       </div>
                     </div>
                   ))}
+                  {/* 🔥 Elemento invisible para scroll automático */}
+                  <div ref={messagesEndRef} />
                 </div>
 
-                {/* Selector de contenido */}
                 {catalog.length > 0 && (
                   <div className="mb-3">
                     <select
@@ -554,7 +545,6 @@ Conversación:\n${JSON.stringify(conversacion, null, 2)}`
                   </div>
                 )}
 
-                {/* Input */}
                 <div className="flex gap-2">
                   <input
                     type="text"
@@ -570,23 +560,12 @@ Conversación:\n${JSON.stringify(conversacion, null, 2)}`
                     disabled={!newMessage.trim() || sending}
                     className="px-6 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 font-semibold disabled:opacity-50 disabled:cursor-not-allowed transition-all"
                   >
-                    {sending ? (
-                      <span className="flex items-center gap-2">
-                        <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
-                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                        </svg>
-                        Sending...
-                      </span>
-                    ) : (
-                      'Send'
-                    )}
+                    {sending ? '⏳' : 'Send'}
                   </button>
                 </div>
               </div>
             </div>
 
-            {/* Sidebar de notas */}
             {showNotesSidebar && (
               <div className="bg-white rounded-xl shadow-lg p-6 max-h-[700px] overflow-y-auto">
                 <div className="flex items-center justify-between mb-4 pb-3 border-b sticky top-0 bg-white">
@@ -599,7 +578,6 @@ Conversación:\n${JSON.stringify(conversacion, null, 2)}`
                   </button>
                 </div>
 
-                {/* OF Username */}
                 <div className="mb-4">
                   <p className="text-xs text-gray-500 mb-1">OnlyFans Username</p>
                   <p className="text-sm font-mono bg-gray-50 px-3 py-2 rounded break-all">
@@ -607,7 +585,6 @@ Conversación:\n${JSON.stringify(conversacion, null, 2)}`
                   </p>
                 </div>
 
-                {/* Nickname */}
                 <div className="mb-4">
                   <p className="text-xs text-gray-500 mb-1">✏️ Nickname</p>
                   {editingNickname ? (
@@ -648,7 +625,6 @@ Conversación:\n${JSON.stringify(conversacion, null, 2)}`
                   )}
                 </div>
 
-                {/* Tier y Spent */}
                 <div className="grid grid-cols-2 gap-3 mb-4">
                   <div>
                     <p className="text-xs text-gray-500 mb-1">Tier</p>
@@ -664,7 +640,6 @@ Conversación:\n${JSON.stringify(conversacion, null, 2)}`
                   </div>
                 </div>
 
-                {/* Last Seen */}
                 <div className="mb-4 pb-4 border-b">
                   <p className="text-xs text-gray-500 mb-1">📅 Last seen</p>
                   <p className="text-sm text-gray-700">
@@ -672,7 +647,6 @@ Conversación:\n${JSON.stringify(conversacion, null, 2)}`
                   </p>
                 </div>
 
-                {/* General Notes */}
                 <div className="mb-4">
                   <p className="text-sm font-semibold mb-2">📝 General Notes</p>
                   <textarea
@@ -691,7 +665,6 @@ Conversación:\n${JSON.stringify(conversacion, null, 2)}`
                   </button>
                 </div>
 
-                {/* Chatter Tips */}
                 <div>
                   <p className="text-sm font-semibold mb-2">💡 Chatter Tips</p>
                   <textarea
@@ -713,7 +686,6 @@ Conversación:\n${JSON.stringify(conversacion, null, 2)}`
             )}
           </div>
 
-          {/* Botón flotante para mostrar sidebar */}
           {!showNotesSidebar && (
             <button
               onClick={() => setShowNotesSidebar(true)}
