@@ -118,16 +118,9 @@ export default function CatalogView({ modelId: propModelId }) {
               <p className="text-white text-sm font-semibold truncate">
                 {item.title}
               </p>
-              <div className="flex items-center justify-between">
-                <p className="text-white/70 text-xs">
-                  {new Date(item.created_at).toLocaleDateString()}
-                </p>
-                {item.of_media_ids && item.of_media_ids.length > 1 && (
-                  <span className="bg-purple-500 text-white text-xs px-2 py-0.5 rounded-full font-semibold">
-                    {item.of_media_ids.length} medias
-                  </span>
-                )}
-              </div>
+              <p className="text-white/70 text-xs">
+                {new Date(item.created_at).toLocaleDateString()}
+              </p>
             </div>
 
             {/* Hover effect */}
@@ -174,7 +167,7 @@ export default function CatalogView({ modelId: propModelId }) {
               {/* Contenido */}
               <div className="bg-gray-100 rounded-lg mb-4 overflow-hidden">
                 {selectedMedia.file_type === 'video' && selectedMedia.media_url ? (
-                  // Reproducir video real
+                  // Reproducir video
                   <video 
                     controls 
                     className="w-full"
@@ -184,32 +177,29 @@ export default function CatalogView({ modelId: propModelId }) {
                     Tu navegador no soporta video HTML5
                   </video>
                 ) : selectedMedia.file_type === 'photo' && selectedMedia.media_url ? (
-                  // Mostrar foto real
+                  // Mostrar foto
                   <img 
                     src={selectedMedia.media_url} 
                     alt={selectedMedia.title}
                     className="w-full"
                   />
                 ) : (
-                  // Placeholder si no hay URL
+                  // Placeholder si no hay URL (expiró)
                   <div className="p-8 flex items-center justify-center">
-                    {selectedMedia.file_type === 'video' ? (
-                      <div className="text-center">
-                        <div className="text-6xl mb-3">🎬</div>
-                        <p className="text-gray-700 font-semibold">Video</p>
-                        <p className="text-sm text-gray-500 mt-2">
-                          ID: {selectedMedia.of_media_id}
-                        </p>
+                    <div className="text-center">
+                      <div className="text-6xl mb-3">
+                        {selectedMedia.file_type === 'video' ? '🎬' : '📸'}
                       </div>
-                    ) : (
-                      <div className="text-center">
-                        <div className="text-6xl mb-3">📸</div>
-                        <p className="text-gray-700 font-semibold">Foto</p>
-                        <p className="text-sm text-gray-500 mt-2">
-                          ID: {selectedMedia.of_media_id}
-                        </p>
-                      </div>
-                    )}
+                      <p className="text-gray-700 font-semibold">
+                        {selectedMedia.file_type === 'video' ? 'Video' : 'Foto'}
+                      </p>
+                      <p className="text-sm text-gray-500 mt-2">
+                        ID: {selectedMedia.of_media_id}
+                      </p>
+                      <p className="text-xs text-gray-400 mt-1">
+                        (URL expirada - usar ID para enviar)
+                      </p>
+                    </div>
                   </div>
                 )}
               </div>

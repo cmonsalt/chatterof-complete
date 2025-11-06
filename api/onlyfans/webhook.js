@@ -118,18 +118,13 @@ async function handleMessage(data, modelId) {
     if (isVaultFan) {
       console.log('📸 Vault content detected! Saving to catalog AND chat...')
       
-      // Detectar TODOS los medias (no solo el primero)
-      let allMediaIds = []
-      let mediaUrls = []
-      let mediaThumbs = []
-      let mediaTypes = []
+      let savedCount = 0
       
+      // 1. Guardar CADA media como registro INDIVIDUAL en catalog
       if (data.media && data.media.length > 0) {
         console.log(`📦 Found ${data.media.length} media(s) in message`)
         
         for (const media of data.media) {
-          allMediaIds.push(media.id?.toString())
-          
           const mediaType = media.type
           let mediaUrl = null
           let mediaThumb = null
@@ -142,71 +137,80 @@ async function handleMessage(data, modelId) {
             mediaThumb = media.files?.thumb?.url
           }
           
-          mediaUrls.push(mediaUrl)
-          mediaThumbs.push(mediaThumb)
-          mediaTypes.push(mediaType)
+          // Crear un registro por cada media
+          const { error: catalogError } = await supabase
+            .from('catalog')
+            .insert({
+              model_id: modelId,
+              offer_id: `vault_${Date.now()}_${media.id}`,
+              title: data.text?.replace(/<[^>]*>/g, '').replace('📸 ', '').trim() || 'Untitled',
+              base_price: 0,
+              nivel: 0,
+              of_media_id: media.id?.toString(),
+              file_type: mediaType,
+              media_url: mediaUrl,
+              media_thumb: mediaThumb,
+              parent_type: 'single',
+              created_at: new Date().toISOString()
+            })
+          
+          if (catalogError) {
+            console.error(`❌ Error saving media ${media.id} to catalog:`, catalogError)
+          } else {
+            savedCount++
+          }
         }
-      }
-      
-      // 1. Guardar en CATALOG (1 registro con array de media_ids)
-      if (allMediaIds.length > 0) {
-        const { error: catalogError } = await supabase
-          .from('catalog')
-          .insert({
-            model_id: modelId,
-            offer_id: `vault_${Date.now()}`,
-            title: data.text?.replace(/<[^>]*>/g, '').replace('📸 ', '').trim() || 'Untitled',
-            base_price: 0,
-            nivel: 0,
-            of_media_id: allMediaIds[0], // Primer media (para compatibilidad)
-            of_media_ids: allMediaIds, // TODOS los medias
-            file_type: mediaTypes[0],
-            media_url: mediaUrls[0], // Primer media como principal
-            media_thumb: mediaThumbs[0],
-            media_thumbnails: mediaThumbs, // Todos los thumbnails
-            parent_type: 'single',
-            created_at: new Date().toISOString()
-          })
         
-        if (catalogError) {
-          console.error('❌ Error saving to catalog:', catalogError)
-        } else {
-          console.log(`✅ Saved to catalog! (${allMediaIds.length} media(s))`)
-        }
+        console.log(`✅ Saved ${savedCount}/${data.media.length} media(s) to catalog!`)
       }
       
       // 2. Guardar en CHAT (primer media como principal para mostrar)
-      const chatData = {
-        fan_id: fanId,
-        message: cleanHTML(data.text),
-        model_id: modelId,
-        ts: new Date(data.createdAt || Date.now()).toISOString(),
-        from: data.isSentByMe ? 'model' : 'fan',
-        of_message_id: data.id?.toString(),
-        media_url: mediaUrls[0],
-        media_thumb: mediaThumbs[0],
-        media_type: mediaTypes[0],
-        amount: parseFloat(data.price || 0),
-        read: data.isOpened || false
-      }
+      if (data.media && data.media.length > 0) {
+        const firstMedia = data.media[0]
+        const mediaType = firstMedia.type
+        let mediaUrl = null
+        let mediaThumb = null
+        
+        if (mediaType === 'video') {
+          mediaUrl = firstMedia.files?.full?.url || firstMedia.url
+          mediaThumb = firstMedia.files?.thumb?.url
+        } else {
+          mediaUrl = firstMedia.files?.full?.url || firstMedia.files?.thumb?.url || firstMedia.url
+          mediaThumb = firstMedia.files?.thumb?.url
+        }
+        
+        const chatData = {
+          fan_id: fanId,
+          message: cleanHTML(data.text),
+          model_id: modelId,
+          ts: new Date(data.createdAt || Date.now()).toISOString(),
+          from: data.isSentByMe ? 'model' : 'fan',
+          of_message_id: data.id?.toString(),
+          media_url: mediaUrl,
+          media_thumb: mediaThumb,
+          media_type: mediaType,
+          amount: parseFloat(data.price || 0),
+          read: data.isOpened || false
+        }
 
-      const { error: chatError } = await supabase
-        .from('chat')
-        .upsert(chatData, { onConflict: 'of_message_id' })
-      
-      if (chatError) {
-        console.error('❌ Error saving to chat:', chatError)
-      } else {
-        console.log('✅ Saved to chat!')
+        const { error: chatError } = await supabase
+          .from('chat')
+          .upsert(chatData, { onConflict: 'of_message_id' })
+        
+        if (chatError) {
+          console.error('❌ Error saving to chat:', chatError)
+        } else {
+          console.log('✅ Saved to chat!')
+        }
       }
       
-      // 3. Crear notificación del vault fan (para pruebas)
-      if (!data.isSentByMe) {
+      // 3. Crear notificación del vault fan
+      if (!data.isSentByMe && data.media && data.media.length > 0) {
         const fanName = data.fromUser?.name || data.user?.name || 'Vault Fan'
-        const count = allMediaIds.length
+        const count = savedCount
         const messagePreview = count > 1 
-          ? `📦 ${count} medias guardados en vault`
-          : mediaTypes[0] === 'video' ? '📹 Video guardado en vault' 
+          ? `📦 ${count} items guardados en vault`
+          : data.media[0].type === 'video' ? '📹 Video guardado en vault' 
           : '📸 Foto guardada en vault'
         
         await createNotification(
