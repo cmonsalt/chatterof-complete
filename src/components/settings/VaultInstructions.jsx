@@ -2,8 +2,9 @@ import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 
-export default function VaultInstructions() {
-  const { user } = useAuth();
+export default function VaultInstructions({ modelId: propModelId, onGoToSetup }) {
+  const { user, modelId: contextModelId } = useAuth();
+  const modelId = propModelId || contextModelId;
   const [vaultFan, setVaultFan] = useState(null);
   const [catalogCount, setCatalogCount] = useState(0);
 
@@ -66,7 +67,7 @@ export default function VaultInstructions() {
             Necesitas configurar un fan de prueba para capturar contenido del vault.
           </p>
           <button
-            onClick={() => window.location.href = '/settings'}
+            onClick={onGoToSetup}
             className="px-6 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 font-semibold"
           >
             Configurar Ahora

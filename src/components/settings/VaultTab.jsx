@@ -36,7 +36,12 @@ export default function VaultTab({ modelId }) {
       </div>
 
       {/* Content */}
-      {activeSubTab === 'instructions' && <VaultInstructions modelId={modelId} />}
+      {activeSubTab === 'instructions' && (
+        <VaultInstructions 
+          modelId={modelId} 
+          onGoToSetup={() => setActiveSubTab('setup')} 
+        />
+      )}
       {activeSubTab === 'setup' && <VaultSetup modelId={modelId} />}
     </div>
   );
