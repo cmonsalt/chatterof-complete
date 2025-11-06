@@ -169,8 +169,8 @@ export default function ChatView() {
         .from('chat')
         .select('*')
         .eq('fan_id', fanId)
-        .eq('model_id', currentModelId)
-        .order('ts', { ascending: false })  // ✅ Más reciente primero
+        .eq('model_id', modelId)  // ✅ Usar modelId, no currentModelId
+        .order('ts', { ascending: false })
         .limit(200);
 
       if (messagesError) {
