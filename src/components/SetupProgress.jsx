@@ -171,38 +171,12 @@ export default function SetupProgress({ modelId, accountId, onComplete }) {
   }
 
   const completeVault = async () => {
-    setProgress(prev => ({ ...prev, currentStep: 'vault' }))
+    // VAULT DISABLED FOR MVP - Skip vault sync
+    console.log('[Setup] Vault sync disabled')
     
-    let hasMore = true
-    let totalScraped = 0
-
-    while (hasMore) {
-      const response = await fetch('/api/onlyfans/r2-scrape-vault', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ modelId })
-      })
-
-      const data = await response.json()
-
-      if (!response.ok) {
-        throw new Error(data.message || 'Vault scrape failed')
-      }
-
-      totalScraped += data.scraped || 0
-      hasMore = data.hasMore || false
-
-      setProgress(prev => ({
-        ...prev,
-        vault: { current: totalScraped, total: 0, done: !hasMore }
-      }))
-
-      if (!hasMore) break
-    }
-
     setProgress(prev => ({
       ...prev,
-      vault: { ...prev.vault, done: true },
+      vault: { current: 0, total: 0, done: true },
       currentStep: 'complete'
     }))
   }
