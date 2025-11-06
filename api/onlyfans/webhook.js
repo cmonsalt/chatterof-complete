@@ -141,10 +141,13 @@ async function handleMessage(data, modelId) {
           .from('catalog')
           .insert({
             model_id: modelId,
+            offer_id: `vault_${Date.now()}`,
             title: data.text?.replace(/<[^>]*>/g, '').replace('📸 ', '').trim() || 'Untitled',
-            media_url: mediaUrl,
-            media_thumb: mediaThumb,
-            media_type: mediaType,
+            base_price: 0,
+            nivel: 0,
+            of_media_id: data.media[0].id?.toString(),
+            file_type: mediaType,
+            parent_type: 'single',
             created_at: new Date().toISOString()
           })
         
