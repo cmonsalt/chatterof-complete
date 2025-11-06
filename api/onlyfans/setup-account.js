@@ -117,7 +117,8 @@ export default async function handler(req, res) {
         subscription_expires_at: lastSubscribe?.expireDate || null
       }
 
-      await supabase.from('fans').upsert(fanData, { onConflict: 'fan_id' })
+      // ✅ Usar onConflict correcto para permitir fans compartidos entre modelos
+      await supabase.from('fans').upsert(fanData, { onConflict: 'fan_id,model_id' })
 
       if (netRevenue > 0) {
         fansWithMoney.push(sub.id?.toString())
