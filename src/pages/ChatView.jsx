@@ -13,6 +13,7 @@ export default function ChatView() {
   const [messages, setMessages] = useState([]);
   const [loading, setLoading] = useState(true);
   const [newMessage, setNewMessage] = useState('');
+  const [sending, setSending] = useState(false);  // ✅ Nuevo state
   
   const [iaAnalisis, setIaAnalisis] = useState(null);
   const [iaLoading, setIaLoading] = useState(false);
@@ -234,10 +235,12 @@ export default function ChatView() {
   }
 
   async function enviarMensaje() {
-    if (!newMessage.trim()) return;
+    if (!newMessage.trim() || sending) return;  // ✅ Prevenir si ya está enviando
     
     const currentModelId = modelId || user?.user_metadata?.model_id;
     if (!currentModelId) return;
+
+    setSending(true);  // ✅ Activar loading
 
     try {
       // Get model's OF account ID
@@ -278,6 +281,8 @@ export default function ChatView() {
     } catch (error) {
       console.error('Error enviando mensaje:', error);
       alert('Error al enviar mensaje: ' + error.message);
+    } finally {
+      setSending(false);  // ✅ Desactivar loading
     }
   }
 
@@ -503,10 +508,20 @@ export default function ChatView() {
                 />
                 <button
                   onClick={enviarMensaje}
-                  disabled={!newMessage.trim()}
-                  className="px-6 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+                  disabled={!newMessage.trim() || sending}
+                  className="px-6 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 font-semibold disabled:opacity-50 disabled:cursor-not-allowed transition-all"
                 >
-                  Send
+                  {sending ? (
+                    <span className="flex items-center gap-2">
+                      <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                      </svg>
+                      Sending...
+                    </span>
+                  ) : (
+                    'Send'
+                  )}
                 </button>
               </div>
             </div>
