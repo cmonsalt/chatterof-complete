@@ -10,11 +10,14 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const { accountId, chatId, text, mediaFiles, price } = req.body;
+  const { accountId, modelId, chatId, text, mediaFiles, price } = req.body;
   const API_KEY = process.env.ONLYFANS_API_KEY;
 
-  if (!accountId || !chatId || !text) {
-    return res.status(400).json({ error: 'accountId, chatId, and text required' });
+  // ✅ Validar que tenemos AMBOS IDs
+  if (!accountId || !modelId || !chatId || !text) {
+    return res.status(400).json({ 
+      error: 'accountId, modelId, chatId, and text required' 
+    });
   }
 
   try {
@@ -27,6 +30,7 @@ export default async function handler(req, res) {
       ...(price && price > 0 && { price })
     };
 
+    // 1. Enviar a OnlyFans API
     const response = await fetch(
       `https://app.onlyfansapi.com/api/${accountId}/chats/${chatId}/messages`,
       {
@@ -46,18 +50,29 @@ export default async function handler(req, res) {
 
     const data = await response.json();
 
-    // Guardar mensaje enviado en BD
-    await supabase.from('chat').insert({
-      message_id: data.id,
+    // 2. Guardar mensaje en BD con nombres de columnas CORRECTOS
+    const { error: dbError } = await supabase.from('chat').insert({
+      of_message_id: data.id?.toString(),  // ✅ ID de OnlyFans
+      fan_id: chatId,                       // ✅ ID del fan
+      model_id: modelId,                    // ✅ ID del modelo en Supabase
+      message: text,                        // ✅ Texto del mensaje
+      ts: new Date().toISOString(),         // ✅ Usar 'ts' no 'timestamp'
+      from: 'model',                        // ✅ Enviado por el modelo
+      read: false,                          // ✅ Iniciar como no leído
+      amount: price || null,                // ✅ Precio si es PPV
+      media_url: mediaFiles?.[0] || null    // ✅ Primera media si existe
+    });
+
+    if (dbError) {
+      console.error('❌ Database error:', dbError);
+      throw new Error('Failed to save message to database');
+    }
+
+    console.log('✅ Message sent and saved:', {
+      of_message_id: data.id,
       fan_id: chatId,
-      message: text,
-      timestamp: new Date(),
-      from: 'model',
-      media: mediaFiles || [],
-      is_ppv: price > 0,
-      ppv_price: price || 0,
-      model_id: accountId,
-      read: false  // ✅ Iniciar como no leído
+      model_id: modelId,
+      read: false
     });
 
     res.status(200).json({ 
@@ -65,7 +80,7 @@ export default async function handler(req, res) {
       message: data 
     });
   } catch (error) {
-    console.error('Send message error:', error);
+    console.error('❌ Send message error:', error);
     res.status(500).json({ error: error.message });
   }
 }

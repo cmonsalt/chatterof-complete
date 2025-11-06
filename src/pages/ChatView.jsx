@@ -4,7 +4,7 @@ import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import Navbar from '../components/Navbar';
 
-export default function ChatView({ embedded = false }) {  // ✅ Agregar prop
+export default function ChatView({ embedded = false }) {
   const { fanId } = useParams();
   const { user, modelId } = useAuth();
   const navigate = useNavigate();
@@ -13,13 +13,12 @@ export default function ChatView({ embedded = false }) {  // ✅ Agregar prop
   const [messages, setMessages] = useState([]);
   const [loading, setLoading] = useState(true);
   const [newMessage, setNewMessage] = useState('');
-  const [sending, setSending] = useState(false);  // ✅ Nuevo state
+  const [sending, setSending] = useState(false);
   
   const [iaAnalisis, setIaAnalisis] = useState(null);
   const [iaLoading, setIaLoading] = useState(false);
   const [showIaPanel, setShowIaPanel] = useState(true);
   
-  // 🔥 NUEVO: Sidebar de notas
   const [showNotesSidebar, setShowNotesSidebar] = useState(true);
   const [editingNickname, setEditingNickname] = useState(false);
   const [nicknameValue, setNicknameValue] = useState('');
@@ -37,7 +36,10 @@ export default function ChatView({ embedded = false }) {  // ✅ Agregar prop
   
   const [catalog, setCatalog] = useState([]);
   const [selectedContent, setSelectedContent] = useState(null);
-  const lastCheckedMessageId = useRef(null); // ✅ Para evitar re-marcar
+  
+  // ✅ Refs para evitar comportamiento duplicado
+  const lastCheckedMessageId = useRef(null);
+  const justSentMessage = useRef(false);  // 🔥 NUEVO: Flag para evitar marcar inmediatamente después de enviar
 
   // Helper para tier badge
   const getTierBadge = (tier) => {
@@ -60,55 +62,58 @@ export default function ChatView({ embedded = false }) {  // ✅ Agregar prop
   useEffect(() => {
     if (messages.length === 0) return;
     
+    // 🔥 Si acabamos de enviar un mensaje, NO marcar nada todavía
+    if (justSentMessage.current) {
+      console.log('⏭️ Skipping read marking - just sent a message');
+      justSentMessage.current = false;  // Reset flag
+      return;
+    }
+    
     const lastMessage = messages[0]; // Más reciente
     
     // Si el último mensaje es del fan Y no lo hemos procesado antes
     if (lastMessage?.from === 'fan' && lastMessage.id !== lastCheckedMessageId.current) {
+      console.log('📖 Fan responded! Marking previous model messages as read');
       lastCheckedMessageId.current = lastMessage.id;
       markPreviousModelMessagesAsRead(lastMessage.ts);
     }
   }, [messages]);
 
   async function markPreviousModelMessagesAsRead(fanMessageTime) {
-    const currentModelId = modelId || user?.user_metadata?.model_id;  // ✅ Fallback
+    const currentModelId = modelId || user?.user_metadata?.model_id;
     if (!fanId || !currentModelId) return;
     
     try {
       // Marcar como leídos solo los mensajes del modelo que son ANTERIORES al mensaje del fan
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from('chat')
         .update({ read: true })
         .eq('fan_id', fanId)
-        .eq('model_id', currentModelId)  // ✅ Usar currentModelId
+        .eq('model_id', currentModelId)
         .eq('from', 'model')
         .eq('read', false)
-        .lt('ts', fanMessageTime); // Solo mensajes anteriores al del fan
+        .lt('ts', fanMessageTime)  // Solo mensajes anteriores al del fan
+        .select();
       
       if (error) {
-        console.error('Error marking messages as read:', error);
+        console.error('❌ Error marking messages as read:', error);
       } else {
-        console.log('✅ Previous messages marked as read');
+        console.log('✅ Marked as read:', data?.length || 0, 'messages');
       }
     } catch (err) {
-      console.error('Error:', err);
+      console.error('❌ Error:', err);
     }
   }
 
-  // 🔥 FIX: Cargar notas cuando se carga el fan
+  // Cargar notas cuando se carga el fan
   useEffect(() => {
     if (fan) {
-      console.log('🔄 Loading fan data into form:', {
-        display_name: fan.display_name,
-        notes: fan.notes,
-        chatter_notes: fan.chatter_notes
-      });
       setNicknameValue(fan.display_name || '');
       setNotesValue(fan.notes || '');
       setChatterNotesValue(fan.chatter_notes || '');
     }
   }, [fan?.fan_id]);
 
-  // 🔥 NUEVO: Guardar nickname
   const handleSaveNickname = async () => {
     if (!fan) return
     
@@ -130,7 +135,6 @@ export default function ChatView({ embedded = false }) {  // ✅ Agregar prop
     }
   }
 
-  // 🔥 NUEVO: Guardar notas generales
   const handleSaveNotes = async () => {
     if (!fan) return
     
@@ -154,7 +158,6 @@ export default function ChatView({ embedded = false }) {  // ✅ Agregar prop
     }
   }
 
-  // 🔥 NUEVO: Guardar chatter tips
   const handleSaveChatterNotes = async () => {
     if (!fan) return
     
@@ -179,15 +182,16 @@ export default function ChatView({ embedded = false }) {  // ✅ Agregar prop
   }
 
   async function loadFanAndMessages() {
-    const currentModelId = modelId || user?.user_metadata?.model_id;  // ✅ Fallback
+    const currentModelId = modelId || user?.user_metadata?.model_id;
     if (!currentModelId) return;
 
     try {
+      // Cargar fan
       const { data: fanData, error: fanError } = await supabase
         .from('fans')
         .select('*')
         .eq('fan_id', fanId)
-        .eq('model_id', currentModelId)  // ✅ Usar currentModelId
+        .eq('model_id', currentModelId)
         .maybeSingle();
 
       if (fanError) {
@@ -204,35 +208,34 @@ export default function ChatView({ embedded = false }) {  // ✅ Agregar prop
 
       setFan(fanData);
 
+      // Cargar mensajes
       const { data: messagesData, error: messagesError } = await supabase
         .from('chat')
         .select('*')
         .eq('fan_id', fanId)
-        .eq('model_id', currentModelId)  // ✅ Usar currentModelId
+        .eq('model_id', currentModelId)
         .order('ts', { ascending: false })
-        .limit(200);
+        .limit(50);
 
       if (messagesError) {
         console.error('❌ Messages error:', messagesError);
       } else {
-        console.log(`✅ Loaded ${messagesData?.length || 0} messages`);
-        // Revertir array: más viejo arriba, nuevo abajo
-        const sortedMessages = (messagesData || []).reverse();
-        setMessages(sortedMessages);
-        calculateFanStats(messagesData || []);
+        setMessages(messagesData || []);
       }
 
+      // Calcular estadísticas
+      calculateFanStats(messagesData || []);
       setLoading(false);
     } catch (error) {
-      console.error('💥 Error general:', error);
+      console.error('❌ Load error:', error);
       setLoading(false);
     }
   }
-  
+
   function calculateFanStats(msgs) {
-    const tips = msgs.filter(m => m.message_type === 'tip');
-    const ppvs = msgs.filter(m => m.message_type === 'ppv_unlocked');
-    const lastMsg = msgs.filter(m => m.from === 'fan').slice(-1)[0];
+    const tips = msgs.filter(m => m.from === 'fan' && m.amount > 0 && !m.media_url);
+    const ppvs = msgs.filter(m => m.from === 'fan' && m.amount > 0 && m.media_url);
+    const lastMsg = msgs[0];
     
     const totalTips = tips.reduce((sum, t) => {
       const amount = parseFloat(t.amount);
@@ -254,15 +257,14 @@ export default function ChatView({ embedded = false }) {  // ✅ Agregar prop
   }
 
   async function loadCatalog() {
-    if (!user?.user_metadata?.model_id) return;
-    
-    const modelId = user.user_metadata.model_id;
+    const currentModelId = modelId || user?.user_metadata?.model_id;
+    if (!currentModelId) return;
     
     try {
       const { data, error } = await supabase
         .from('catalog')
         .select('*')
-        .eq('model_id', modelId)
+        .eq('model_id', currentModelId)
         .order('created_at', { ascending: false });
       
       if (error) throw error;
@@ -273,15 +275,16 @@ export default function ChatView({ embedded = false }) {  // ✅ Agregar prop
   }
 
   async function enviarMensaje() {
-    if (!newMessage.trim() || sending) return;  // ✅ Prevenir si ya está enviando
+    if (!newMessage.trim() || sending) return;
     
     const currentModelId = modelId || user?.user_metadata?.model_id;
     if (!currentModelId) return;
 
-    setSending(true);  // ✅ Activar loading
+    setSending(true);
+    justSentMessage.current = true;  // 🔥 Activar flag ANTES de enviar
 
     try {
-      // Get model's OF account ID
+      // Obtener of_account_id del modelo
       const { data: model } = await supabase
         .from('models')
         .select('of_account_id')
@@ -290,16 +293,24 @@ export default function ChatView({ embedded = false }) {  // ✅ Agregar prop
 
       if (!model?.of_account_id) {
         alert('Model not connected to OnlyFans');
+        justSentMessage.current = false;
         return;
       }
 
-      // 1. Send to OnlyFans API
+      console.log('📤 Sending message:', {
+        accountId: model.of_account_id,
+        modelId: currentModelId,
+        fanId: fanId,
+        text: newMessage
+      });
+
+      // Enviar a OnlyFans API
       const response = await fetch('/api/onlyfans/send-message', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          accountId: model.of_account_id,
-          modelId: currentModelId,  // ✅ Agregar modelId
+          accountId: model.of_account_id,  // ✅ of_account_id para la API
+          modelId: currentModelId,         // ✅ model_id para la BD
           chatId: fanId,
           text: newMessage,
           mediaFiles: selectedContent ? [selectedContent] : [],
@@ -312,43 +323,68 @@ export default function ChatView({ embedded = false }) {  // ✅ Agregar prop
         throw new Error(error.error || 'Failed to send message');
       }
 
-      // 2. Message already saved by endpoint, just refresh UI
+      console.log('✅ Message sent successfully');
+
+      // Limpiar input y recargar mensajes
       setNewMessage('');
+      setSelectedContent(null);
+      
+      // Esperar un poco antes de recargar para dar tiempo al servidor
+      await new Promise(resolve => setTimeout(resolve, 500));
       await loadFanAndMessages();
       
     } catch (error) {
-      console.error('Error enviando mensaje:', error);
+      console.error('❌ Error enviando mensaje:', error);
       alert('Error al enviar mensaje: ' + error.message);
+      justSentMessage.current = false;  // Reset flag en caso de error
     } finally {
-      setSending(false);  // ✅ Desactivar loading
+      setSending(false);
     }
   }
 
   async function analizarConIA() {
-    if (!user?.user_metadata?.model_id) return;
+    const currentModelId = modelId || user?.user_metadata?.model_id;
+    if (!currentModelId) return;
     
-    const modelId = user.user_metadata.model_id;
     setIaLoading(true);
 
     try {
       const conversacion = messages.map(m => ({
         role: m.from === 'fan' ? 'user' : 'assistant',
         content: m.message
-      }));
+      })).reverse();
 
-      const { data, error } = await supabase.functions.invoke('chat-analyze', {
-        body: {
-          model_id: modelId,
-          fan_id: fanId,
-          conversation: conversacion,
-          fan_stats: fanStats
-        }
+      const response = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': import.meta.env.VITE_ANTHROPIC_API_KEY,
+          'anthropic-version': '2023-06-01'
+        },
+        body: JSON.stringify({
+          model: 'claude-3-5-sonnet-20241022',
+          max_tokens: 1024,
+          messages: [
+            {
+              role: 'user',
+              content: `Eres un experto asesor de OnlyFans. Analiza esta conversación y dame:
+1. Resumen del fan
+2. Estado emocional
+3. Siguiente mejor acción para maximizar revenue
+4. Sugerencia de mensaje
+
+Conversación:\n${JSON.stringify(conversacion, null, 2)}`
+            }
+          ]
+        })
       });
 
-      if (error) throw error;
-      setIaAnalisis(data);
+      if (!response.ok) throw new Error('API error');
+
+      const data = await response.json();
+      setIaAnalisis(data.content[0].text);
     } catch (error) {
-      console.error('Error en análisis IA:', error);
+      console.error('Error IA:', error);
       alert('Error al analizar con IA');
     } finally {
       setIaLoading(false);
@@ -359,8 +395,11 @@ export default function ChatView({ embedded = false }) {  // ✅ Agregar prop
     return (
       <>
         {!embedded && <Navbar />}
-        <div className="flex items-center justify-center h-screen">
-          <div className="text-xl">Loading...</div>
+        <div className="flex items-center justify-center min-h-screen">
+          <div className="text-center">
+            <div className="text-5xl mb-4">💬</div>
+            <p className="text-gray-500 font-semibold">Loading chat...</p>
+          </div>
         </div>
       </>
     );
@@ -370,12 +409,13 @@ export default function ChatView({ embedded = false }) {  // ✅ Agregar prop
     return (
       <>
         {!embedded && <Navbar />}
-        <div className="flex items-center justify-center h-screen">
+        <div className="flex items-center justify-center min-h-screen">
           <div className="text-center">
-            <h2 className="text-2xl font-bold mb-4">Fan not found</h2>
+            <div className="text-5xl mb-4">❌</div>
+            <p className="text-gray-500 font-semibold">Fan not found</p>
             <button
               onClick={() => navigate('/dashboard')}
-              className="px-4 py-2 bg-blue-500 text-white rounded"
+              className="mt-4 px-6 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600"
             >
               Back to Dashboard
             </button>
@@ -385,191 +425,168 @@ export default function ChatView({ embedded = false }) {  // ✅ Agregar prop
     );
   }
 
+  const tierBadge = getTierBadge(fan.tier || 0);
+
   return (
     <>
       {!embedded && <Navbar />}
-      <div className="min-h-screen bg-gradient-to-br from-purple-50 to-pink-50 p-6">
-        <div className="max-w-7xl mx-auto">
-          
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-purple-50">
+        <div className="max-w-7xl mx-auto px-4 py-8">
           {/* Header con info del fan */}
           <div className="bg-white rounded-xl shadow-lg p-6 mb-6">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-4">
-                {fan.of_avatar_url ? (
-                  <img 
-                    src={fan.of_avatar_url} 
-                    alt={fan.name}
-                    className="w-20 h-20 rounded-full object-cover border-4 border-purple-200"
-                  />
-                ) : (
-                  <div className="w-20 h-20 rounded-full bg-gradient-to-br from-purple-400 to-pink-400 flex items-center justify-center text-white text-3xl font-bold border-4 border-purple-200">
-                    {fan.name?.[0]?.toUpperCase() || '👤'}
-                  </div>
-                )}
-                
-                <div>
-                  <h1 className="text-3xl font-bold text-gray-800">
-                    {fan.display_name || fan.name || fan.of_username || 'Unknown Fan'}
-                  </h1>
-                  <div className="flex items-center gap-3 mt-2">
-                    {(() => {
-                      const tierBadge = getTierBadge(fan.tier || 0)
-                      return (
-                        <span className={`px-3 py-1 rounded-full text-sm font-semibold ${tierBadge.color}`}>
-                          {tierBadge.emoji} {tierBadge.label}
-                        </span>
-                      )
-                    })()}
-                    <span className="text-lg font-bold text-green-600">${fan.spent_total || 0} spent</span>
-                  </div>
+                <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-purple-500 rounded-full flex items-center justify-center text-white text-2xl font-bold">
+                  {(fan.display_name || fan.name || 'F')[0].toUpperCase()}
                 </div>
+                <div>
+                  <h1 className="text-2xl font-bold text-gray-800">
+                    {fan.display_name || fan.name || 'Fan'}
+                  </h1>
+                  <p className="text-sm text-gray-500">@{fan.of_username || fan.fan_id}</p>
+                </div>
+                <span className={`ml-4 px-3 py-1 rounded-full text-sm font-semibold ${tierBadge.color}`}>
+                  {tierBadge.emoji} {tierBadge.label}
+                </span>
               </div>
-
-              <div className="flex gap-2">
-                <button
-                  onClick={() => navigate('/dashboard')}
-                  className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300"
-                >
-                  ← Back
-                </button>
-                <button
-                  onClick={() => setShowNotesSidebar(!showNotesSidebar)}
-                  className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600"
-                >
-                  {showNotesSidebar ? 'Hide' : 'Show'} Notes
-                </button>
+              
+              <div className="flex gap-4">
+                <div className="text-center">
+                  <p className="text-2xl font-bold text-green-600">${fan.spent_total || 0}</p>
+                  <p className="text-xs text-gray-500">Total Spent</p>
+                </div>
+                <div className="text-center">
+                  <p className="text-2xl font-bold text-blue-600">{fanStats.tipsCount}</p>
+                  <p className="text-xs text-gray-500">Tips</p>
+                </div>
+                <div className="text-center">
+                  <p className="text-2xl font-bold text-purple-600">{fanStats.ppvCount}</p>
+                  <p className="text-xs text-gray-500">PPV</p>
+                </div>
               </div>
             </div>
           </div>
 
-          {/* Main content con grid */}
-          <div className={`grid gap-6 ${showNotesSidebar ? 'grid-cols-4' : 'grid-cols-3'}`}>
-            
-            {/* Panel IA */}
-            {showIaPanel && (
-              <div className="bg-white rounded-xl shadow-lg p-6">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="font-bold text-lg">🤖 AI Assistant</h3>
-                  <button
-                    onClick={() => setShowIaPanel(false)}
-                    className="text-gray-400 hover:text-gray-600"
-                  >
-                    ✕
-                  </button>
-                </div>
-
+          {/* Main Grid */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Chat Area */}
+            <div className={showNotesSidebar ? 'lg:col-span-2' : 'lg:col-span-3'}>
+              <div className="bg-white rounded-xl shadow-lg p-6 flex flex-col h-[600px]">
+                {/* Botón IA */}
                 <button
                   onClick={analizarConIA}
                   disabled={iaLoading}
-                  className="w-full px-4 py-3 bg-purple-500 text-white rounded-lg hover:bg-purple-600 font-semibold disabled:opacity-50 mb-4"
+                  className="mb-4 w-full px-4 py-2 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-lg hover:from-purple-600 hover:to-pink-600 font-semibold disabled:opacity-50"
                 >
-                  {iaLoading ? 'Analyzing...' : '🔮 Analyze Chat'}
+                  {iaLoading ? '🤖 Analyzing...' : '🤖 Analyze with AI'}
                 </button>
 
-                {iaAnalisis && (
-                  <div className="space-y-3">
-                    <div className="bg-purple-50 border border-purple-200 rounded-lg p-3">
-                      <p className="text-sm font-semibold text-purple-800 mb-1">💡 Suggestion:</p>
-                      <p className="text-sm text-gray-700">{iaAnalisis.suggestion}</p>
+                {/* Panel IA */}
+                {iaAnalisis && showIaPanel && (
+                  <div className="mb-4 p-4 bg-purple-50 rounded-lg border-2 border-purple-200">
+                    <div className="flex justify-between items-start mb-2">
+                      <h3 className="font-bold text-purple-700">💡 AI Analysis</h3>
+                      <button
+                        onClick={() => setShowIaPanel(false)}
+                        className="text-purple-400 hover:text-purple-600"
+                      >
+                        ✕
+                      </button>
                     </div>
-                    
-                    {iaAnalisis.recommended_content && (
-                      <div className="bg-green-50 border border-green-200 rounded-lg p-3">
-                        <p className="text-sm font-semibold text-green-800 mb-1">📦 Recommended:</p>
-                        <p className="text-sm text-gray-700">{iaAnalisis.recommended_content}</p>
-                      </div>
-                    )}
+                    <div className="text-sm text-gray-700 whitespace-pre-wrap">{iaAnalisis}</div>
                   </div>
                 )}
 
-                {/* Stats */}
-                <div className="mt-6 pt-4 border-t">
-                  <p className="text-xs font-semibold text-gray-500 mb-3">FAN STATS</p>
-                  <div className="space-y-2 text-sm">
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">Tips:</span>
-                      <span className="font-semibold">${fanStats.totalTips.toFixed(2)} ({fanStats.tipsCount})</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">PPV:</span>
-                      <span className="font-semibold">${fanStats.ppvUnlocked.toFixed(2)} ({fanStats.ppvCount})</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Chat messages */}
-            <div className={`bg-white rounded-xl shadow-lg p-6 ${showNotesSidebar ? 'col-span-2' : 'col-span-2'}`}>
-              <h3 className="font-bold text-lg mb-4">💬 Conversation</h3>
-              
-              <div className="h-[500px] overflow-y-auto mb-4 space-y-3 px-2">
-                {messages.map((msg, idx) => (
-                  <div
-                    key={idx}
-                    className={`flex ${msg.from === 'model' ? 'justify-end' : 'justify-start'}`}
-                  >
-                    <div className="flex flex-col items-start max-w-[70%]">
-                      {/* 🔥 NUEVO: Indicador de quién envió */}
-                      <span className={`text-xs font-semibold mb-1 ${
-                        msg.from === 'model' ? 'text-blue-600 self-end' : 'text-gray-500'
-                      }`}>
-                        {msg.from === 'model' ? '💙 You' : '👤 ' + (fan.display_name || fan.name || 'Fan')}
-                      </span>
-                      
-                      <div
-                        className={`px-4 py-2 rounded-lg ${
-                          msg.from === 'model'
-                            ? 'bg-blue-500 text-white'
-                            : 'bg-gray-100 text-gray-800'
-                        }`}
-                      >
-                        <p className="text-sm">{msg.message}</p>
-                        <div className="flex items-center justify-end gap-2 text-xs opacity-70 mt-1">
-                          <span>{new Date(msg.ts).toLocaleTimeString()}</span>
-                          {msg.from === 'model' && (
-                            <span className={msg.read ? 'text-blue-400' : 'text-gray-400'}>
-                              {msg.read ? '✓✓' : '✓'}
-                            </span>
+                {/* Mensajes */}
+                <div className="flex-1 overflow-y-auto mb-4 space-y-4">
+                  {messages.map((msg) => (
+                    <div
+                      key={msg.id}
+                      className={`flex ${msg.from === 'model' ? 'justify-end' : 'justify-start'}`}
+                    >
+                      <div className={`flex flex-col max-w-[70%] ${msg.from === 'model' ? 'items-end' : 'items-start'}`}>
+                        <span className={`text-xs font-semibold mb-1 ${
+                          msg.from === 'model' ? 'text-blue-600' : 'text-gray-500'
+                        }`}>
+                          {msg.from === 'model' ? '💙 You' : '👤 ' + (fan.display_name || fan.name || 'Fan')}
+                        </span>
+                        
+                        <div
+                          className={`px-4 py-2 rounded-lg ${
+                            msg.from === 'model'
+                              ? 'bg-blue-500 text-white'
+                              : 'bg-gray-100 text-gray-800'
+                          }`}
+                        >
+                          {msg.media_url && (
+                            <img src={msg.media_url} alt="media" className="rounded mb-2 max-w-full" />
                           )}
+                          <p className="text-sm">{msg.message}</p>
+                          <div className="flex items-center justify-end gap-2 text-xs opacity-70 mt-1">
+                            <span>{new Date(msg.ts).toLocaleTimeString()}</span>
+                            {msg.from === 'model' && (
+                              <span className={msg.read ? 'text-blue-200' : 'text-white/60'}>
+                                {msg.read ? '✓✓' : '✓'}
+                              </span>
+                            )}
+                          </div>
                         </div>
                       </div>
                     </div>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
 
-              {/* Input */}
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  value={newMessage}
-                  onChange={(e) => setNewMessage(e.target.value)}
-                  onKeyPress={(e) => e.key === 'Enter' && enviarMensaje()}
-                  placeholder="Type your message..."
-                  className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-                <button
-                  onClick={enviarMensaje}
-                  disabled={!newMessage.trim() || sending}
-                  className="px-6 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 font-semibold disabled:opacity-50 disabled:cursor-not-allowed transition-all"
-                >
-                  {sending ? (
-                    <span className="flex items-center gap-2">
-                      <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                      </svg>
-                      Sending...
-                    </span>
-                  ) : (
-                    'Send'
-                  )}
-                </button>
+                {/* Selector de contenido */}
+                {catalog.length > 0 && (
+                  <div className="mb-3">
+                    <select
+                      value={selectedContent || ''}
+                      onChange={(e) => setSelectedContent(e.target.value)}
+                      className="w-full px-3 py-2 border rounded-lg text-sm"
+                    >
+                      <option value="">📎 Select content from catalog</option>
+                      {catalog.map((item) => (
+                        <option key={item.id} value={item.media_url}>
+                          {item.title || item.media_type}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
+                {/* Input */}
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={newMessage}
+                    onChange={(e) => setNewMessage(e.target.value)}
+                    onKeyPress={(e) => e.key === 'Enter' && !sending && enviarMensaje()}
+                    placeholder="Type your message..."
+                    disabled={sending}
+                    className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
+                  />
+                  <button
+                    onClick={enviarMensaje}
+                    disabled={!newMessage.trim() || sending}
+                    className="px-6 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 font-semibold disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                  >
+                    {sending ? (
+                      <span className="flex items-center gap-2">
+                        <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                        </svg>
+                        Sending...
+                      </span>
+                    ) : (
+                      'Send'
+                    )}
+                  </button>
+                </div>
               </div>
             </div>
 
-            {/* 🔥 SIDEBAR DE NOTAS */}
+            {/* Sidebar de notas */}
             {showNotesSidebar && (
               <div className="bg-white rounded-xl shadow-lg p-6 max-h-[700px] overflow-y-auto">
                 <div className="flex items-center justify-between mb-4 pb-3 border-b sticky top-0 bg-white">
@@ -590,7 +607,7 @@ export default function ChatView({ embedded = false }) {  // ✅ Agregar prop
                   </p>
                 </div>
 
-                {/* 🔥 Nickname Editable */}
+                {/* Nickname */}
                 <div className="mb-4">
                   <p className="text-xs text-gray-500 mb-1">✏️ Nickname</p>
                   {editingNickname ? (
@@ -635,14 +652,9 @@ export default function ChatView({ embedded = false }) {  // ✅ Agregar prop
                 <div className="grid grid-cols-2 gap-3 mb-4">
                   <div>
                     <p className="text-xs text-gray-500 mb-1">Tier</p>
-                    {(() => {
-                      const tierBadge = getTierBadge(fan.tier || 0)
-                      return (
-                        <div className={`px-3 py-2 rounded text-center text-sm font-semibold ${tierBadge.color}`}>
-                          {tierBadge.emoji} {tierBadge.label}
-                        </div>
-                      )
-                    })()}
+                    <div className={`px-3 py-2 rounded text-center text-sm font-semibold ${tierBadge.color}`}>
+                      {tierBadge.emoji} {tierBadge.label}
+                    </div>
                   </div>
                   <div>
                     <p className="text-xs text-gray-500 mb-1">Total Spent</p>
@@ -660,7 +672,7 @@ export default function ChatView({ embedded = false }) {  // ✅ Agregar prop
                   </p>
                 </div>
 
-                {/* 🔥 General Notes */}
+                {/* General Notes */}
                 <div className="mb-4">
                   <p className="text-sm font-semibold mb-2">📝 General Notes</p>
                   <textarea
@@ -679,7 +691,7 @@ export default function ChatView({ embedded = false }) {  // ✅ Agregar prop
                   </button>
                 </div>
 
-                {/* 🔥 Chatter Tips */}
+                {/* Chatter Tips */}
                 <div>
                   <p className="text-sm font-semibold mb-2">💡 Chatter Tips</p>
                   <textarea
@@ -701,7 +713,7 @@ export default function ChatView({ embedded = false }) {  // ✅ Agregar prop
             )}
           </div>
 
-          {/* Botón flotante para mostrar sidebar si está oculto */}
+          {/* Botón flotante para mostrar sidebar */}
           {!showNotesSidebar && (
             <button
               onClick={() => setShowNotesSidebar(true)}
