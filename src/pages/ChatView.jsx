@@ -6,7 +6,7 @@ import Navbar from '../components/Navbar';
 
 export default function ChatView() {
   const { fanId } = useParams();
-  const { user } = useAuth();
+  const { user, modelId } = useAuth();  // ← Agregar modelId
   const navigate = useNavigate();
   
   const [fan, setFan] = useState(null);
@@ -52,7 +52,7 @@ export default function ChatView() {
     loadCatalog();
     const interval = setInterval(loadFanAndMessages, 5000);
     return () => clearInterval(interval);
-  }, [fanId, user, user?.user_metadata?.model_id]);  // ← Detecta cambio de modelo
+  }, [fanId, user, modelId]);  // ← Detecta cambio de modelo
 
   // 🔥 FIX: Cargar notas cuando se carga el fan
   useEffect(() => {
@@ -139,16 +139,16 @@ export default function ChatView() {
   }
 
   async function loadFanAndMessages() {
-    if (!user?.user_metadata?.model_id) return;
+    const currentModelId = modelId || user?.user_metadata?.model_id;
     
-    const modelId = user.user_metadata.model_id;
+    if (!currentModelId) return;
 
     try {
       const { data: fanData, error: fanError } = await supabase
         .from('fans')
         .select('*')
         .eq('fan_id', fanId)
-        .eq('model_id', modelId)
+        .eq('model_id', currentModelId)
         .maybeSingle();
 
       if (fanError) {
@@ -171,8 +171,8 @@ export default function ChatView() {
         .from('chat')
         .select('*')
         .eq('fan_id', fanId)
-        .eq('model_id', modelId)
-        .order('ts', { ascending: true })
+        .eq('model_id', currentModelId)
+        .order('ts', { ascending: false })  // ✅ Más reciente primero
         .limit(200);
 
       if (messagesError) {
@@ -215,15 +215,14 @@ export default function ChatView() {
   }
 
   async function loadCatalog() {
-    if (!user?.user_metadata?.model_id) return;
-    
-    const modelId = user.user_metadata.model_id;
+    const currentModelId = modelId || user?.user_metadata?.model_id;
+    if (!currentModelId) return;
     
     try {
-      const { data, error } = await supabase
+      const { data, error} = await supabase
         .from('catalog')
         .select('*')
-        .eq('model_id', modelId)
+        .eq('model_id', currentModelId)
         .order('created_at', { ascending: false });
       
       if (error) throw error;
