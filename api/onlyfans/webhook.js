@@ -160,6 +160,22 @@ async function handleMessage(data, modelId) {
         console.log('⚠️ No media found in message')
       }
       
+      // ✅ CREAR NOTIFICACIÓN del vault fan también (para pruebas)
+      if (!data.isSentByMe) {
+        const fanName = data.fromUser?.name || data.user?.name || 'Vault Fan'
+        const messagePreview = mediaType === 'video' ? '📹 Contenido guardado en vault' :
+                              mediaType === 'photo' ? '📸 Contenido guardado en vault' :
+                              '📎 Contenido guardado en vault'
+        
+        await createNotification(
+          modelId,
+          fanId,
+          'vault_upload',
+          `${fanName} - Vault`,
+          messagePreview
+        )
+      }
+      
       // NO guardar en chat (es solo para vault)
       return
     }
