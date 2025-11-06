@@ -105,7 +105,60 @@ async function handleMessage(data, modelId) {
       return
     }
 
-    // Upsert fan
+    // 🔥 VERIFICAR SI ES VAULT FAN
+    const { data: modelData } = await supabase
+      .from('models')
+      .select('vault_fan_id')
+      .eq('model_id', modelId)
+      .single()
+
+    const isVaultFan = modelData?.vault_fan_id === fanId
+    
+    if (isVaultFan && data.isSentByMe) {
+      console.log('📸 Vault upload detected! Saving to catalog...')
+      
+      // Detectar tipo de media
+      let mediaUrl = null
+      let mediaThumb = null
+      let mediaType = null
+      
+      if (data.media && data.media.length > 0) {
+        const media = data.media[0]
+        mediaType = media.type
+        
+        if (mediaType === 'video') {
+          mediaUrl = media.files?.full?.url || media.url
+          mediaThumb = media.files?.thumb?.url
+        } else {
+          mediaUrl = media.files?.full?.url || media.files?.thumb?.url || media.url
+        }
+      }
+      
+      // Guardar en catalog
+      if (mediaUrl) {
+        const { error: catalogError } = await supabase
+          .from('catalog')
+          .insert({
+            model_id: modelId,
+            title: data.text?.replace(/<[^>]*>/g, '').replace('📸 ', '').trim() || 'Untitled',
+            media_url: mediaUrl,
+            media_thumb: mediaThumb,
+            media_type: mediaType,
+            created_at: new Date().toISOString()
+          })
+        
+        if (catalogError) {
+          console.error('❌ Error saving to catalog:', catalogError)
+        } else {
+          console.log('✅ Saved to catalog!')
+        }
+      }
+      
+      // NO guardar en chat (es solo para vault)
+      return
+    }
+
+    // Upsert fan (código existente)
     await supabase.from('fans').upsert({
       fan_id: fanId,
       name: data.fromUser?.name || data.user?.name || 'Unknown',
@@ -115,28 +168,26 @@ async function handleMessage(data, modelId) {
       last_message_date: data.createdAt || new Date().toISOString()
     }, { onConflict: 'fan_id,model_id' })
 
-    // 🔥 DETECTAR TIPO DE MEDIA
+    // Detectar tipo de media
     let mediaUrl = null
     let mediaThumb = null
     let mediaType = null
     
     if (data.media && data.media.length > 0) {
       const media = data.media[0]
-      mediaType = media.type // 'photo', 'video', 'gif', 'audio'
+      mediaType = media.type
       
       if (mediaType === 'video') {
-        // Para videos: guardar AMBOS
-        mediaUrl = media.files?.full?.url || media.url      // 🎥 Video completo
-        mediaThumb = media.files?.thumb?.url                 // 🖼️ Thumbnail
+        mediaUrl = media.files?.full?.url || media.url
+        mediaThumb = media.files?.thumb?.url
         console.log('🎬 Video detected:', { url: mediaUrl, thumb: mediaThumb })
       } else {
-        // Para fotos/GIFs: solo URL
         mediaUrl = media.files?.full?.url || media.files?.thumb?.url || media.url
         console.log('🖼️ Media detected:', { type: mediaType, url: mediaUrl })
       }
     }
 
-    // Guardar mensaje
+    // Guardar mensaje (código existente...)
     const chatData = {
       fan_id: fanId,
       message: cleanHTML(data.text),
@@ -144,9 +195,9 @@ async function handleMessage(data, modelId) {
       ts: new Date(data.createdAt || Date.now()).toISOString(),
       from: data.isSentByMe ? 'model' : 'fan',
       of_message_id: data.id?.toString(),
-      media_url: mediaUrl,                    // 🔥 URL del archivo (video/foto)
-      media_thumb: mediaThumb,                // 🔥 Thumbnail (solo para videos)
-      media_type: mediaType,                  // 🔥 Tipo: photo/video/gif
+      media_url: mediaUrl,
+      media_thumb: mediaThumb,
+      media_type: mediaType,
       amount: parseFloat(data.price || 0),
       read: data.isOpened || false
     }
@@ -161,7 +212,7 @@ async function handleMessage(data, modelId) {
       console.log('✅ Message saved')
     }
 
-    // Crear notificación si es del fan
+    // Crear notificación si es del fan (código existente...)
     if (!data.isSentByMe) {
       const fanName = data.fromUser?.name || data.user?.name || 'Un fan'
       const tipAmount = parseFloat(data.price || 0)
@@ -190,7 +241,6 @@ async function handleMessage(data, modelId) {
         isTip ? tipAmount : null
       )
 
-      // Si es tip, actualizar spent_total
       if (isTip) {
         await supabase.rpc('increment_fan_spent', {
           p_fan_id: fanId,
