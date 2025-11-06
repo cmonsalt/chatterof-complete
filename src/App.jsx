@@ -6,7 +6,7 @@ import Signup from './pages/Signup'
 import Dashboard from './pages/Dashboard'
 import ChatView from './pages/ChatView'
 import Settings from './pages/Settings'
-import ChatterDashboard from './pages/ChatterDashboard2'
+import ChatterMode from './pages/ChatterMode'  // ✅ Cambiado
 import AuthCallback from './pages/AuthCallback'
 
 function App() {
@@ -35,13 +35,19 @@ function App() {
             </ProtectedRoute>
           } />
 
+          {/* ✅ ChatterMode con y sin fanId */}
           <Route path="/chatter" element={
             <ProtectedRoute>
-              <ChatterDashboard />
+              <ChatterMode />
             </ProtectedRoute>
           } />
 
-          {/* ✅ MOVER ESTA LÍNEA AQUÍ DENTRO . */}
+          <Route path="/chatter/:fanId" element={
+            <ProtectedRoute>
+              <ChatterMode />
+            </ProtectedRoute>
+          } />
+
           <Route path="/auth/callback" element={<AuthCallback />} />
 
           <Route path="/" element={<Navigate to="/dashboard" replace />} />
