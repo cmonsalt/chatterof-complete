@@ -117,15 +117,23 @@ async function handleMessage(data, modelId) {
 
     // 🔥 DETECTAR TIPO DE MEDIA
     let mediaUrl = null
+    let mediaThumb = null
     let mediaType = null
     
     if (data.media && data.media.length > 0) {
       const media = data.media[0]
-      // Priorizar URL completa sobre thumbnail
-      mediaUrl = media.files?.full?.url || media.files?.thumb?.url || media.url
       mediaType = media.type // 'photo', 'video', 'gif', 'audio'
       
-      console.log('🎬 Media detected:', { type: mediaType, url: mediaUrl })
+      if (mediaType === 'video') {
+        // Para videos: guardar AMBOS
+        mediaUrl = media.files?.full?.url || media.url      // 🎥 Video completo
+        mediaThumb = media.files?.thumb?.url                 // 🖼️ Thumbnail
+        console.log('🎬 Video detected:', { url: mediaUrl, thumb: mediaThumb })
+      } else {
+        // Para fotos/GIFs: solo URL
+        mediaUrl = media.files?.full?.url || media.files?.thumb?.url || media.url
+        console.log('🖼️ Media detected:', { type: mediaType, url: mediaUrl })
+      }
     }
 
     // Guardar mensaje
@@ -136,7 +144,8 @@ async function handleMessage(data, modelId) {
       ts: new Date(data.createdAt || Date.now()).toISOString(),
       from: data.isSentByMe ? 'model' : 'fan',
       of_message_id: data.id?.toString(),
-      media_url: mediaUrl,                    // 🔥 URL del archivo
+      media_url: mediaUrl,                    // 🔥 URL del archivo (video/foto)
+      media_thumb: mediaThumb,                // 🔥 Thumbnail (solo para videos)
       media_type: mediaType,                  // 🔥 Tipo: photo/video/gif
       amount: parseFloat(data.price || 0),
       read: data.isOpened || false

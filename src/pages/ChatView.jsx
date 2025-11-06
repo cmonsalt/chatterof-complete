@@ -506,15 +506,18 @@ Conversación:\n${JSON.stringify(conversacion, null, 2)}`
                           {msg.media_url && (
                             <>
                               {msg.media_type === 'video' ? (
-                                // 🎥 VIDEO con player HTML5
-                                <video 
-                                  controls 
-                                  className="rounded mb-2 max-w-full max-h-64 bg-black"
-                                  preload="metadata"
-                                >
-                                  <source src={msg.media_url} type="video/mp4" />
-                                  Tu navegador no soporta reproducción de video
-                                </video>
+                                // 🎥 VIDEO con thumbnail de preview
+                                <div className="relative mb-2">
+                                  <video 
+                                    controls 
+                                    poster={msg.media_thumb}
+                                    className="rounded max-w-full max-h-64 bg-black"
+                                    preload="metadata"
+                                  >
+                                    <source src={msg.media_url} type="video/mp4" />
+                                    Tu navegador no soporta reproducción de video
+                                  </video>
+                                </div>
                               ) : msg.media_type === 'gif' ? (
                                 // 🎭 GIF
                                 <img 
