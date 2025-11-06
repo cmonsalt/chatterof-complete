@@ -37,11 +37,17 @@ export default function ChatView({ embedded = false }) {
   const [catalog, setCatalog] = useState([]);
   const [selectedContent, setSelectedContent] = useState(null);
   
+  // 🔥 REPLY functionality
+  const [replyingTo, setReplyingTo] = useState(null);
+  
+  // 🔥 PPV functionality  
+  const [ppvPrice, setPpvPrice] = useState(0);
+  const [showPpvInput, setShowPpvInput] = useState(false);
+  
   const lastCheckedMessageId = useRef(null);
   const justSentMessage = useRef(false);
-  const messagesEndRef = useRef(null);  // 🔥 Para scroll automático
+  const messagesEndRef = useRef(null);
 
-  // 🔥 Scroll automático al final
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
@@ -75,7 +81,6 @@ export default function ChatView({ embedded = false }) {
       return;
     }
     
-    // 🔥 Último mensaje = el del FINAL del array (más reciente)
     const lastMessage = messages[messages.length - 1];
     
     if (lastMessage?.from === 'fan' && lastMessage.id !== lastCheckedMessageId.current) {
@@ -211,19 +216,18 @@ export default function ChatView({ embedded = false }) {
 
       setFan(fanData);
 
-      // 🔥 Traer en orden ASCENDENTE (viejos primero)
-      const { data: messagesData, error: messagesError } = await supabase
+      const { data: messagesData, error: messagesError} = await supabase
         .from('chat')
         .select('*')
         .eq('fan_id', fanId)
         .eq('model_id', currentModelId)
-        .order('ts', { ascending: true })  // 🔥 Cambio clave: true = viejos primero
+        .order('ts', { ascending: true })
         .limit(50);
 
       if (messagesError) {
         console.error('❌ Messages error:', messagesError);
       } else {
-        setMessages(messagesData || []);  // 🔥 Sin reverse, ya vienen ordenados
+        setMessages(messagesData || []);
       }
 
       calculateFanStats(messagesData || []);
@@ -307,7 +311,10 @@ export default function ChatView({ embedded = false }) {
           chatId: fanId,
           text: newMessage,
           mediaFiles: selectedContent ? [selectedContent] : [],
-          price: 0
+          price: ppvPrice || 0,  // 🔥 PPV
+          // 🔥 REPLY
+          replyToMessageId: replyingTo?.id || null,
+          replyToText: replyingTo?.message || null
         })
       });
 
@@ -318,6 +325,9 @@ export default function ChatView({ embedded = false }) {
 
       setNewMessage('');
       setSelectedContent(null);
+      setReplyingTo(null);     // 🔥 Limpiar reply
+      setPpvPrice(0);          // 🔥 Limpiar PPV
+      setShowPpvInput(false);  // 🔥 Ocultar input PPV
       
       await new Promise(resolve => setTimeout(resolve, 500));
       await loadFanAndMessages();
@@ -481,7 +491,6 @@ Conversación:\n${JSON.stringify(conversacion, null, 2)}`
                   </div>
                 )}
 
-                {/* 🔥 Contenedor de mensajes con scroll */}
                 <div className="flex-1 overflow-y-auto mb-4 space-y-4">
                   {messages.map((msg) => (
                     <div
@@ -496,17 +505,29 @@ Conversación:\n${JSON.stringify(conversacion, null, 2)}`
                         </span>
                         
                         <div
-                          className={`px-4 py-2 rounded-lg ${
+                          className={`px-4 py-2 rounded-lg relative group ${
                             msg.from === 'model'
                               ? 'bg-blue-500 text-white'
                               : 'bg-gray-100 text-gray-800'
                           }`}
                         >
-                          {/* 🔥 Renderizar imagen o video */}
+                          {/* 🔥 REPLY CONTEXT */}
+                          {msg.reply_to_text && (
+                            <div className={`text-xs p-2 rounded mb-2 border-l-2 ${
+                              msg.from === 'model' 
+                                ? 'bg-blue-600 border-blue-300' 
+                                : 'bg-gray-200 border-gray-400'
+                            }`}>
+                              <div className="opacity-70 mb-1">↩️ Respondiendo a:</div>
+                              <div className="italic">
+                                {msg.reply_to_text.slice(0, 60)}{msg.reply_to_text.length > 60 ? '...' : ''}
+                              </div>
+                            </div>
+                          )}
+
                           {msg.media_url && (
                             <>
                               {msg.media_type === 'video' ? (
-                                // 🎥 VIDEO con thumbnail de preview
                                 <div className="relative mb-2">
                                   <video 
                                     controls 
@@ -519,7 +540,6 @@ Conversación:\n${JSON.stringify(conversacion, null, 2)}`
                                   </video>
                                 </div>
                               ) : msg.media_type === 'gif' ? (
-                                // 🎭 GIF
                                 <img 
                                   src={msg.media_url} 
                                   alt="gif" 
@@ -527,7 +547,6 @@ Conversación:\n${JSON.stringify(conversacion, null, 2)}`
                                   onClick={() => window.open(msg.media_url, '_blank')}
                                 />
                               ) : (
-                                // 🖼️ IMAGEN normal
                                 <img 
                                   src={msg.media_url} 
                                   alt="photo" 
@@ -538,6 +557,14 @@ Conversación:\n${JSON.stringify(conversacion, null, 2)}`
                             </>
                           )}
                           <p className="text-sm">{msg.message}</p>
+                          
+                          {/* 🔥 PPV BADGE */}
+                          {msg.amount > 0 && (
+                            <div className="bg-green-500 text-white text-xs px-2 py-1 rounded-full inline-block mt-1">
+                              💰 ${msg.amount}
+                            </div>
+                          )}
+
                           <div className="flex items-center justify-end gap-2 text-xs opacity-70 mt-1">
                             <span>{new Date(msg.ts).toLocaleTimeString()}</span>
                             {msg.from === 'model' && (
@@ -546,13 +573,42 @@ Conversación:\n${JSON.stringify(conversacion, null, 2)}`
                               </span>
                             )}
                           </div>
+
+                          {/* 🔥 BOTÓN REPLY */}
+                          {msg.from === 'fan' && (
+                            <button
+                              onClick={() => setReplyingTo(msg)}
+                              className="absolute -bottom-8 right-0 opacity-0 group-hover:opacity-100 transition-opacity bg-gray-700 text-white text-xs px-3 py-1 rounded-full hover:bg-gray-600"
+                            >
+                              ↩️ Reply
+                            </button>
+                          )}
                         </div>
                       </div>
                     </div>
                   ))}
-                  {/* 🔥 Elemento invisible para scroll automático */}
                   <div ref={messagesEndRef} />
                 </div>
+
+                {/* 🔥 REPLY PREVIEW */}
+                {replyingTo && (
+                  <div className="mb-2 bg-blue-50 border-l-4 border-blue-500 p-3 rounded flex justify-between items-start">
+                    <div className="flex-1">
+                      <div className="text-xs text-blue-600 font-semibold mb-1">
+                        ↩️ Respondiendo a:
+                      </div>
+                      <div className="text-sm text-gray-700">
+                        {replyingTo.message.slice(0, 80)}{replyingTo.message.length > 80 ? '...' : ''}
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => setReplyingTo(null)}
+                      className="text-gray-400 hover:text-gray-600 ml-2"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                )}
 
                 {catalog.length > 0 && (
                   <div className="mb-3">
@@ -571,16 +627,29 @@ Conversación:\n${JSON.stringify(conversacion, null, 2)}`
                   </div>
                 )}
 
-                <div className="flex gap-2">
+                <div className="flex gap-2 items-end">
                   <input
                     type="text"
                     value={newMessage}
                     onChange={(e) => setNewMessage(e.target.value)}
                     onKeyPress={(e) => e.key === 'Enter' && !sending && enviarMensaje()}
-                    placeholder="Type your message..."
+                    placeholder={replyingTo ? "Escribe tu respuesta..." : "Type your message..."}
                     disabled={sending}
                     className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
                   />
+                  
+                  {/* 🔥 BOTÓN PPV */}
+                  <button
+                    onClick={() => setShowPpvInput(!showPpvInput)}
+                    className={`px-4 py-2 rounded-lg font-semibold transition-all ${
+                      showPpvInput 
+                        ? 'bg-green-500 text-white' 
+                        : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                    }`}
+                  >
+                    💰 {ppvPrice > 0 ? `$${ppvPrice}` : 'PPV'}
+                  </button>
+
                   <button
                     onClick={enviarMensaje}
                     disabled={!newMessage.trim() || sending}
@@ -589,6 +658,41 @@ Conversación:\n${JSON.stringify(conversacion, null, 2)}`
                     {sending ? '⏳' : 'Send'}
                   </button>
                 </div>
+
+                {/* 🔥 PPV INPUT */}
+                {showPpvInput && (
+                  <div className="mt-2 bg-green-50 border border-green-200 rounded-lg p-3">
+                    <label className="text-sm font-semibold text-green-700 mb-2 block">
+                      💰 Precio PPV (Pay-Per-View):
+                    </label>
+                    <div className="flex gap-2 items-center">
+                      <span className="text-gray-600">$</span>
+                      <input
+                        type="number"
+                        min="0"
+                        step="1"
+                        value={ppvPrice}
+                        onChange={(e) => setPpvPrice(parseFloat(e.target.value) || 0)}
+                        placeholder="10"
+                        className="flex-1 px-3 py-2 border border-green-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                      />
+                      <button
+                        onClick={() => {
+                          setPpvPrice(0);
+                          setShowPpvInput(false);
+                        }}
+                        className="text-gray-400 hover:text-gray-600"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                    <p className="text-xs text-gray-500 mt-2">
+                      {ppvPrice > 0 
+                        ? `El fan deberá pagar $${ppvPrice} para ver este contenido` 
+                        : 'Ingresa el precio para bloquear el contenido'}
+                    </p>
+                  </div>
+                )}
               </div>
             </div>
 
