@@ -32,8 +32,10 @@ export default function Navbar() {
   const handleModelSwitch = (modelId) => {
     switchModel(modelId)
     setShowModelSelector(false)
-    // Recargar la página para actualizar los fans
-    window.location.reload()
+    
+    // Navegar a dashboard en lugar de reload
+    // Esto resetea el estado limpiamente
+    navigate('/dashboard')
   }
 
   return (
