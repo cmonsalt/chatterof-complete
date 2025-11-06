@@ -177,7 +177,9 @@ export default function ChatView() {
         console.error('❌ Messages error:', messagesError);
       } else {
         console.log(`✅ Loaded ${messagesData?.length || 0} messages`);
-        setMessages(messagesData || []);
+        // Revertir array: más viejo arriba, nuevo abajo
+        const sortedMessages = (messagesData || []).reverse();
+        setMessages(sortedMessages);
         calculateFanStats(messagesData || []);
       }
 
