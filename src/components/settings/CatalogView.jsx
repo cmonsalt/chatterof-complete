@@ -40,7 +40,7 @@ export default function CatalogView({ modelId }) {
 
       data.forEach(item => {
         // Sessions: items que tienen session_id
-        if (item.session_id) {
+        if (item.session_id && item.step_number != null) {
           if (!sessionsMap.has(item.session_id)) {
             sessionsMap.set(item.session_id, {
               session_id: item.session_id,
