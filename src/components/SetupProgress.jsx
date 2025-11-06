@@ -214,7 +214,8 @@ export default function SetupProgress({ modelId, accountId, onComplete }) {
           <div className="text-green-700 space-y-1">
             <p>✅ {progress.fans.current} fans synced</p>
             <p>✅ {progress.chats.current} messages synced</p>
-            <p>✅ {progress.vault.current} media files scraped</p>
+            {/* VAULT DISABLED - HIDDEN */}
+            {/* <p>✅ {progress.vault.current} media files scraped</p> */}
           </div>
         </div>
       </div>
@@ -274,8 +275,8 @@ export default function SetupProgress({ modelId, accountId, onComplete }) {
             )}
           </div>
 
-          {/* Vault */}
-          <div className={`p-4 rounded-lg ${progress.currentStep === 'vault' ? 'bg-indigo-50' : 'bg-gray-50'}`}>
+          {/* VAULT DISABLED FOR MVP - HIDDEN FROM UI */}
+          {/* <div className={`p-4 rounded-lg ${progress.currentStep === 'vault' ? 'bg-indigo-50' : 'bg-gray-50'}`}>
             <div className="flex items-center justify-between mb-2">
               <span className="font-medium">
                 {progress.vault.done ? '✅' : progress.currentStep === 'vault' ? '⏳' : '⏸️'} Scraping Vault
@@ -287,7 +288,7 @@ export default function SetupProgress({ modelId, accountId, onComplete }) {
                 <div className="h-full bg-indigo-600 animate-pulse w-full" />
               </div>
             )}
-          </div>
+          </div> */}
         </div>
 
         <p className="text-sm text-gray-600 mt-6 text-center">
