@@ -211,14 +211,14 @@ export default function ChatterMode() {
             </div>
           </div>
 
-          <div className="grid grid-cols-4 gap-6">
-            {/* Left: Fan List (1 column) */}
-            <div className="bg-white rounded-xl shadow-lg p-6">
+          <div className="grid grid-cols-12 gap-6">
+            {/* Left: Fan List (3 columns) */}
+            <div className="col-span-3 bg-white rounded-xl shadow-lg p-6">
               <div className="flex items-center justify-between mb-3 pb-3 border-b">
-                <h3 className="font-semibold">Active Chats ({filteredChats.length})</h3>
+                <h3 className="font-bold text-lg">Active Chats ({filteredChats.length})</h3>
               </div>
 
-              <div className="flex gap-2 text-xs text-gray-600 mb-4">
+              <div className="flex gap-3 text-xs text-gray-600 mb-4">
                 <span className="flex items-center gap-1">
                   <div className="w-2 h-2 rounded-full bg-red-500"></div>
                   Urgent
@@ -239,16 +239,16 @@ export default function ChatterMode() {
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   placeholder="🔍 Search fans..."
-                  className="w-full px-3 py-2 border rounded-lg text-sm"
+                  className="w-full px-4 py-2.5 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none"
                 />
               </div>
 
-              <div className="space-y-2 max-h-[calc(100vh-400px)] overflow-y-auto">
+              <div className="space-y-2 max-h-[calc(100vh-450px)] overflow-y-auto pr-2">
                 {filteredChats.length === 0 ? (
-                  <div className="text-center py-12">
-                    <div className="text-6xl mb-4">💬</div>
-                    <p className="text-gray-500 font-semibold">No active chats</p>
-                    <p className="text-gray-400 text-sm mt-2">
+                  <div className="text-center py-16">
+                    <div className="text-5xl mb-3">💬</div>
+                    <p className="text-gray-500 font-semibold text-sm">No active chats</p>
+                    <p className="text-gray-400 text-xs mt-2">
                       {searchQuery 
                         ? 'No fans match your search' 
                         : 'Fans with recent messages will appear here'}
@@ -265,28 +265,28 @@ export default function ChatterMode() {
                         onClick={() => navigate(`/chatter/${chat.fan_id}`)}
                         className={`p-3 rounded-lg cursor-pointer transition-all ${
                           isSelected
-                            ? 'bg-blue-50 border-2 border-blue-500'
-                            : 'bg-gray-50 hover:bg-gray-100'
+                            ? 'bg-blue-50 border-2 border-blue-500 shadow-sm'
+                            : 'bg-gray-50 hover:bg-gray-100 border-2 border-transparent'
                         }`}
                       >
-                        <div className="flex items-center justify-between mb-1">
-                          <div className="flex items-center gap-2">
-                            <div className={`w-3 h-3 rounded-full ${getStatusColor(chat)}`}></div>
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="flex items-center gap-2 flex-1 min-w-0">
+                            <div className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${getStatusColor(chat)}`}></div>
                             <span className="font-semibold text-sm truncate">{chat.display_name || chat.name}</span>
                           </div>
-                          <span className="text-xs text-gray-500">{getTimeText(chat)}</span>
+                          <span className="text-xs text-gray-500 ml-2 flex-shrink-0">{getTimeText(chat)}</span>
                         </div>
                         
                         <div className="flex items-center justify-between text-xs mb-2">
-                          <span className={`px-2 py-0.5 rounded-full font-semibold ${tierBadge.color}`}>
+                          <span className={`px-2 py-0.5 rounded-full font-semibold text-xs ${tierBadge.color}`}>
                             {tierBadge.emoji} {tierBadge.label}
                           </span>
-                          <span className="font-semibold text-green-600">${chat.spent_total || 0}</span>
+                          <span className="font-bold text-green-600">${chat.spent_total || 0}</span>
                         </div>
 
                         <div className="text-xs text-gray-600 truncate">
-                          {chat.lastMessageFrom === 'fan' && '👤 '}
-                          {chat.lastMessageFrom === 'model' && '💙 '}
+                          {chat.lastMessageFrom === 'fan' && <span className="font-semibold">👤 Fan: </span>}
+                          {chat.lastMessageFrom === 'model' && <span className="font-semibold">💙 You: </span>}
                           {chat.lastMessage}
                         </div>
                       </div>
@@ -296,15 +296,15 @@ export default function ChatterMode() {
               </div>
             </div>
 
-            {/* Right: ChatView Component (3 columns) */}
-            <div className="col-span-3">
+            {/* Right: ChatView Component (9 columns - más espacio) */}
+            <div className="col-span-9">
               {fanId ? (
                 <ChatView embedded={true} />
               ) : (
-                <div className="bg-white rounded-xl shadow-lg p-6 h-[calc(100vh-200px)] flex items-center justify-center">
+                <div className="bg-white rounded-xl shadow-lg h-[calc(100vh-250px)] flex items-center justify-center">
                   <div className="text-center">
-                    <div className="text-6xl mb-4">💬</div>
-                    <p className="text-gray-500 font-semibold">Select a chat to start</p>
+                    <div className="text-7xl mb-4">💬</div>
+                    <p className="text-gray-500 font-bold text-xl">Select a chat to start</p>
                     <p className="text-gray-400 text-sm mt-2">
                       Choose a fan from the list to view conversation
                     </p>
