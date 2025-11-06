@@ -6,7 +6,7 @@ import Navbar from '../components/Navbar';
 
 export default function ChatView() {
   const { fanId } = useParams();
-  const { user } = useAuth();
+  const { user, modelId } = useAuth();  // ← Agregar modelId
   const navigate = useNavigate();
   
   const [fan, setFan] = useState(null);
