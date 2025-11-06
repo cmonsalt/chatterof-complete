@@ -80,17 +80,35 @@ export default function CatalogView({ modelId: propModelId }) {
             onClick={() => setSelectedMedia(item)}
             className="relative group cursor-pointer bg-white rounded-lg overflow-hidden shadow hover:shadow-lg transition-all"
           >
-            {/* Thumbnail placeholder */}
-            <div className="aspect-square bg-gradient-to-br from-purple-100 to-pink-100 flex items-center justify-center">
-              {item.file_type === 'video' ? (
+            {/* Thumbnail o video */}
+            <div className="aspect-square bg-gradient-to-br from-purple-100 to-pink-100 flex items-center justify-center overflow-hidden">
+              {item.media_thumb ? (
+                // Mostrar thumbnail real
+                <img 
+                  src={item.media_thumb} 
+                  alt={item.title}
+                  className="w-full h-full object-cover"
+                />
+              ) : item.file_type === 'video' ? (
+                // Placeholder de video
                 <div className="text-center">
                   <div className="text-4xl mb-2">🎬</div>
                   <span className="text-xs text-gray-600">Video</span>
                 </div>
               ) : (
+                // Placeholder de foto
                 <div className="text-center">
                   <div className="text-4xl mb-2">📸</div>
                   <span className="text-xs text-gray-600">Foto</span>
+                </div>
+              )}
+              
+              {/* Play icon para videos */}
+              {item.file_type === 'video' && (
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <div className="bg-black/50 rounded-full p-3">
+                    <div className="text-white text-3xl">▶️</div>
+                  </div>
                 </div>
               )}
             </div>
@@ -147,22 +165,44 @@ export default function CatalogView({ modelId: propModelId }) {
               </div>
 
               {/* Contenido */}
-              <div className="bg-gray-100 rounded-lg p-8 mb-4 flex items-center justify-center">
-                {selectedMedia.file_type === 'video' ? (
-                  <div className="text-center">
-                    <div className="text-6xl mb-3">🎬</div>
-                    <p className="text-gray-700 font-semibold">Video</p>
-                    <p className="text-sm text-gray-500 mt-2">
-                      ID: {selectedMedia.of_media_id}
-                    </p>
-                  </div>
+              <div className="bg-gray-100 rounded-lg mb-4 overflow-hidden">
+                {selectedMedia.file_type === 'video' && selectedMedia.media_url ? (
+                  // Reproducir video real
+                  <video 
+                    controls 
+                    className="w-full"
+                    poster={selectedMedia.media_thumb}
+                  >
+                    <source src={selectedMedia.media_url} type="video/mp4" />
+                    Tu navegador no soporta video HTML5
+                  </video>
+                ) : selectedMedia.file_type === 'photo' && selectedMedia.media_url ? (
+                  // Mostrar foto real
+                  <img 
+                    src={selectedMedia.media_url} 
+                    alt={selectedMedia.title}
+                    className="w-full"
+                  />
                 ) : (
-                  <div className="text-center">
-                    <div className="text-6xl mb-3">📸</div>
-                    <p className="text-gray-700 font-semibold">Foto</p>
-                    <p className="text-sm text-gray-500 mt-2">
-                      ID: {selectedMedia.of_media_id}
-                    </p>
+                  // Placeholder si no hay URL
+                  <div className="p-8 flex items-center justify-center">
+                    {selectedMedia.file_type === 'video' ? (
+                      <div className="text-center">
+                        <div className="text-6xl mb-3">🎬</div>
+                        <p className="text-gray-700 font-semibold">Video</p>
+                        <p className="text-sm text-gray-500 mt-2">
+                          ID: {selectedMedia.of_media_id}
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="text-center">
+                        <div className="text-6xl mb-3">📸</div>
+                        <p className="text-gray-700 font-semibold">Foto</p>
+                        <p className="text-sm text-gray-500 mt-2">
+                          ID: {selectedMedia.of_media_id}
+                        </p>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>

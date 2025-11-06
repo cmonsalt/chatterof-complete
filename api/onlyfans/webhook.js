@@ -147,6 +147,8 @@ async function handleMessage(data, modelId) {
             nivel: 0,
             of_media_id: data.media[0].id?.toString(),
             file_type: mediaType,
+            media_url: mediaUrl,
+            media_thumb: mediaThumb,
             parent_type: 'single',
             created_at: new Date().toISOString()
           })
