@@ -6,7 +6,7 @@ import Navbar from '../components/Navbar';
 
 export default function ChatView() {
   const { fanId } = useParams();
-  const { user, modelId } = useAuth();  // ← Agregar modelId
+  const { user } = useAuth();
   const navigate = useNavigate();
   
   const [fan, setFan] = useState(null);
@@ -52,7 +52,7 @@ export default function ChatView() {
     loadCatalog();
     const interval = setInterval(loadFanAndMessages, 5000);
     return () => clearInterval(interval);
-  }, [fanId, user, modelId]);  // ← Detecta cambio de modelo
+  }, [fanId, user]);
 
   // 🔥 FIX: Cargar notas cuando se carga el fan
   useEffect(() => {
@@ -139,16 +139,16 @@ export default function ChatView() {
   }
 
   async function loadFanAndMessages() {
-    const currentModelId = modelId || user?.user_metadata?.model_id;
+    if (!user?.user_metadata?.model_id) return;
     
-    if (!currentModelId) return;
+    const modelId = user.user_metadata.model_id;
 
     try {
       const { data: fanData, error: fanError } = await supabase
         .from('fans')
         .select('*')
         .eq('fan_id', fanId)
-        .eq('model_id', currentModelId)
+        .eq('model_id', modelId)
         .maybeSingle();
 
       if (fanError) {
@@ -158,10 +158,8 @@ export default function ChatView() {
       }
       
       if (!fanData) {
-        console.log('⚠️ Fan no encontrado en este modelo');
+        console.log('⚠️ Fan no encontrado');
         setLoading(false);
-        // Redirigir al dashboard si el fan no existe en este modelo
-        navigate('/dashboard');
         return;
       }
 
@@ -171,8 +169,8 @@ export default function ChatView() {
         .from('chat')
         .select('*')
         .eq('fan_id', fanId)
-        .eq('model_id', currentModelId)
-        .order('ts', { ascending: false })  // ✅ Más reciente primero
+        .eq('model_id', modelId)
+        .order('ts', { ascending: true })
         .limit(200);
 
       if (messagesError) {
@@ -215,14 +213,15 @@ export default function ChatView() {
   }
 
   async function loadCatalog() {
-    const currentModelId = modelId || user?.user_metadata?.model_id;
-    if (!currentModelId) return;
+    if (!user?.user_metadata?.model_id) return;
+    
+    const modelId = user.user_metadata.model_id;
     
     try {
-      const { data, error} = await supabase
+      const { data, error } = await supabase
         .from('catalog')
         .select('*')
-        .eq('model_id', currentModelId)
+        .eq('model_id', modelId)
         .order('created_at', { ascending: false });
       
       if (error) throw error;
@@ -233,31 +232,49 @@ export default function ChatView() {
   }
 
   async function enviarMensaje() {
-    if (!newMessage.trim() || !user?.user_metadata?.model_id) return;
+    if (!newMessage.trim()) return;
     
-    const modelId = user.user_metadata.model_id;
+    const currentModelId = modelId || user?.user_metadata?.model_id;
+    if (!currentModelId) return;
 
     try {
-      const { error } = await supabase
-        .from('chat')
-        .insert({
-          fan_id: fanId,
-          model_id: modelId,
-          from: 'model',
-          message: newMessage,
-          message_type: 'text',
-          ts: new Date().toISOString(),
-          source: 'manual',
-          chatter_id: user?.id
-        });
+      // Get model's OF account ID
+      const { data: model } = await supabase
+        .from('models')
+        .select('of_account_id')
+        .eq('model_id', currentModelId)
+        .single();
 
-      if (error) throw error;
+      if (!model?.of_account_id) {
+        alert('Model not connected to OnlyFans');
+        return;
+      }
 
+      // 1. Send to OnlyFans API
+      const response = await fetch('/api/onlyfans/send-message', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          accountId: model.of_account_id,
+          chatId: fanId,
+          text: newMessage,
+          mediaFiles: selectedContent ? [selectedContent] : [],
+          price: 0
+        })
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to send message');
+      }
+
+      // 2. Message already saved by endpoint, just refresh UI
       setNewMessage('');
       await loadFanAndMessages();
+      
     } catch (error) {
       console.error('Error enviando mensaje:', error);
-      alert('Error al enviar mensaje');
+      alert('Error al enviar mensaje: ' + error.message);
     }
   }
 

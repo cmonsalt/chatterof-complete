@@ -46,21 +46,25 @@ export default async function handler(req, res) {
 
     const data = await response.json();
 
-    // Guardar mensaje enviado en BD
+    // Guardar mensaje enviado en BD con columnas correctas
     await supabase.from('chat').insert({
-      message_id: data.id,
+      of_message_id: data.id?.toString(),
       fan_id: chatId,
       message: text,
-      timestamp: new Date(),
+      timestamp: new Date().toISOString(),
       from: 'model',
-      media: mediaFiles || [],
-      is_ppv: price > 0,
-      ppv_price: price || 0,
-      model_id: accountId
+      message_type: mediaFiles && mediaFiles.length > 0 ? 'media' : 'text',
+      media_url: mediaFiles?.[0]?.url || null,
+      amount: price || 0,
+      model_id: accountId,
+      source: 'manual',
+      is_locked: price > 0,
+      is_purchased: false
     });
 
     res.status(200).json({ 
       success: true, 
+      messageId: data.id,
       message: data 
     });
   } catch (error) {
