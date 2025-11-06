@@ -1,8 +1,8 @@
 import { createClient } from '@supabase/supabase-js';
 
 const supabase = createClient(
-  process.env.VITE_SUPABASE_URL,
-  process.env.VITE_SUPABASE_ANON_KEY
+  process.env.NEXT_PUBLIC_SUPABASE_URL,
+  process.env.SUPABASE_SERVICE_ROLE_KEY
 );
 
 export default async function handler(req, res) {
@@ -47,11 +47,11 @@ export default async function handler(req, res) {
     const data = await response.json();
 
     // Guardar mensaje enviado en BD con columnas correctas
-    await supabase.from('chat').insert({
+    const { error: dbError } = await supabase.from('chat').insert({
       of_message_id: data.id?.toString(),
       fan_id: chatId,
       message: text,
-      timestamp: new Date().toISOString(),
+      ts: new Date().toISOString(),  // ✅ Usar 'ts' en vez de 'timestamp'
       from: 'model',
       message_type: mediaFiles && mediaFiles.length > 0 ? 'media' : 'text',
       media_url: mediaFiles?.[0]?.url || null,
@@ -59,13 +59,20 @@ export default async function handler(req, res) {
       model_id: accountId,
       source: 'manual',
       is_locked: price > 0,
-      is_purchased: false
+      is_purchased: false,
+      read: true  // Mensajes del modelo ya están "leídos"
     });
+
+    if (dbError) {
+      console.error('Error saving message to DB:', dbError);
+      // No fallar si no se guarda, ya se envió a OF
+    }
 
     res.status(200).json({ 
       success: true, 
       messageId: data.id,
-      message: data 
+      message: data,
+      savedToDb: !dbError
     });
   } catch (error) {
     console.error('Send message error:', error);
