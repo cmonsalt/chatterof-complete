@@ -143,7 +143,7 @@ export default async function handler(req, res) {
 
             const { error } = await supabase
               .from('chat')
-              .upsert(chatData, { onConflict: 'of_message_id,model_id' })
+              .upsert(chatData, { onConflict: 'of_message_id' })
 
             if (!error) syncedMessages++
             else console.error('❌ Error saving message:', msg.id, error)
