@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
@@ -37,6 +37,7 @@ export default function ChatView({ embedded = false }) {  // ✅ Agregar prop
   
   const [catalog, setCatalog] = useState([]);
   const [selectedContent, setSelectedContent] = useState(null);
+  const lastCheckedMessageId = useRef(null); // ✅ Para evitar re-marcar
 
   // Helper para tier badge
   const getTierBadge = (tier) => {
@@ -61,8 +62,9 @@ export default function ChatView({ embedded = false }) {  // ✅ Agregar prop
     
     const lastMessage = messages[0]; // Más reciente
     
-    // Si el último mensaje es del fan, marcar todos los mensajes anteriores del modelo como leídos
-    if (lastMessage?.from === 'fan') {
+    // Si el último mensaje es del fan Y no lo hemos procesado antes
+    if (lastMessage?.from === 'fan' && lastMessage.id !== lastCheckedMessageId.current) {
+      lastCheckedMessageId.current = lastMessage.id;
       markPreviousModelMessagesAsRead(lastMessage.ts);
     }
   }, [messages]);
