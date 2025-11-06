@@ -199,7 +199,18 @@ async function handleMessage(data, modelId) {
         )
       }
       
-      // ✅ Continuar para que también actualice el fan (NO return aquí)
+      // 4. Actualizar info del fan
+      await supabase.from('fans').upsert({
+        fan_id: fanId,
+        name: data.fromUser?.name || data.user?.name || 'Vault Fan',
+        model_id: modelId,
+        of_username: data.fromUser?.username || data.user?.username,
+        of_avatar_url: data.fromUser?.avatar || data.user?.avatar,
+        last_message_date: data.createdAt || new Date().toISOString()
+      }, { onConflict: 'fan_id,model_id' })
+      
+      // ✅ YA procesamos todo para vault fan, salir aquí
+      return
     }
 
     // Upsert fan (código existente)
