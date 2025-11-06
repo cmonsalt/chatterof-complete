@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import VaultSetup from './VaultSetup';
 import VaultInstructions from './VaultInstructions';
-import CatalogView from './CatalogView';
+import CatalogViewComplete from './CatalogView-COMPLETE';
 
 export default function VaultTab({ modelId }) {
   const [activeSubTab, setActiveSubTab] = useState('instructions');
@@ -53,7 +53,7 @@ export default function VaultTab({ modelId }) {
           onGoToSetup={() => setActiveSubTab('setup')} 
         />
       )}
-      {activeSubTab === 'catalog' && <CatalogView modelId={modelId} />}
+      {activeSubTab === 'catalog' && <CatalogViewComplete modelId={modelId} />}
       {activeSubTab === 'setup' && <VaultSetup modelId={modelId} />}
     </div>
   );

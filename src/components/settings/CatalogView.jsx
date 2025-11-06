@@ -1,247 +1,503 @@
-import { useState, useEffect } from 'react';
-import { supabase } from '../../lib/supabase';
-import { useAuth } from '../../contexts/AuthContext';
+import { useState, useEffect } from 'react'
+import { createClient } from '@supabase/supabase-js'
+import SessionManager from './SessionManager'
 
-export default function CatalogView({ modelId: propModelId }) {
-  const { user, modelId: contextModelId } = useAuth();
-  const modelId = propModelId || contextModelId;
-  const [catalog, setCatalog] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [selectedMedia, setSelectedMedia] = useState(null);
+const supabase = createClient(
+  import.meta.env.VITE_SUPABASE_URL,
+  import.meta.env.VITE_SUPABASE_ANON_KEY
+)
+
+export default function CatalogViewComplete({ modelId }) {
+  const [activeTab, setActiveTab] = useState('sessions') // 'sessions' | 'singles'
+  const [sessions, setSessions] = useState([])
+  const [singles, setSingles] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [showSessionManager, setShowSessionManager] = useState(false)
+  const [editingSession, setEditingSession] = useState(null)
+  const [expandedSessions, setExpandedSessions] = useState(new Set())
+  const [previewMedia, setPreviewMedia] = useState(null)
 
   useEffect(() => {
-    loadCatalog();
-  }, [modelId]);
+    loadCatalog()
+  }, [modelId])
 
-  async function loadCatalog() {
+  const loadCatalog = async () => {
+    setLoading(true)
     try {
-      const currentModelId = modelId || user?.user_metadata?.model_id;
-      if (!currentModelId) return;
-
+      // Cargar todos los items del catálogo
       const { data, error } = await supabase
         .from('catalog')
         .select('*')
-        .eq('model_id', currentModelId)
-        .order('created_at', { ascending: false });
+        .eq('model_id', modelId)
+        .order('created_at', { ascending: false })
 
-      if (error) throw error;
+      if (error) throw error
 
-      setCatalog(data || []);
-      setLoading(false);
+      // Separar sessions y singles
+      const sessionsMap = new Map()
+      const singlesArray = []
+
+      data.forEach(item => {
+        if (item.parent_type === 'session' && item.session_id) {
+          if (!sessionsMap.has(item.session_id)) {
+            sessionsMap.set(item.session_id, {
+              session_id: item.session_id,
+              session_name: item.session_name,
+              session_description: item.session_description,
+              parts: []
+            })
+          }
+          sessionsMap.get(item.session_id).parts.push(item)
+        } else if (item.parent_type === 'single') {
+          singlesArray.push(item)
+        }
+      })
+
+      // Ordenar parts dentro de cada session
+      sessionsMap.forEach(session => {
+        session.parts.sort((a, b) => a.step_number - b.step_number)
+      })
+
+      setSessions(Array.from(sessionsMap.values()))
+      setSingles(singlesArray)
+
     } catch (error) {
-      console.error('Error loading catalog:', error);
-      setLoading(false);
+      console.error('Error loading catalog:', error)
+      alert('Error loading catalog: ' + error.message)
+    } finally {
+      setLoading(false)
     }
+  }
+
+  const toggleSession = (sessionId) => {
+    const newExpanded = new Set(expandedSessions)
+    if (newExpanded.has(sessionId)) {
+      newExpanded.delete(sessionId)
+    } else {
+      newExpanded.add(sessionId)
+    }
+    setExpandedSessions(newExpanded)
+  }
+
+  const handleDeleteSession = async (session) => {
+    if (!confirm(`¿Eliminar session "${session.session_name}"? Los medias volverán a estar disponibles como singles.`)) {
+      return
+    }
+
+    try {
+      // Actualizar todos los parts de la session a singles
+      const { error } = await supabase
+        .from('catalog')
+        .update({ 
+          parent_type: 'single',
+          session_id: null,
+          session_name: null,
+          session_description: null,
+          step_number: null
+        })
+        .eq('session_id', session.session_id)
+
+      if (error) throw error
+
+      alert('✅ Session eliminada. Los medias están disponibles como singles.')
+      loadCatalog()
+
+    } catch (error) {
+      console.error('Error deleting session:', error)
+      alert('Error: ' + error.message)
+    }
+  }
+
+  const handleEditSession = (session) => {
+    setEditingSession(session)
+    setShowSessionManager(true)
+  }
+
+  const handleDeleteSingle = async (single) => {
+    if (!confirm(`¿Eliminar "${single.title}" del catálogo?`)) {
+      return
+    }
+
+    try {
+      const { error } = await supabase
+        .from('catalog')
+        .delete()
+        .eq('id', single.id)
+
+      if (error) throw error
+
+      alert('✅ Item eliminado')
+      loadCatalog()
+
+    } catch (error) {
+      console.error('Error deleting single:', error)
+      alert('Error: ' + error.message)
+    }
+  }
+
+  const getNivelBadge = (nivel) => {
+    const badges = {
+      1: { label: '🟢 Tease', color: 'bg-green-100 text-green-800' },
+      2: { label: '🟢 Soft', color: 'bg-green-100 text-green-800' },
+      3: { label: '🟢 Innocent', color: 'bg-green-100 text-green-800' },
+      4: { label: '🟡 Bikini', color: 'bg-yellow-100 text-yellow-800' },
+      5: { label: '🟡 Lingerie', color: 'bg-yellow-100 text-yellow-800' },
+      6: { label: '🟡 Topless', color: 'bg-yellow-100 text-yellow-800' },
+      7: { label: '🟠 Nude', color: 'bg-orange-100 text-orange-800' },
+      8: { label: '🟠 Solo Play', color: 'bg-orange-100 text-orange-800' },
+      9: { label: '🔴 Explicit', color: 'bg-red-100 text-red-800' },
+      10: { label: '⚫ Hardcore', color: 'bg-gray-900 text-white' }
+    }
+    return badges[nivel] || badges[1]
   }
 
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600"></div>
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading catalog...</p>
+        </div>
       </div>
-    );
-  }
-
-  if (catalog.length === 0) {
-    return (
-      <div className="text-center py-12">
-        <div className="text-6xl mb-4">📦</div>
-        <h3 className="text-xl font-bold text-gray-800 mb-2">
-          Catálogo Vacío
-        </h3>
-        <p className="text-gray-600">
-          Envía contenido al fan de prueba para agregarlo aquí
-        </p>
-      </div>
-    );
+    )
   }
 
   return (
     <div className="space-y-6">
-      {/* Header */}
+      
+      {/* Header con Tabs */}
       <div className="flex items-center justify-between">
-        <div>
-          <h3 className="text-xl font-bold text-gray-800">Tu Catálogo</h3>
-          <p className="text-sm text-gray-600">{catalog.length} items</p>
+        <div className="flex gap-4 border-b border-gray-200">
+          <button
+            onClick={() => setActiveTab('sessions')}
+            className={`pb-3 px-4 font-semibold border-b-2 transition-colors ${
+              activeTab === 'sessions'
+                ? 'border-purple-600 text-purple-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            📁 Sessions ({sessions.length})
+          </button>
+          <button
+            onClick={() => setActiveTab('singles')}
+            className={`pb-3 px-4 font-semibold border-b-2 transition-colors ${
+              activeTab === 'singles'
+                ? 'border-purple-600 text-purple-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            📄 Singles ({singles.length})
+          </button>
         </div>
+
         <button
-          onClick={loadCatalog}
-          className="px-4 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600 font-semibold text-sm"
+          onClick={() => {
+            setEditingSession(null)
+            setShowSessionManager(true)
+          }}
+          className="px-6 py-2 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-lg font-semibold hover:shadow-lg transition-all"
         >
-          🔄 Actualizar
+          ✨ Create Session
         </button>
       </div>
 
-      {/* Grid de contenido */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-        {catalog.map((item) => (
-          <div
-            key={item.id}
-            onClick={() => setSelectedMedia(item)}
-            className="relative group cursor-pointer bg-white rounded-lg overflow-hidden shadow hover:shadow-lg transition-all"
-          >
-            {/* Thumbnail o video */}
-            <div className="aspect-square bg-gradient-to-br from-purple-100 to-pink-100 flex items-center justify-center overflow-hidden">
-              {item.media_thumb ? (
-                // Mostrar thumbnail real
-                <img 
-                  src={item.media_thumb} 
-                  alt={item.title}
-                  className="w-full h-full object-cover"
-                />
-              ) : item.file_type === 'video' ? (
-                // Placeholder de video
-                <div className="text-center">
-                  <div className="text-4xl mb-2">🎬</div>
-                  <span className="text-xs text-gray-600">Video</span>
-                </div>
-              ) : (
-                // Placeholder de foto
-                <div className="text-center">
-                  <div className="text-4xl mb-2">📸</div>
-                  <span className="text-xs text-gray-600">Foto</span>
-                </div>
-              )}
-              
-              {/* Play icon para videos */}
-              {item.file_type === 'video' && (
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <div className="bg-black/50 rounded-full p-3">
-                    <div className="text-white text-3xl">▶️</div>
+      {/* Content */}
+      {activeTab === 'sessions' ? (
+        <div className="space-y-4">
+          {sessions.length === 0 ? (
+            <div className="text-center py-12 bg-gray-50 rounded-lg border-2 border-dashed border-gray-300">
+              <p className="text-gray-500 text-lg">📁 No sessions yet</p>
+              <p className="text-gray-400 text-sm mt-2">
+                Create your first session to organize content in multiple parts
+              </p>
+              <button
+                onClick={() => setShowSessionManager(true)}
+                className="mt-4 px-6 py-2 bg-purple-600 text-white rounded-lg font-semibold hover:bg-purple-700"
+              >
+                Create First Session
+              </button>
+            </div>
+          ) : (
+            sessions.map(session => (
+              <div
+                key={session.session_id}
+                className="border-2 border-purple-200 rounded-lg overflow-hidden bg-white hover:shadow-lg transition-all"
+              >
+                {/* Session Header */}
+                <div
+                  className="bg-gradient-to-r from-purple-50 to-pink-50 p-4 cursor-pointer"
+                  onClick={() => toggleSession(session.session_id)}
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-3">
+                        <span className="text-2xl">
+                          {expandedSessions.has(session.session_id) ? '📂' : '📁'}
+                        </span>
+                        <div>
+                          <h3 className="text-lg font-bold text-gray-900">
+                            {session.session_name}
+                          </h3>
+                          <p className="text-sm text-gray-600">
+                            {session.parts.length} parts • {session.session_description}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          handleEditSession(session)
+                        }}
+                        className="px-3 py-1 bg-white border border-purple-300 text-purple-600 rounded-lg hover:bg-purple-50 text-sm font-semibold"
+                      >
+                        ✏️ Edit
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          handleDeleteSession(session)
+                        }}
+                        className="px-3 py-1 bg-white border border-red-300 text-red-600 rounded-lg hover:bg-red-50 text-sm font-semibold"
+                      >
+                        🗑️
+                      </button>
+                    </div>
                   </div>
                 </div>
-              )}
-            </div>
 
-            {/* Info overlay */}
-            <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-3">
-              <p className="text-white text-sm font-semibold truncate">
-                {item.title}
-              </p>
-              <p className="text-white/70 text-xs">
-                {new Date(item.created_at).toLocaleDateString()}
-              </p>
-            </div>
+                {/* Session Parts (expandible) */}
+                {expandedSessions.has(session.session_id) && (
+                  <div className="p-4 space-y-3 bg-white">
+                    {session.parts.map(part => {
+                      const nivelBadge = getNivelBadge(part.nivel)
+                      return (
+                        <div
+                          key={part.id}
+                          className="border border-gray-200 rounded-lg p-3 hover:border-purple-300 transition-all"
+                        >
+                          <div className="flex gap-3">
+                            {/* Thumbnail */}
+                            <div
+                              className="w-24 h-24 flex-shrink-0 rounded-lg overflow-hidden bg-gray-100 cursor-pointer hover:ring-2 ring-purple-500"
+                              onClick={() => setPreviewMedia(part)}
+                            >
+                              {part.media_thumb ? (
+                                <img
+                                  src={part.media_thumb}
+                                  alt={part.title}
+                                  className="w-full h-full object-cover"
+                                />
+                              ) : (
+                                <div className="w-full h-full flex items-center justify-center text-gray-400">
+                                  {part.file_type === 'video' ? '🎥' : '📷'}
+                                </div>
+                              )}
+                            </div>
 
-            {/* Hover effect */}
-            <div className="absolute inset-0 bg-purple-500/0 group-hover:bg-purple-500/10 transition-colors flex items-center justify-center">
-              <div className="opacity-0 group-hover:opacity-100 transition-opacity">
-                <div className="bg-white rounded-full p-3 shadow-lg">
-                  <span className="text-xl">👁️</span>
-                </div>
-              </div>
-            </div>
-          </div>
-        ))}
-      </div>
-
-      {/* Modal de vista previa */}
-      {selectedMedia && (
-        <div
-          className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4"
-          onClick={() => setSelectedMedia(null)}
-        >
-          <div
-            className="bg-white rounded-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="p-6">
-              {/* Header */}
-              <div className="flex items-center justify-between mb-4">
-                <div>
-                  <h3 className="text-xl font-bold text-gray-800">
-                    {selectedMedia.title}
-                  </h3>
-                  <p className="text-sm text-gray-600">
-                    {new Date(selectedMedia.created_at).toLocaleString()}
-                  </p>
-                </div>
-                <button
-                  onClick={() => setSelectedMedia(null)}
-                  className="text-gray-400 hover:text-gray-600 text-2xl"
-                >
-                  ×
-                </button>
-              </div>
-
-              {/* Contenido */}
-              <div className="bg-gray-100 rounded-lg mb-4 overflow-hidden">
-                {selectedMedia.file_type === 'video' && selectedMedia.media_url ? (
-                  // Reproducir video
-                  <video 
-                    controls 
-                    className="w-full"
-                    poster={selectedMedia.media_thumb}
-                  >
-                    <source src={selectedMedia.media_url} type="video/mp4" />
-                    Tu navegador no soporta video HTML5
-                  </video>
-                ) : selectedMedia.file_type === 'photo' && selectedMedia.media_url ? (
-                  // Mostrar foto
-                  <img 
-                    src={selectedMedia.media_url} 
-                    alt={selectedMedia.title}
-                    className="w-full"
-                  />
-                ) : (
-                  // Placeholder si no hay URL (expiró)
-                  <div className="p-8 flex items-center justify-center">
-                    <div className="text-center">
-                      <div className="text-6xl mb-3">
-                        {selectedMedia.file_type === 'video' ? '🎬' : '📸'}
-                      </div>
-                      <p className="text-gray-700 font-semibold">
-                        {selectedMedia.file_type === 'video' ? 'Video' : 'Foto'}
-                      </p>
-                      <p className="text-sm text-gray-500 mt-2">
-                        ID: {selectedMedia.of_media_id}
-                      </p>
-                      <p className="text-xs text-gray-400 mt-1">
-                        (URL expirada - usar ID para enviar)
-                      </p>
-                    </div>
+                            {/* Info */}
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-start justify-between gap-2">
+                                <div className="flex-1">
+                                  <h4 className="font-semibold text-gray-900 mb-1">
+                                    Part {part.step_number}: {part.title}
+                                  </h4>
+                                  <div className="flex flex-wrap items-center gap-2 mb-2">
+                                    <span className="px-2 py-1 bg-green-100 text-green-800 rounded-full text-xs font-semibold">
+                                      💰 ${part.base_price}
+                                    </span>
+                                    <span className={`px-2 py-1 rounded-full text-xs font-semibold ${nivelBadge.color}`}>
+                                      {nivelBadge.label}
+                                    </span>
+                                    <span className="px-2 py-1 bg-blue-100 text-blue-800 rounded-full text-xs font-semibold">
+                                      {part.of_media_ids?.length || 1} media(s)
+                                    </span>
+                                  </div>
+                                  {part.keywords && part.keywords.length > 0 && (
+                                    <div className="flex flex-wrap gap-1">
+                                      {part.keywords.slice(0, 5).map((keyword, ki) => (
+                                        <span
+                                          key={ki}
+                                          className="px-2 py-0.5 bg-purple-50 text-purple-700 rounded text-xs"
+                                        >
+                                          #{keyword}
+                                        </span>
+                                      ))}
+                                      {part.keywords.length > 5 && (
+                                        <span className="text-xs text-gray-400">
+                                          +{part.keywords.length - 5} more
+                                        </span>
+                                      )}
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      )
+                    })}
                   </div>
                 )}
               </div>
-
-              {/* Info */}
-              <div className="space-y-2 text-sm">
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Tipo:</span>
-                  <span className="font-semibold">{selectedMedia.file_type}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Precio base:</span>
-                  <span className="font-semibold">${selectedMedia.base_price}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Nivel:</span>
-                  <span className="font-semibold">Tier {selectedMedia.nivel}</span>
-                </div>
-              </div>
-
-              {/* Acciones */}
-              <div className="mt-6 flex gap-2">
-                <button
-                  onClick={() => {
-                    navigator.clipboard.writeText(selectedMedia.of_media_id);
-                    alert('ID copiado al portapapeles');
-                  }}
-                  className="flex-1 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 font-semibold"
-                >
-                  📋 Copiar ID
-                </button>
-                <button
-                  onClick={() => setSelectedMedia(null)}
-                  className="flex-1 px-4 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600 font-semibold"
-                >
-                  Cerrar
-                </button>
-              </div>
+            ))
+          )}
+        </div>
+      ) : (
+        <div className="space-y-4">
+          {singles.length === 0 ? (
+            <div className="text-center py-12 bg-gray-50 rounded-lg border-2 border-dashed border-gray-300">
+              <p className="text-gray-500 text-lg">📄 No singles available</p>
+              <p className="text-gray-400 text-sm mt-2">
+                Send content to your vault fan or create it from existing sessions
+              </p>
             </div>
-          </div>
+          ) : (
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+              {singles.map(single => {
+                const nivelBadge = getNivelBadge(single.nivel || 1)
+                return (
+                  <div
+                    key={single.id}
+                    className="border border-gray-200 rounded-lg overflow-hidden hover:shadow-lg transition-all bg-white group"
+                  >
+                    {/* Thumbnail */}
+                    <div
+                      className="relative aspect-square cursor-pointer"
+                      onClick={() => setPreviewMedia(single)}
+                    >
+                      {single.media_thumb ? (
+                        <img
+                          src={single.media_thumb}
+                          alt={single.title}
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <div className="w-full h-full bg-gray-100 flex items-center justify-center text-gray-400 text-4xl">
+                          {single.file_type === 'video' ? '🎥' : '📷'}
+                        </div>
+                      )}
+
+                      {/* Overlay on hover */}
+                      <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-40 transition-all flex items-center justify-center">
+                        <span className="text-white text-sm font-semibold opacity-0 group-hover:opacity-100 transition-all">
+                          👁️ Preview
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Info */}
+                    <div className="p-3">
+                      <h4 className="font-semibold text-gray-900 text-sm mb-2 truncate">
+                        {single.title || 'Untitled'}
+                      </h4>
+                      
+                      <div className="flex flex-wrap gap-1 mb-2">
+                        {single.base_price > 0 && (
+                          <span className="px-2 py-0.5 bg-green-100 text-green-800 rounded-full text-xs font-semibold">
+                            ${single.base_price}
+                          </span>
+                        )}
+                        <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${nivelBadge.color}`}>
+                          Lv.{single.nivel || 1}
+                        </span>
+                      </div>
+
+                      <button
+                        onClick={() => handleDeleteSingle(single)}
+                        className="w-full px-3 py-1 bg-red-50 text-red-600 rounded hover:bg-red-100 text-xs font-semibold"
+                      >
+                        🗑️ Delete
+                      </button>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
         </div>
       )}
+
+      {/* Session Manager Modal */}
+      {showSessionManager && (
+        <SessionManager
+          isOpen={showSessionManager}
+          onClose={() => {
+            setShowSessionManager(false)
+            setEditingSession(null)
+            loadCatalog()
+          }}
+          modelId={modelId}
+          editingSession={editingSession}
+        />
+      )}
+
+      {/* Media Preview Modal */}
+      {previewMedia && (
+        <MediaPreviewModal
+          media={previewMedia}
+          onClose={() => setPreviewMedia(null)}
+        />
+      )}
+
     </div>
-  );
+  )
+}
+
+// Modal de preview
+function MediaPreviewModal({ media, onClose }) {
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-xl shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-hidden">
+        
+        {/* Header */}
+        <div className="bg-gradient-to-r from-purple-600 to-pink-600 text-white p-4 flex items-center justify-between">
+          <div>
+            <h3 className="text-lg font-bold">{media.title || 'Preview'}</h3>
+            <p className="text-sm text-purple-100">
+              {media.file_type === 'video' ? '🎥 Video' : '📷 Photo'}
+            </p>
+          </div>
+          <button
+            onClick={onClose}
+            className="text-white hover:bg-white/20 rounded-lg p-2"
+          >
+            ✕
+          </button>
+        </div>
+
+        {/* Content */}
+        <div className="p-4 max-h-[70vh] overflow-auto">
+          {media.file_type === 'video' ? (
+            <video
+              src={media.media_url}
+              controls
+              className="w-full rounded-lg"
+            >
+              Your browser doesn't support video
+            </video>
+          ) : (
+            <img
+              src={media.media_url || media.media_thumb}
+              alt={media.title}
+              className="w-full rounded-lg"
+            />
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="border-t p-4">
+          <button
+            onClick={onClose}
+            className="w-full px-4 py-2 bg-gray-100 text-gray-700 rounded-lg font-semibold hover:bg-gray-200"
+          >
+            Close
+          </button>
+        </div>
+
+      </div>
+    </div>
+  )
 }
