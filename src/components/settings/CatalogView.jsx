@@ -118,9 +118,16 @@ export default function CatalogView({ modelId: propModelId }) {
               <p className="text-white text-sm font-semibold truncate">
                 {item.title}
               </p>
-              <p className="text-white/70 text-xs">
-                {new Date(item.created_at).toLocaleDateString()}
-              </p>
+              <div className="flex items-center justify-between">
+                <p className="text-white/70 text-xs">
+                  {new Date(item.created_at).toLocaleDateString()}
+                </p>
+                {item.of_media_ids && item.of_media_ids.length > 1 && (
+                  <span className="bg-purple-500 text-white text-xs px-2 py-0.5 rounded-full font-semibold">
+                    {item.of_media_ids.length} medias
+                  </span>
+                )}
+              </div>
             </div>
 
             {/* Hover effect */}
