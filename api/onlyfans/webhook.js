@@ -138,25 +138,24 @@ async function handleMessage(data, modelId) {
           }
           
           // Crear un registro por cada media (UPSERT para evitar duplicados)
-          const { error: catalogError } = await supabase
-            .from('catalog')
-            .upsert({
-              model_id: modelId,
-              offer_id: `vault_${Date.now()}_${media.id}`,
-              title: data.text?.replace(/<[^>]*>/g, '').replace('📸 ', '').trim() || 'Untitled',
-              base_price: 0,
-              nivel: 0,
-              of_media_id: media.id?.toString(),
-              file_type: mediaType,
-              media_url: mediaUrl,
-              media_thumb: mediaThumb,
-              parent_type: 'single',
-              status: 'inbox', 
-              created_at: new Date().toISOString()
-            }, { 
-              onConflict: 'of_media_id',
-              ignoreDuplicates: false  // Actualiza si ya existe
-            })
+        const { error: catalogError } = await supabase
+  .from('catalog')
+  .upsert({
+    model_id: modelId,
+    offer_id: `vault_${Date.now()}_${media.id}`,
+    title: data.text?.replace(/<[^>]*>/g, '').replace('📸 ', '').trim() || 'Untitled',
+    base_price: 0,
+    nivel: 1,
+    of_media_id: media.id?.toString(),
+    file_type: mediaType,
+    media_url: mediaUrl,
+    media_thumb: mediaThumb,
+    is_single: false, // ← Por defecto no es single
+    created_at: new Date().toISOString()
+  }, { 
+    onConflict: 'of_media_id',
+    ignoreDuplicates: false
+  })
           
           if (catalogError) {
             console.error(`❌ Error saving media ${media.id} to catalog:`, catalogError)

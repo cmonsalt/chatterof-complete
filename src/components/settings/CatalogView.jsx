@@ -26,11 +26,11 @@ export default function CatalogView({ modelId }) {
   const loadCatalog = async () => {
     setLoading(true)
     try {
+      // Cargar todo el contenido
       const { data, error} = await supabase
         .from('catalog')
         .select('*')
         .eq('model_id', modelId)
-        .in('status', ['session', 'single'])
         .order('created_at', { ascending: false })
 
       if (error) throw error
@@ -39,7 +39,8 @@ export default function CatalogView({ modelId }) {
       const singlesArray = []
 
       data.forEach(item => {
-        if (item.status === 'session' && item.session_id) {
+        // Sessions: items que tienen session_id
+        if (item.session_id) {
           if (!sessionsMap.has(item.session_id)) {
             sessionsMap.set(item.session_id, {
               session_id: item.session_id,
@@ -49,13 +50,16 @@ export default function CatalogView({ modelId }) {
             })
           }
           sessionsMap.get(item.session_id).parts.push(item)
-        } else if (item.status === 'single') {
+        }
+        
+        // Singles: items marcados como single
+        if (item.is_single) {
           singlesArray.push(item)
         }
       })
 
       sessionsMap.forEach(session => {
-        session.parts.sort((a, b) => a.step_number - b.step_number)
+        session.parts.sort((a, b) => (a.step_number || 0) - (b.step_number || 0))
       })
 
       setSessions(Array.from(sessionsMap.values()))
@@ -79,16 +83,15 @@ export default function CatalogView({ modelId }) {
   }
 
   const handleDeleteSession = async (session) => {
-    if (!confirm(`¿Eliminar session "${session.session_name}"? Los medias volverán a Inbox.`)) {
+    if (!confirm(`¿Eliminar session "${session.session_name}"? Los medias volverán a estar sin organizar pero seguirán en Inbox.`)) {
       return
     }
 
     try {
+      // Solo quitar la referencia de session, NO eliminar los items
       const { error } = await supabase
         .from('catalog')
         .update({ 
-          status: 'inbox',
-          parent_type: 'single',
           session_id: null,
           session_name: null,
           session_description: null,
@@ -98,7 +101,7 @@ export default function CatalogView({ modelId }) {
 
       if (error) throw error
 
-      alert('✅ Session eliminada. Los medias están en Inbox.')
+      alert('✅ Session eliminada. Los medias siguen en Inbox.')
       loadCatalog()
 
     } catch (error) {
@@ -113,23 +116,23 @@ export default function CatalogView({ modelId }) {
   }
 
   const handleDeleteSingle = async (single) => {
-    if (!confirm(`¿Mover "${single.title}" de vuelta a Inbox?`)) {
+    if (!confirm(`¿Desmarcar "${single.title}" como Single? El media seguirá en Inbox.`)) {
       return
     }
 
     try {
       const { error } = await supabase
         .from('catalog')
-        .update({ status: 'inbox' })
+        .update({ is_single: false })
         .eq('id', single.id)
 
       if (error) throw error
 
-      alert('✅ Movido a Inbox')
+      alert('✅ Single desmarcado. El media sigue en Inbox.')
       loadCatalog()
 
     } catch (error) {
-      console.error('Error moving to inbox:', error)
+      console.error('Error unmarking single:', error)
       alert('Error: ' + error.message)
     }
   }
@@ -344,6 +347,19 @@ export default function CatalogView({ modelId }) {
         </div>
       ) : (
         <div className="space-y-4">
+          {/* Add Single Button */}
+          <div className="flex justify-end">
+            <button
+              onClick={() => {
+                // Buscar un item sin organizar para agregarlo como single
+                alert('Para agregar Singles: ve a Inbox, busca el contenido que quieres, y configúralo desde Catalog. Próximamente: selector directo aquí.')
+              }}
+              className="px-4 py-2 bg-green-600 text-white rounded-lg font-semibold hover:bg-green-700"
+            >
+              ➕ Add Single
+            </button>
+          </div>
+
           {singles.length === 0 ? (
             <div className="text-center py-12 bg-gray-50 rounded-lg border-2 border-dashed border-gray-300">
               <p className="text-gray-500 text-lg">💎 No singles yet</p>

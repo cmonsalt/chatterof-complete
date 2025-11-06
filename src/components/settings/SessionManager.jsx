@@ -63,17 +63,28 @@ export default function SessionManager({ isOpen, onClose, modelId, editingSessio
 
   const loadAvailableMedias = async () => {
     try {
-      // Obtener medias que están en inbox o que no tienen session_id (disponibles)
+      // Obtener TODOS los medias del model
       const { data, error } = await supabase
         .from('catalog')
         .select('*')
         .eq('model_id', modelId)
-        .in('status', ['inbox', 'single']) // Inbox o singles (pueden reasignarse)
-        .is('session_id', null)
         .order('created_at', { ascending: false })
 
       if (error) throw error
-      setAvailableMedias(data || [])
+      
+      // Filtrar: mostrar solo los que NO están en otra session
+      // (pero si estoy editando, mostrar los de MI session también)
+      const available = (data || []).filter(m => {
+        if (editingSession) {
+          // Si edito, mostrar: sin session O de mi session
+          return !m.session_id || m.session_id === editingSession.session_id
+        } else {
+          // Si creo nueva, mostrar solo sin session
+          return !m.session_id
+        }
+      })
+      
+      setAvailableMedias(available)
     } catch (error) {
       console.error('Error loading available medias:', error)
     }
@@ -190,7 +201,6 @@ export default function SessionManager({ isOpen, onClose, modelId, editingSessio
           base_price: part.base_price,
           nivel: part.nivel,
           keywords: part.keywords,
-          parent_type: 'session',
           session_id: sessionId,
           session_name: sessionName,
           session_description: sessionDescription,
@@ -199,7 +209,6 @@ export default function SessionManager({ isOpen, onClose, modelId, editingSessio
           media_url: firstMedia.media_url,
           media_thumb: firstMedia.media_thumb,
           file_type: firstMedia.file_type,
-          status: 'session',
           offer_id: `${sessionId}_part_${part.step_number}`
         }
 
@@ -221,10 +230,7 @@ export default function SessionManager({ isOpen, onClose, modelId, editingSessio
             const media = part.selectedMedias[j]
             const { error: updateError } = await supabase
               .from('catalog')
-              .update({ 
-                session_id: sessionId,
-                status: 'session'
-              })
+              .update({ session_id: sessionId })
               .eq('of_media_id', media.of_media_id)
             
             if (updateError) {
