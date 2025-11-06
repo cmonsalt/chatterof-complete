@@ -108,6 +108,7 @@ export default async function handler(req, res) {
 
       default:
         console.log('❓ Unknown event type:', payload.event)
+        console.log('📋 Full payload:', JSON.stringify(payload, null, 2))
     }
 
     return res.status(200).json({ received: true })
@@ -177,14 +178,22 @@ async function handleMessage(data, modelId) {
       console.log('🔔 Message is from fan, creating notification')
       const fanName = data.fromUser?.name || data.user?.name || 'Un fan'
       const messagePreview = cleanHTML(data.text).slice(0, 50) || (data.mediaCount > 0 ? 'Envió contenido multimedia' : 'Nuevo mensaje')
+      const tipAmount = parseFloat(data.price || 0)
+      
+      // Si el mensaje tiene precio > 0, es un TIP
+      const isTip = tipAmount > 0
+      const notifType = isTip ? 'new_tip' : 'new_message'
+      const notifTitle = isTip 
+        ? `💸 ${fanName} te envió un tip de $${tipAmount.toFixed(2)}!`
+        : `${fanName} te escribió`
       
       await createNotification(
         modelId,
         fanId,
-        'new_message',
-        `${fanName} te escribió`,
+        notifType,
+        notifTitle,
         messagePreview,
-        parseFloat(data.price || 0),
+        tipAmount,
         { chat_id: data.id }
       )
     } else {
