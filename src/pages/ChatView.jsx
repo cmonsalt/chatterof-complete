@@ -55,6 +55,40 @@ export default function ChatView({ embedded = false }) {  // ✅ Agregar prop
     return () => clearInterval(interval);
   }, [fanId, user]);
 
+  // ✅ Marcar mensajes como leídos cuando fan responde
+  useEffect(() => {
+    if (messages.length === 0) return;
+    
+    const lastMessage = messages[0]; // Más reciente
+    
+    // Si el último mensaje es del fan, marcar todos los mensajes del modelo como leídos
+    if (lastMessage?.from === 'fan') {
+      markModelMessagesAsRead();
+    }
+  }, [messages]);
+
+  async function markModelMessagesAsRead() {
+    if (!fanId || !modelId) return;
+    
+    try {
+      const { error } = await supabase
+        .from('chat')
+        .update({ read: true })
+        .eq('fan_id', fanId)
+        .eq('model_id', modelId)
+        .eq('from', 'model')
+        .eq('read', false);
+      
+      if (error) {
+        console.error('Error marking messages as read:', error);
+      } else {
+        console.log('✅ Messages marked as read');
+      }
+    } catch (err) {
+      console.error('Error:', err);
+    }
+  }
+
   // 🔥 FIX: Cargar notas cuando se carga el fan
   useEffect(() => {
     if (fan) {
@@ -485,9 +519,14 @@ export default function ChatView({ embedded = false }) {  // ✅ Agregar prop
                         }`}
                       >
                         <p className="text-sm">{msg.message}</p>
-                        <p className="text-xs opacity-70 mt-1">
-                          {new Date(msg.ts).toLocaleTimeString()}
-                        </p>
+                        <div className="flex items-center justify-end gap-2 text-xs opacity-70 mt-1">
+                          <span>{new Date(msg.ts).toLocaleTimeString()}</span>
+                          {msg.from === 'model' && (
+                            <span className={msg.read ? 'text-blue-400' : 'text-gray-400'}>
+                              {msg.read ? '✓✓' : '✓'}
+                            </span>
+                          )}
+                        </div>
                       </div>
                     </div>
                   </div>
