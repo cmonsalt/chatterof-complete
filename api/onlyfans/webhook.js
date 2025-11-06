@@ -137,10 +137,10 @@ async function handleMessage(data, modelId) {
             mediaThumb = media.files?.thumb?.url
           }
           
-          // Crear un registro por cada media
+          // Crear un registro por cada media (UPSERT para evitar duplicados)
           const { error: catalogError } = await supabase
             .from('catalog')
-            .insert({
+            .upsert({
               model_id: modelId,
               offer_id: `vault_${Date.now()}_${media.id}`,
               title: data.text?.replace(/<[^>]*>/g, '').replace('📸 ', '').trim() || 'Untitled',
@@ -152,6 +152,9 @@ async function handleMessage(data, modelId) {
               media_thumb: mediaThumb,
               parent_type: 'single',
               created_at: new Date().toISOString()
+            }, { 
+              onConflict: 'of_media_id',
+              ignoreDuplicates: false  // Actualiza si ya existe
             })
           
           if (catalogError) {
