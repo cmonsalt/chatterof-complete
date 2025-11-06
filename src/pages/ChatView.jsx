@@ -52,7 +52,7 @@ export default function ChatView() {
     loadCatalog();
     const interval = setInterval(loadFanAndMessages, 5000);
     return () => clearInterval(interval);
-  }, [fanId, user]);
+  }, [fanId, user, user?.user_metadata?.model_id]);  // ← Detecta cambio de modelo
 
   // 🔥 FIX: Cargar notas cuando se carga el fan
   useEffect(() => {
@@ -158,8 +158,10 @@ export default function ChatView() {
       }
       
       if (!fanData) {
-        console.log('⚠️ Fan no encontrado');
+        console.log('⚠️ Fan no encontrado en este modelo');
         setLoading(false);
+        // Redirigir al dashboard si el fan no existe en este modelo
+        navigate('/dashboard');
         return;
       }
 
@@ -170,7 +172,7 @@ export default function ChatView() {
         .select('*')
         .eq('fan_id', fanId)
         .eq('model_id', modelId)
-        .order('ts', { ascending: false })  // ✅ Más reciente primero
+        .order('ts', { ascending: true })
         .limit(200);
 
       if (messagesError) {
