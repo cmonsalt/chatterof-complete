@@ -6,12 +6,10 @@ const supabase = createClient(
   import.meta.env.VITE_SUPABASE_ANON_KEY
 )
 
-export default function InboxView({ modelId, onContentOrganized }) {
+export default function InboxView({ modelId }) {
   const [inboxItems, setInboxItems] = useState([])
   const [loading, setLoading] = useState(true)
-  const [selectedItems, setSelectedItems] = useState(new Set())
   const [previewMedia, setPreviewMedia] = useState(null)
-  const [processingAction, setProcessingAction] = useState(null)
 
   useEffect(() => {
     loadInbox()
@@ -36,99 +34,6 @@ export default function InboxView({ modelId, onContentOrganized }) {
     }
   }
 
-  const toggleSelect = (itemId) => {
-    const newSelected = new Set(selectedItems)
-    if (newSelected.has(itemId)) {
-      newSelected.delete(itemId)
-    } else {
-      newSelected.add(itemId)
-    }
-    setSelectedItems(newSelected)
-  }
-
-  const selectAll = () => {
-    if (selectedItems.size === inboxItems.length) {
-      setSelectedItems(new Set())
-    } else {
-      setSelectedItems(new Set(inboxItems.map(item => item.id)))
-    }
-  }
-
-  const handleMarkAsSingle = async () => {
-    if (selectedItems.size === 0) {
-      alert('Selecciona al menos un item')
-      return
-    }
-
-    setProcessingAction('single')
-    try {
-      const updates = Array.from(selectedItems).map(id => {
-        return supabase
-          .from('catalog')
-          .update({ 
-            status: 'single',
-            parent_type: 'single'
-          })
-          .eq('id', id)
-      })
-
-      await Promise.all(updates)
-      
-      alert(`✅ ${selectedItems.size} item(s) marcados como Singles. Ahora configúralos en la tab Singles.`)
-      setSelectedItems(new Set())
-      loadInbox()
-      onContentOrganized?.()
-      
-    } catch (error) {
-      console.error('Error marking as single:', error)
-      alert('Error: ' + error.message)
-    } finally {
-      setProcessingAction(null)
-    }
-  }
-
-  const handleCreateSession = () => {
-    if (selectedItems.size === 0) {
-      alert('Selecciona al menos un item para crear la session')
-      return
-    }
-    
-    onContentOrganized?.('create-session', Array.from(selectedItems))
-  }
-
-  const handleDelete = async () => {
-    if (selectedItems.size === 0) {
-      alert('Selecciona al menos un item')
-      return
-    }
-
-    if (!confirm(`¿Eliminar ${selectedItems.size} item(s)? Esta acción no se puede deshacer.`)) {
-      return
-    }
-
-    setProcessingAction('delete')
-    try {
-      const deletes = Array.from(selectedItems).map(id => {
-        return supabase
-          .from('catalog')
-          .delete()
-          .eq('id', id)
-      })
-
-      await Promise.all(deletes)
-      
-      alert(`✅ ${selectedItems.size} item(s) eliminados`)
-      setSelectedItems(new Set())
-      loadInbox()
-      
-    } catch (error) {
-      console.error('Error deleting:', error)
-      alert('Error: ' + error.message)
-    } finally {
-      setProcessingAction(null)
-    }
-  }
-
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -143,77 +48,32 @@ export default function InboxView({ modelId, onContentOrganized }) {
   return (
     <div className="space-y-6">
       
+      {/* Header */}
       <div className="bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg p-6 border border-blue-200">
         <div className="flex items-start justify-between">
           <div>
             <h3 className="text-2xl font-bold text-gray-900 mb-2">
-              📥 Inbox - Processing Zone
+              📥 Inbox - Content Library
             </h3>
             <p className="text-gray-600 mb-4">
-              Todo el contenido nuevo llega aquí primero. Organízalo en Sessions o Singles para que la IA pueda usarlo.
+              Todo el contenido que envías al vault fan aparece aquí. Para organizarlo en Sessions o Singles, ve a la tab <strong>Catalog</strong>.
             </p>
             <div className="flex gap-4 text-sm">
               <span className="px-3 py-1 bg-blue-100 text-blue-800 rounded-full font-semibold">
-                {inboxItems.length} items sin organizar
+                {inboxItems.length} items disponibles
               </span>
-              {selectedItems.size > 0 && (
-                <span className="px-3 py-1 bg-purple-100 text-purple-800 rounded-full font-semibold">
-                  {selectedItems.size} seleccionados
-                </span>
-              )}
             </div>
           </div>
         </div>
       </div>
 
-      {inboxItems.length > 0 && (
-        <div className="bg-white rounded-lg border-2 border-gray-200 p-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <button
-                onClick={selectAll}
-                className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 font-semibold text-sm"
-              >
-                {selectedItems.size === inboxItems.length ? '✓ Deseleccionar todo' : 'Seleccionar todo'}
-              </button>
-              <span className="text-sm text-gray-500">
-                {selectedItems.size} de {inboxItems.length} seleccionados
-              </span>
-            </div>
-
-            <div className="flex gap-2">
-              <button
-                onClick={handleCreateSession}
-                disabled={selectedItems.size === 0 || processingAction}
-                className="px-4 py-2 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-lg hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed font-semibold text-sm"
-              >
-                📁 Crear Session
-              </button>
-              <button
-                onClick={handleMarkAsSingle}
-                disabled={selectedItems.size === 0 || processingAction}
-                className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed font-semibold text-sm"
-              >
-                💎 Marcar como Single
-              </button>
-              <button
-                onClick={handleDelete}
-                disabled={selectedItems.size === 0 || processingAction}
-                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed font-semibold text-sm"
-              >
-                🗑️ Eliminar
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
+      {/* Content Grid */}
       {inboxItems.length === 0 ? (
         <div className="text-center py-16 bg-gray-50 rounded-lg border-2 border-dashed border-gray-300">
           <div className="text-6xl mb-4">📭</div>
           <p className="text-gray-500 text-lg font-semibold">Inbox vacío</p>
           <p className="text-gray-400 text-sm mt-2">
-            Todo el contenido nuevo aparecerá aquí
+            Envía contenido a tu vault fan para que aparezca aquí
           </p>
         </div>
       ) : (
@@ -221,39 +81,10 @@ export default function InboxView({ modelId, onContentOrganized }) {
           {inboxItems.map(item => (
             <div
               key={item.id}
-              className={`relative border-2 rounded-lg overflow-hidden hover:shadow-lg transition-all cursor-pointer ${
-                selectedItems.has(item.id)
-                  ? 'border-purple-600 ring-2 ring-purple-300'
-                  : 'border-gray-200 hover:border-gray-300'
-              }`}
-              onClick={() => toggleSelect(item.id)}
+              className="relative border-2 border-gray-200 rounded-lg overflow-hidden hover:shadow-lg hover:border-gray-300 transition-all cursor-pointer"
+              onClick={() => setPreviewMedia(item)}
             >
-              <div className="absolute top-2 left-2 z-10">
-                <div
-                  className={`w-6 h-6 rounded-full border-2 flex items-center justify-center ${
-                    selectedItems.has(item.id)
-                      ? 'bg-purple-600 border-purple-600'
-                      : 'bg-white border-gray-300'
-                  }`}
-                >
-                  {selectedItems.has(item.id) && (
-                    <span className="text-white text-sm">✓</span>
-                  )}
-                </div>
-              </div>
-
-              <div className="absolute top-2 right-2 z-10">
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    setPreviewMedia(item)
-                  }}
-                  className="w-8 h-8 bg-black bg-opacity-50 hover:bg-opacity-70 rounded-full flex items-center justify-center text-white"
-                >
-                  👁️
-                </button>
-              </div>
-
+              {/* Thumbnail */}
               <div className="aspect-square bg-gray-100">
                 {item.media_thumb ? (
                   <img
@@ -268,6 +99,14 @@ export default function InboxView({ modelId, onContentOrganized }) {
                 )}
               </div>
 
+              {/* Hover overlay */}
+              <div className="absolute inset-0 bg-black bg-opacity-0 hover:bg-opacity-40 transition-all flex items-center justify-center">
+                <span className="text-white text-sm font-semibold opacity-0 hover:opacity-100 transition-all">
+                  👁️ Preview
+                </span>
+              </div>
+
+              {/* Info */}
               <div className="p-3 bg-white">
                 <p className="text-sm font-semibold text-gray-900 truncate mb-1">
                   {item.title || 'Untitled'}
@@ -282,18 +121,17 @@ export default function InboxView({ modelId, onContentOrganized }) {
         </div>
       )}
 
-      {processingAction && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 flex items-center gap-4">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600"></div>
-            <span className="text-gray-700 font-semibold">
-              {processingAction === 'single' && 'Marcando como Singles...'}
-              {processingAction === 'delete' && 'Eliminando...'}
-            </span>
-          </div>
+      {/* Info Box */}
+      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+        <p className="text-sm font-semibold text-blue-900 mb-2">💡 Para organizar este contenido:</p>
+        <div className="text-sm text-blue-800 space-y-1">
+          <p>• Ve a la tab <strong>Catalog</strong></p>
+          <p>• Click en <strong>"Create Session"</strong> para crear guiones multi-parte</p>
+          <p>• O usa el SessionManager para seleccionar medias del Inbox</p>
         </div>
-      )}
+      </div>
 
+      {/* Preview Modal */}
       {previewMedia && (
         <MediaPreviewModal
           media={previewMedia}
@@ -305,6 +143,7 @@ export default function InboxView({ modelId, onContentOrganized }) {
   )
 }
 
+// Modal de preview
 function MediaPreviewModal({ media, onClose }) {
   return (
     <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4">
@@ -343,7 +182,12 @@ function MediaPreviewModal({ media, onClose }) {
           )}
         </div>
 
-        <div className="border-t p-4">
+        <div className="border-t p-4 bg-gray-50">
+          <div className="text-sm text-gray-600 mb-3">
+            <p><strong>Tipo:</strong> {media.file_type}</p>
+            <p><strong>Creado:</strong> {new Date(media.created_at).toLocaleString()}</p>
+            <p><strong>ID:</strong> {media.of_media_id}</p>
+          </div>
           <button
             onClick={onClose}
             className="w-full px-4 py-2 bg-gray-100 text-gray-700 rounded-lg font-semibold hover:bg-gray-200"

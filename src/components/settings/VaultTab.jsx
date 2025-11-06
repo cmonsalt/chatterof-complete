@@ -3,24 +3,10 @@ import InboxView from './InboxView'
 import CatalogView from './CatalogView'
 import VaultSetup from './VaultSetup'
 import VaultInstructions from './VaultInstructions'
-import SessionManager from './SessionManager'
 
 export default function VaultTab({ modelId }) {
   const [activeTab, setActiveTab] = useState('instructions')
-  const [showSessionManager, setShowSessionManager] = useState(false)
-  const [preselectedMediaIds, setPreselectedMediaIds] = useState([])
   const [refreshKey, setRefreshKey] = useState(0)
-
-  const handleContentOrganized = (action, data) => {
-    if (action === 'create-session') {
-      // Abrir SessionManager con medias preseleccionados
-      setPreselectedMediaIds(data)
-      setShowSessionManager(true)
-    } else {
-      // Refrescar vistas
-      setRefreshKey(prev => prev + 1)
-    }
-  }
 
   return (
     <div>
@@ -83,8 +69,7 @@ export default function VaultTab({ modelId }) {
       {activeTab === 'inbox' && (
         <InboxView 
           key={`inbox-${refreshKey}`}
-          modelId={modelId} 
-          onContentOrganized={handleContentOrganized}
+          modelId={modelId}
         />
       )}
       
@@ -99,19 +84,6 @@ export default function VaultTab({ modelId }) {
         <VaultSetup modelId={modelId} />
       )}
 
-      {/* SessionManager Modal (abierto desde Inbox) */}
-      {showSessionManager && (
-        <SessionManager
-          isOpen={showSessionManager}
-          onClose={() => {
-            setShowSessionManager(false)
-            setPreselectedMediaIds([])
-            setRefreshKey(prev => prev + 1)
-          }}
-          modelId={modelId}
-          preselectedMediaIds={preselectedMediaIds}
-        />
-      )}
     </div>
   )
 }

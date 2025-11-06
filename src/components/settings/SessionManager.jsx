@@ -182,7 +182,7 @@ export default function SessionManager({ isOpen, onClose, modelId, editingSessio
         const part = parts[i]
         const mediaIds = part.selectedMedias.map(m => m.of_media_id)
         
-        // Si es el primer media, usar su info
+        // IMPORTANTE: Usar el primer media para actualizar su registro
         const firstMedia = part.selectedMedias[0]
         
         const partData = {
@@ -195,45 +195,42 @@ export default function SessionManager({ isOpen, onClose, modelId, editingSessio
           session_name: sessionName,
           session_description: sessionDescription,
           step_number: part.step_number,
-          of_media_id: firstMedia.of_media_id,
           of_media_ids: mediaIds, // Array de todos los IDs
           media_url: firstMedia.media_url,
           media_thumb: firstMedia.media_thumb,
           file_type: firstMedia.file_type,
-          model_id: modelId,
-          status: 'session', // Estado correcto
-          offer_id: `${sessionId}_part_${part.step_number}` // Generar offer_id único
+          status: 'session',
+          offer_id: `${sessionId}_part_${part.step_number}`
         }
 
-        if (part.id) {
-          // Actualizar part existente
-          const { error } = await supabase
-            .from('catalog')
-            .update(partData)
-            .eq('id', part.id)
-          
-          if (error) throw error
-        } else {
-          // Crear nuevo part
-          const { error } = await supabase
-            .from('catalog')
-            .insert(partData)
-          
-          if (error) throw error
+        // SIEMPRE ACTUALIZAR el registro existente usando of_media_id del primer media
+        const { error } = await supabase
+          .from('catalog')
+          .update(partData)
+          .eq('of_media_id', firstMedia.of_media_id)
+        
+        if (error) {
+          console.error(`Error updating part ${i + 1}:`, error)
+          throw error
         }
 
-        // Marcar los medias como usados (asignarles session_id y status)
-        for (const media of part.selectedMedias) {
-          const { error } = await supabase
-            .from('catalog')
-            .update({ 
-              session_id: sessionId,
-              parent_type: 'session',
-              status: 'session' // Actualizar status también
-            })
-            .eq('of_media_id', media.of_media_id)
-          
-          if (error) throw error
+        // Actualizar los otros medias del bundle (si hay más de uno)
+        // Solo actualizar su session_id para marcarlos como "usados"
+        if (mediaIds.length > 1) {
+          for (let j = 1; j < part.selectedMedias.length; j++) {
+            const media = part.selectedMedias[j]
+            const { error: updateError } = await supabase
+              .from('catalog')
+              .update({ 
+                session_id: sessionId,
+                status: 'session'
+              })
+              .eq('of_media_id', media.of_media_id)
+            
+            if (updateError) {
+              console.error(`Error marking media ${media.of_media_id} as used:`, updateError)
+            }
+          }
         }
       }
 
