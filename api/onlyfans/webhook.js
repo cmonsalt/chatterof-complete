@@ -116,7 +116,7 @@ async function handleMessage(data, modelId) {
     
     // ✅ GUARDAR CUALQUIER MENSAJE DEL VAULT FAN (enviado o recibido)
     if (isVaultFan) {
-      console.log('📸 Vault content detected! Saving to catalog...')
+      console.log('📸 Vault content detected! Saving to catalog AND chat...')
       
       // Detectar tipo de media
       let mediaUrl = null
@@ -135,7 +135,7 @@ async function handleMessage(data, modelId) {
         }
       }
       
-      // Guardar en catalog
+      // 1. Guardar en CATALOG
       if (mediaUrl) {
         const { error: catalogError } = await supabase
           .from('catalog')
@@ -156,15 +156,38 @@ async function handleMessage(data, modelId) {
         } else {
           console.log('✅ Saved to catalog!')
         }
-      } else {
-        console.log('⚠️ No media found in message')
       }
       
-      // ✅ CREAR NOTIFICACIÓN del vault fan también (para pruebas)
+      // 2. Guardar en CHAT (para poder ver el video)
+      const chatData = {
+        fan_id: fanId,
+        message: cleanHTML(data.text),
+        model_id: modelId,
+        ts: new Date(data.createdAt || Date.now()).toISOString(),
+        from: data.isSentByMe ? 'model' : 'fan',
+        of_message_id: data.id?.toString(),
+        media_url: mediaUrl,
+        media_thumb: mediaThumb,
+        media_type: mediaType,
+        amount: parseFloat(data.price || 0),
+        read: data.isOpened || false
+      }
+
+      const { error: chatError } = await supabase
+        .from('chat')
+        .upsert(chatData, { onConflict: 'of_message_id' })
+      
+      if (chatError) {
+        console.error('❌ Error saving to chat:', chatError)
+      } else {
+        console.log('✅ Saved to chat!')
+      }
+      
+      // 3. Crear notificación del vault fan (para pruebas)
       if (!data.isSentByMe) {
         const fanName = data.fromUser?.name || data.user?.name || 'Vault Fan'
-        const messagePreview = mediaType === 'video' ? '📹 Contenido guardado en vault' :
-                              mediaType === 'photo' ? '📸 Contenido guardado en vault' :
+        const messagePreview = mediaType === 'video' ? '📹 Video guardado en vault' :
+                              mediaType === 'photo' ? '📸 Foto guardada en vault' :
                               '📎 Contenido guardado en vault'
         
         await createNotification(
@@ -176,8 +199,7 @@ async function handleMessage(data, modelId) {
         )
       }
       
-      // NO guardar en chat (es solo para vault)
-      return
+      // ✅ Continuar para que también actualice el fan (NO return aquí)
     }
 
     // Upsert fan (código existente)
