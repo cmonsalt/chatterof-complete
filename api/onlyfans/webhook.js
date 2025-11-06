@@ -114,8 +114,9 @@ async function handleMessage(data, modelId) {
 
     const isVaultFan = modelData?.vault_fan_id === fanId
     
-    if (isVaultFan && data.isSentByMe) {
-      console.log('📸 Vault upload detected! Saving to catalog...')
+    // ✅ GUARDAR CUALQUIER MENSAJE DEL VAULT FAN (enviado o recibido)
+    if (isVaultFan) {
+      console.log('📸 Vault content detected! Saving to catalog...')
       
       // Detectar tipo de media
       let mediaUrl = null
@@ -152,6 +153,8 @@ async function handleMessage(data, modelId) {
         } else {
           console.log('✅ Saved to catalog!')
         }
+      } else {
+        console.log('⚠️ No media found in message')
       }
       
       // NO guardar en chat (es solo para vault)
