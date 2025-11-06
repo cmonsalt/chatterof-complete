@@ -50,17 +50,34 @@ export default async function handler(req, res) {
 
     const data = await response.json();
 
+    // 🔥 Detectar tipo de media si se envió
+    let mediaType = null
+    if (mediaFiles && mediaFiles.length > 0) {
+      const firstMedia = mediaFiles[0]
+      // Si viene del catálogo, puede tener el tipo
+      if (typeof firstMedia === 'string') {
+        if (firstMedia.includes('.mp4') || firstMedia.includes('video')) {
+          mediaType = 'video'
+        } else if (firstMedia.includes('.gif')) {
+          mediaType = 'gif'
+        } else {
+          mediaType = 'photo'
+        }
+      }
+    }
+
     // 2. Guardar mensaje en BD con nombres de columnas CORRECTOS
     const { error: dbError } = await supabase.from('chat').insert({
-      of_message_id: data.id?.toString(),  // ✅ ID de OnlyFans
-      fan_id: chatId,                       // ✅ ID del fan
-      model_id: modelId,                    // ✅ ID del modelo en Supabase
-      message: text,                        // ✅ Texto del mensaje
-      ts: new Date().toISOString(),         // ✅ Usar 'ts' no 'timestamp'
-      from: 'model',                        // ✅ Enviado por el modelo
-      read: false,                          // ✅ Iniciar como no leído
-      amount: price || null,                // ✅ Precio si es PPV
-      media_url: mediaFiles?.[0] || null    // ✅ Primera media si existe
+      of_message_id: data.id?.toString(),
+      fan_id: chatId,
+      model_id: modelId,
+      message: text,
+      ts: new Date().toISOString(),
+      from: 'model',
+      read: false,
+      amount: price || null,
+      media_url: mediaFiles?.[0] || null,
+      media_type: mediaType                // 🔥 Guardar tipo
     });
 
     if (dbError) {

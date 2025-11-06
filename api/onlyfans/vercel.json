@@ -1,8 +1,14 @@
 {
   "crons": [
     {
-      "path": "/api/cron/check-notifications",
+      "path": "/api/onlyfans/cron-check-notifications",
       "schedule": "*/5 * * * *"
+    }
+  ],
+  "rewrites": [
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
     }
   ]
 }

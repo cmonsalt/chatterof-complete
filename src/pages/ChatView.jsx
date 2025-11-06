@@ -502,14 +502,37 @@ Conversación:\n${JSON.stringify(conversacion, null, 2)}`
                               : 'bg-gray-100 text-gray-800'
                           }`}
                         >
-                          {/* 🔥 Renderizar imagen si existe */}
+                          {/* 🔥 Renderizar imagen o video */}
                           {msg.media_url && (
-                            <img 
-                              src={msg.media_url} 
-                              alt="media" 
-                              className="rounded mb-2 max-w-full max-h-64 object-cover cursor-pointer hover:opacity-90"
-                              onClick={() => window.open(msg.media_url, '_blank')}
-                            />
+                            <>
+                              {msg.media_type === 'video' ? (
+                                // 🎥 VIDEO con player HTML5
+                                <video 
+                                  controls 
+                                  className="rounded mb-2 max-w-full max-h-64 bg-black"
+                                  preload="metadata"
+                                >
+                                  <source src={msg.media_url} type="video/mp4" />
+                                  Tu navegador no soporta reproducción de video
+                                </video>
+                              ) : msg.media_type === 'gif' ? (
+                                // 🎭 GIF
+                                <img 
+                                  src={msg.media_url} 
+                                  alt="gif" 
+                                  className="rounded mb-2 max-w-full max-h-64 object-contain cursor-pointer"
+                                  onClick={() => window.open(msg.media_url, '_blank')}
+                                />
+                              ) : (
+                                // 🖼️ IMAGEN normal
+                                <img 
+                                  src={msg.media_url} 
+                                  alt="photo" 
+                                  className="rounded mb-2 max-w-full max-h-64 object-cover cursor-pointer hover:opacity-90"
+                                  onClick={() => window.open(msg.media_url, '_blank')}
+                                />
+                              )}
+                            </>
                           )}
                           <p className="text-sm">{msg.message}</p>
                           <div className="flex items-center justify-end gap-2 text-xs opacity-70 mt-1">
