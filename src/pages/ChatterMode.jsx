@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
 import Navbar from '../components/Navbar'
+import ChatView from './ChatView'  // ✅ Importar ChatView
 
 export default function ChatterMode() {
   const { fanId } = useParams()
@@ -298,14 +299,7 @@ export default function ChatterMode() {
             {/* Right: ChatView Component (3 columns) */}
             <div className="col-span-3">
               {fanId ? (
-                <div className="bg-white rounded-xl shadow-lg p-6">
-                  {/* Aquí se importa ChatView sin Navbar */}
-                  <iframe 
-                    src={`/chat/${fanId}?embedded=true`}
-                    className="w-full h-[calc(100vh-200px)] border-0"
-                    title="Chat View"
-                  />
-                </div>
+                <ChatView embedded={true} />
               ) : (
                 <div className="bg-white rounded-xl shadow-lg p-6 h-[calc(100vh-200px)] flex items-center justify-center">
                   <div className="text-center">

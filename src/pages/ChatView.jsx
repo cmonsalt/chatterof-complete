@@ -4,9 +4,9 @@ import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import Navbar from '../components/Navbar';
 
-export default function ChatView() {
+export default function ChatView({ embedded = false }) {  // ✅ Agregar prop
   const { fanId } = useParams();
-  const { user, modelId } = useAuth();  // ← Agregar modelId
+  const { user, modelId } = useAuth();
   const navigate = useNavigate();
   
   const [fan, setFan] = useState(null);
@@ -320,7 +320,7 @@ export default function ChatView() {
   if (loading) {
     return (
       <>
-        <Navbar />
+        {!embedded && <Navbar />}
         <div className="flex items-center justify-center h-screen">
           <div className="text-xl">Loading...</div>
         </div>
@@ -331,7 +331,7 @@ export default function ChatView() {
   if (!fan) {
     return (
       <>
-        <Navbar />
+        {!embedded && <Navbar />}
         <div className="flex items-center justify-center h-screen">
           <div className="text-center">
             <h2 className="text-2xl font-bold mb-4">Fan not found</h2>
@@ -349,7 +349,7 @@ export default function ChatView() {
 
   return (
     <>
-      <Navbar />
+      {!embedded && <Navbar />}
       <div className="min-h-screen bg-gradient-to-br from-purple-50 to-pink-50 p-6">
         <div className="max-w-7xl mx-auto">
           
