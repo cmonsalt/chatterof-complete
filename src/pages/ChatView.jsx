@@ -70,7 +70,8 @@ export default function ChatView({ embedded = false }) {  // ✅ Agregar prop
   }, [messages]);
 
   async function markPreviousModelMessagesAsRead(fanMessageTime) {
-    if (!fanId || !modelId) return;
+    const currentModelId = modelId || user?.user_metadata?.model_id;  // ✅ Fallback
+    if (!fanId || !currentModelId) return;
     
     try {
       // Marcar como leídos solo los mensajes del modelo que son ANTERIORES al mensaje del fan
@@ -78,7 +79,7 @@ export default function ChatView({ embedded = false }) {  // ✅ Agregar prop
         .from('chat')
         .update({ read: true })
         .eq('fan_id', fanId)
-        .eq('model_id', modelId)
+        .eq('model_id', currentModelId)  // ✅ Usar currentModelId
         .eq('from', 'model')
         .eq('read', false)
         .lt('ts', fanMessageTime); // Solo mensajes anteriores al del fan
@@ -178,14 +179,15 @@ export default function ChatView({ embedded = false }) {  // ✅ Agregar prop
   }
 
   async function loadFanAndMessages() {
-    if (!modelId) return;  // ✅ Usar modelId del hook directamente
+    const currentModelId = modelId || user?.user_metadata?.model_id;  // ✅ Fallback
+    if (!currentModelId) return;
 
     try {
       const { data: fanData, error: fanError } = await supabase
         .from('fans')
         .select('*')
         .eq('fan_id', fanId)
-        .eq('model_id', modelId)  // ✅ Ya usa el correcto
+        .eq('model_id', currentModelId)  // ✅ Usar currentModelId
         .maybeSingle();
 
       if (fanError) {
@@ -206,7 +208,7 @@ export default function ChatView({ embedded = false }) {  // ✅ Agregar prop
         .from('chat')
         .select('*')
         .eq('fan_id', fanId)
-        .eq('model_id', modelId)  // ✅ Usar modelId, no currentModelId
+        .eq('model_id', currentModelId)  // ✅ Usar currentModelId
         .order('ts', { ascending: false })
         .limit(200);
 
