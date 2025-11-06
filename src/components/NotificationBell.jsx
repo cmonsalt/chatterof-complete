@@ -105,10 +105,11 @@ export default function NotificationBell() {
     await markAsRead(notification.id)
     setShowDropdown(false)
 
-    // Navegar según el tipo
-    if (notification.type === 'new_message' && notification.fan_id) {
+    // Navegar según el tipo - TODOS llevan al chat del fan
+    if (notification.fan_id) {
       navigate(`/chat/${notification.fan_id}`)
     } else if (notification.type === 'new_subscriber') {
+      // Si es suscriptor nuevo pero sin fan_id, ir a dashboard
       navigate('/dashboard')
     }
   }
@@ -131,7 +132,8 @@ export default function NotificationBell() {
       new_message: '💬',
       new_purchase: '💰',
       new_tip: '💸',
-      new_subscriber: '⭐'
+      new_subscriber: '⭐',
+      new_like: '❤️'
     }
     return icons[type] || '🔔'
   }

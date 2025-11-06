@@ -100,6 +100,12 @@ export default async function handler(req, res) {
         await handleTransaction(data, modelId)
         break
 
+      case 'posts.liked':
+      case 'messages.liked':
+        console.log('❤️ Handling like event')
+        await handleLike(data, modelId)
+        break
+
       default:
         console.log('❓ Unknown event type:', payload.event)
     }
@@ -309,5 +315,42 @@ async function handleTransaction(data, modelId) {
 
   } catch (error) {
     console.error('💥 Error handling transaction:', error)
+  }
+}
+
+async function handleLike(data, modelId) {
+  try {
+    console.log('❤️ Processing like event')
+    
+    const fanId = data.user?.id?.toString() || data.fromUser?.id?.toString()
+    
+    if (!fanId) {
+      console.log('⚠️ No fanId found in like event')
+      return
+    }
+
+    const fanName = data.user?.name || data.fromUser?.name || 'Un fan'
+    const contentType = data.post ? 'post' : 'mensaje'
+    const contentPreview = data.post?.text || data.message?.text || 'tu contenido'
+
+    console.log(`❤️ Like from ${fanName} on ${contentType}`)
+
+    // Create notification
+    await createNotification(
+      modelId,
+      fanId,
+      'new_like',
+      `${fanName} le dio ❤️ a tu ${contentType}`,
+      contentPreview.slice(0, 50),
+      null,
+      { 
+        like_id: data.id,
+        post_id: data.post?.id || data.message?.id
+      }
+    )
+
+    console.log(`✅ Like notification created for fan ${fanId}`)
+  } catch (error) {
+    console.error('💥 Error handling like:', error)
   }
 }
