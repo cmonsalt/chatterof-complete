@@ -1,14 +1,15 @@
 import { useState, useEffect } from 'react'
 import { createClient } from '@supabase/supabase-js'
 import SessionManager from './SessionManager'
+import SingleEditor from './SingleEditor'
 
 const supabase = createClient(
   import.meta.env.VITE_SUPABASE_URL,
   import.meta.env.VITE_SUPABASE_ANON_KEY
 )
 
-export default function CatalogViewComplete({ modelId }) {
-  const [activeTab, setActiveTab] = useState('sessions') // 'sessions' | 'singles'
+export default function CatalogView({ modelId }) {
+  const [activeTab, setActiveTab] = useState('sessions')
   const [sessions, setSessions] = useState([])
   const [singles, setSingles] = useState([])
   const [loading, setLoading] = useState(true)
@@ -16,6 +17,7 @@ export default function CatalogViewComplete({ modelId }) {
   const [editingSession, setEditingSession] = useState(null)
   const [expandedSessions, setExpandedSessions] = useState(new Set())
   const [previewMedia, setPreviewMedia] = useState(null)
+  const [editingSingle, setEditingSingle] = useState(null)
 
   useEffect(() => {
     loadCatalog()
@@ -24,21 +26,20 @@ export default function CatalogViewComplete({ modelId }) {
   const loadCatalog = async () => {
     setLoading(true)
     try {
-      // Cargar todos los items del catálogo
-      const { data, error } = await supabase
+      const { data, error} = await supabase
         .from('catalog')
         .select('*')
         .eq('model_id', modelId)
+        .in('status', ['session', 'single'])
         .order('created_at', { ascending: false })
 
       if (error) throw error
 
-      // Separar sessions y singles
       const sessionsMap = new Map()
       const singlesArray = []
 
       data.forEach(item => {
-        if (item.parent_type === 'session' && item.session_id) {
+        if (item.status === 'session' && item.session_id) {
           if (!sessionsMap.has(item.session_id)) {
             sessionsMap.set(item.session_id, {
               session_id: item.session_id,
@@ -48,12 +49,11 @@ export default function CatalogViewComplete({ modelId }) {
             })
           }
           sessionsMap.get(item.session_id).parts.push(item)
-        } else if (item.parent_type === 'single') {
+        } else if (item.status === 'single') {
           singlesArray.push(item)
         }
       })
 
-      // Ordenar parts dentro de cada session
       sessionsMap.forEach(session => {
         session.parts.sort((a, b) => a.step_number - b.step_number)
       })
@@ -63,7 +63,6 @@ export default function CatalogViewComplete({ modelId }) {
 
     } catch (error) {
       console.error('Error loading catalog:', error)
-      alert('Error loading catalog: ' + error.message)
     } finally {
       setLoading(false)
     }
@@ -80,15 +79,15 @@ export default function CatalogViewComplete({ modelId }) {
   }
 
   const handleDeleteSession = async (session) => {
-    if (!confirm(`¿Eliminar session "${session.session_name}"? Los medias volverán a estar disponibles como singles.`)) {
+    if (!confirm(`¿Eliminar session "${session.session_name}"? Los medias volverán a Inbox.`)) {
       return
     }
 
     try {
-      // Actualizar todos los parts de la session a singles
       const { error } = await supabase
         .from('catalog')
         .update({ 
+          status: 'inbox',
           parent_type: 'single',
           session_id: null,
           session_name: null,
@@ -99,7 +98,7 @@ export default function CatalogViewComplete({ modelId }) {
 
       if (error) throw error
 
-      alert('✅ Session eliminada. Los medias están disponibles como singles.')
+      alert('✅ Session eliminada. Los medias están en Inbox.')
       loadCatalog()
 
     } catch (error) {
@@ -114,25 +113,29 @@ export default function CatalogViewComplete({ modelId }) {
   }
 
   const handleDeleteSingle = async (single) => {
-    if (!confirm(`¿Eliminar "${single.title}" del catálogo?`)) {
+    if (!confirm(`¿Mover "${single.title}" de vuelta a Inbox?`)) {
       return
     }
 
     try {
       const { error } = await supabase
         .from('catalog')
-        .delete()
+        .update({ status: 'inbox' })
         .eq('id', single.id)
 
       if (error) throw error
 
-      alert('✅ Item eliminado')
+      alert('✅ Movido a Inbox')
       loadCatalog()
 
     } catch (error) {
-      console.error('Error deleting single:', error)
+      console.error('Error moving to inbox:', error)
       alert('Error: ' + error.message)
     }
+  }
+
+  const handleEditSingle = (single) => {
+    setEditingSingle(single)
   }
 
   const getNivelBadge = (nivel) => {
@@ -165,7 +168,6 @@ export default function CatalogViewComplete({ modelId }) {
   return (
     <div className="space-y-6">
       
-      {/* Header con Tabs */}
       <div className="flex items-center justify-between">
         <div className="flex gap-4 border-b border-gray-200">
           <button
@@ -186,7 +188,7 @@ export default function CatalogViewComplete({ modelId }) {
                 : 'border-transparent text-gray-500 hover:text-gray-700'
             }`}
           >
-            📄 Singles ({singles.length})
+            💎 Singles ({singles.length})
           </button>
         </div>
 
@@ -201,14 +203,13 @@ export default function CatalogViewComplete({ modelId }) {
         </button>
       </div>
 
-      {/* Content */}
       {activeTab === 'sessions' ? (
         <div className="space-y-4">
           {sessions.length === 0 ? (
             <div className="text-center py-12 bg-gray-50 rounded-lg border-2 border-dashed border-gray-300">
               <p className="text-gray-500 text-lg">📁 No sessions yet</p>
               <p className="text-gray-400 text-sm mt-2">
-                Create your first session to organize content in multiple parts
+                Create sessions from Inbox content
               </p>
               <button
                 onClick={() => setShowSessionManager(true)}
@@ -223,7 +224,6 @@ export default function CatalogViewComplete({ modelId }) {
                 key={session.session_id}
                 className="border-2 border-purple-200 rounded-lg overflow-hidden bg-white hover:shadow-lg transition-all"
               >
-                {/* Session Header */}
                 <div
                   className="bg-gradient-to-r from-purple-50 to-pink-50 p-4 cursor-pointer"
                   onClick={() => toggleSession(session.session_id)}
@@ -268,7 +268,6 @@ export default function CatalogViewComplete({ modelId }) {
                   </div>
                 </div>
 
-                {/* Session Parts (expandible) */}
                 {expandedSessions.has(session.session_id) && (
                   <div className="p-4 space-y-3 bg-white">
                     {session.parts.map(part => {
@@ -279,7 +278,6 @@ export default function CatalogViewComplete({ modelId }) {
                           className="border border-gray-200 rounded-lg p-3 hover:border-purple-300 transition-all"
                         >
                           <div className="flex gap-3">
-                            {/* Thumbnail */}
                             <div
                               className="w-24 h-24 flex-shrink-0 rounded-lg overflow-hidden bg-gray-100 cursor-pointer hover:ring-2 ring-purple-500"
                               onClick={() => setPreviewMedia(part)}
@@ -297,7 +295,6 @@ export default function CatalogViewComplete({ modelId }) {
                               )}
                             </div>
 
-                            {/* Info */}
                             <div className="flex-1 min-w-0">
                               <div className="flex items-start justify-between gap-2">
                                 <div className="flex-1">
@@ -349,21 +346,24 @@ export default function CatalogViewComplete({ modelId }) {
         <div className="space-y-4">
           {singles.length === 0 ? (
             <div className="text-center py-12 bg-gray-50 rounded-lg border-2 border-dashed border-gray-300">
-              <p className="text-gray-500 text-lg">📄 No singles available</p>
+              <p className="text-gray-500 text-lg">💎 No singles yet</p>
               <p className="text-gray-400 text-sm mt-2">
-                Send content to your vault fan or create it from existing sessions
+                Mark content as Singles from Inbox for quick direct sales
               </p>
             </div>
           ) : (
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
               {singles.map(single => {
                 const nivelBadge = getNivelBadge(single.nivel || 1)
+                const isConfigured = single.base_price > 0 && single.keywords?.length > 0
+                
                 return (
                   <div
                     key={single.id}
-                    className="border border-gray-200 rounded-lg overflow-hidden hover:shadow-lg transition-all bg-white group"
+                    className={`border-2 rounded-lg overflow-hidden hover:shadow-lg transition-all bg-white group ${
+                      isConfigured ? 'border-green-200' : 'border-yellow-300'
+                    }`}
                   >
-                    {/* Thumbnail */}
                     <div
                       className="relative aspect-square cursor-pointer"
                       onClick={() => setPreviewMedia(single)}
@@ -380,24 +380,32 @@ export default function CatalogViewComplete({ modelId }) {
                         </div>
                       )}
 
-                      {/* Overlay on hover */}
                       <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-40 transition-all flex items-center justify-center">
                         <span className="text-white text-sm font-semibold opacity-0 group-hover:opacity-100 transition-all">
                           👁️ Preview
                         </span>
                       </div>
+
+                      {!isConfigured && (
+                        <div className="absolute top-2 left-2 px-2 py-1 bg-yellow-500 text-white text-xs font-bold rounded">
+                          ⚠️ Configure
+                        </div>
+                      )}
                     </div>
 
-                    {/* Info */}
                     <div className="p-3">
                       <h4 className="font-semibold text-gray-900 text-sm mb-2 truncate">
                         {single.title || 'Untitled'}
                       </h4>
                       
                       <div className="flex flex-wrap gap-1 mb-2">
-                        {single.base_price > 0 && (
+                        {single.base_price > 0 ? (
                           <span className="px-2 py-0.5 bg-green-100 text-green-800 rounded-full text-xs font-semibold">
                             ${single.base_price}
+                          </span>
+                        ) : (
+                          <span className="px-2 py-0.5 bg-gray-100 text-gray-600 rounded-full text-xs font-semibold">
+                            No price
                           </span>
                         )}
                         <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${nivelBadge.color}`}>
@@ -405,12 +413,20 @@ export default function CatalogViewComplete({ modelId }) {
                         </span>
                       </div>
 
-                      <button
-                        onClick={() => handleDeleteSingle(single)}
-                        className="w-full px-3 py-1 bg-red-50 text-red-600 rounded hover:bg-red-100 text-xs font-semibold"
-                      >
-                        🗑️ Delete
-                      </button>
+                      <div className="flex gap-1">
+                        <button
+                          onClick={() => handleEditSingle(single)}
+                          className="flex-1 px-3 py-1 bg-purple-50 text-purple-600 rounded hover:bg-purple-100 text-xs font-semibold"
+                        >
+                          ✏️ {isConfigured ? 'Edit' : 'Configure'}
+                        </button>
+                        <button
+                          onClick={() => handleDeleteSingle(single)}
+                          className="px-3 py-1 bg-red-50 text-red-600 rounded hover:bg-red-100 text-xs font-semibold"
+                        >
+                          🗑️
+                        </button>
+                      </div>
                     </div>
                   </div>
                 )
@@ -420,7 +436,6 @@ export default function CatalogViewComplete({ modelId }) {
         </div>
       )}
 
-      {/* Session Manager Modal */}
       {showSessionManager && (
         <SessionManager
           isOpen={showSessionManager}
@@ -434,7 +449,18 @@ export default function CatalogViewComplete({ modelId }) {
         />
       )}
 
-      {/* Media Preview Modal */}
+      {editingSingle && (
+        <SingleEditor
+          isOpen={!!editingSingle}
+          single={editingSingle}
+          onClose={() => {
+            setEditingSingle(null)
+            loadCatalog()
+          }}
+          modelId={modelId}
+        />
+      )}
+
       {previewMedia && (
         <MediaPreviewModal
           media={previewMedia}
@@ -446,13 +472,11 @@ export default function CatalogViewComplete({ modelId }) {
   )
 }
 
-// Modal de preview
 function MediaPreviewModal({ media, onClose }) {
   return (
     <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-xl shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-hidden">
         
-        {/* Header */}
         <div className="bg-gradient-to-r from-purple-600 to-pink-600 text-white p-4 flex items-center justify-between">
           <div>
             <h3 className="text-lg font-bold">{media.title || 'Preview'}</h3>
@@ -468,7 +492,6 @@ function MediaPreviewModal({ media, onClose }) {
           </button>
         </div>
 
-        {/* Content */}
         <div className="p-4 max-h-[70vh] overflow-auto">
           {media.file_type === 'video' ? (
             <video
@@ -487,7 +510,6 @@ function MediaPreviewModal({ media, onClose }) {
           )}
         </div>
 
-        {/* Footer */}
         <div className="border-t p-4">
           <button
             onClick={onClose}

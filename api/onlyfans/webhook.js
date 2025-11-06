@@ -151,6 +151,7 @@ async function handleMessage(data, modelId) {
               media_url: mediaUrl,
               media_thumb: mediaThumb,
               parent_type: 'single',
+              status: 'inbox', 
               created_at: new Date().toISOString()
             }, { 
               onConflict: 'of_media_id',
