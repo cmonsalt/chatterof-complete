@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { supabase } from '../../lib/supabase';
-import { useAuth } from '../contexts/AuthContext';
+import { supabase } from '../../lib/supabase';        // ✅ Dos niveles arriba
+import { useAuth } from '../../contexts/AuthContext';  // ✅ Dos niveles arriba
 
 export default function VaultSetup({ modelId: propModelId }) {
   const { user, modelId: contextModelId } = useAuth();
