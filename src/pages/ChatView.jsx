@@ -140,16 +140,14 @@ export default function ChatView({ embedded = false }) {  // ✅ Agregar prop
   }
 
   async function loadFanAndMessages() {
-    if (!user?.user_metadata?.model_id) return;
-    
-    const modelId = user.user_metadata.model_id;
+    if (!modelId) return;  // ✅ Usar modelId del hook directamente
 
     try {
       const { data: fanData, error: fanError } = await supabase
         .from('fans')
         .select('*')
         .eq('fan_id', fanId)
-        .eq('model_id', modelId)
+        .eq('model_id', modelId)  // ✅ Ya usa el correcto
         .maybeSingle();
 
       if (fanError) {
