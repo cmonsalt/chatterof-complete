@@ -10,13 +10,30 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const { accountId, modelId, chatId, text, mediaFiles, price } = req.body;
+  const { 
+    accountId, 
+    modelId, 
+    chatId, 
+    text, 
+    mediaFiles, 
+    price,
+    replyToMessageId,  // 🔥 REPLY
+    replyToText        // 🔥 REPLY
+  } = req.body;
+  
   const API_KEY = process.env.ONLYFANS_API_KEY;
 
   // ✅ Validar que tenemos AMBOS IDs
   if (!accountId || !modelId || !chatId || !text) {
     return res.status(400).json({ 
       error: 'accountId, modelId, chatId, and text required' 
+    });
+  }
+
+  // 🔥 Validar PPV (precio requiere media)
+  if (price && price > 0 && (!mediaFiles || mediaFiles.length === 0)) {
+    return res.status(400).json({
+      error: 'PPV messages must include media files'
     });
   }
 
@@ -77,7 +94,10 @@ export default async function handler(req, res) {
       read: false,
       amount: price || null,
       media_url: mediaFiles?.[0] || null,
-      media_type: mediaType                // 🔥 Guardar tipo
+      media_type: mediaType,
+      // 🔥 REPLY
+      reply_to_message_id: replyToMessageId || null,
+      reply_to_text: replyToText || null
     });
 
     if (dbError) {
@@ -89,7 +109,9 @@ export default async function handler(req, res) {
       of_message_id: data.id,
       fan_id: chatId,
       model_id: modelId,
-      read: false
+      read: false,
+      ppv_price: price || 0,
+      has_reply: !!replyToMessageId
     });
 
     res.status(200).json({ 
