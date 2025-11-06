@@ -169,8 +169,8 @@ export default function ChatView() {
         .from('chat')
         .select('*')
         .eq('fan_id', fanId)
-        .eq('model_id', modelId)
-        .order('ts', { ascending: true })
+        .eq('model_id', currentModelId)
+        .order('ts', { ascending: false })  // ✅ Más reciente primero
         .limit(200);
 
       if (messagesError) {
@@ -256,6 +256,7 @@ export default function ChatView() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           accountId: model.of_account_id,
+          modelId: currentModelId,  // ✅ Agregar modelId
           chatId: fanId,
           text: newMessage,
           mediaFiles: selectedContent ? [selectedContent] : [],

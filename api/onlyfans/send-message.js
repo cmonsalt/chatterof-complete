@@ -10,11 +10,11 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' })
   }
 
-  const { accountId, chatId, text, mediaFiles, price } = req.body
+  const { accountId, modelId, chatId, text, mediaFiles, price } = req.body
   const API_KEY = process.env.ONLYFANS_API_KEY
 
-  if (!accountId || !chatId || !text) {
-    return res.status(400).json({ error: 'accountId, chatId, and text required' })
+  if (!accountId || !modelId || !chatId || !text) {
+    return res.status(400).json({ error: 'accountId, modelId, chatId, and text required' })
   }
 
   try {
@@ -62,7 +62,7 @@ export default async function handler(req, res) {
         message_type: mediaFiles && mediaFiles.length > 0 ? 'media' : 'text',
         media_url: mediaFiles?.[0]?.url || null,
         amount: price || 0,
-        model_id: accountId,
+        model_id: modelId,  // ✅ Usar modelId, NO accountId
         source: 'manual',
         is_locked: price > 0,
         is_purchased: false,
