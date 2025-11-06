@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { supabase } from '../../lib/supabase';        // ✅ Dos niveles arriba
-import { useAuth } from '../../contexts/AuthContext';  // ✅ Dos niveles arriba
+import { supabase } from '../../lib/supabase';
+import { useAuth } from '../../contexts/AuthContext';
 
 export default function VaultSetup({ modelId: propModelId }) {
   const { user, modelId: contextModelId } = useAuth();
@@ -9,7 +9,9 @@ export default function VaultSetup({ modelId: propModelId }) {
   const [selectedVaultFan, setSelectedVaultFan] = useState('');
   const [currentVaultFan, setCurrentVaultFan] = useState(null);
   const [saving, setSaving] = useState(false);
+  const [syncing, setSyncing] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [ofAccountId, setOfAccountId] = useState(null);
 
   useEffect(() => {
     loadFansAndVaultConfig();
@@ -20,6 +22,15 @@ export default function VaultSetup({ modelId: propModelId }) {
     if (!currentModelId) return;
 
     try {
+      // Cargar account ID
+      const { data: modelData } = await supabase
+        .from('models')
+        .select('vault_fan_id, of_account_id')
+        .eq('model_id', currentModelId)
+        .single();
+
+      setOfAccountId(modelData?.of_account_id);
+
       // Cargar fans
       const { data: fansData, error: fansError } = await supabase
         .from('fans')
@@ -30,18 +41,9 @@ export default function VaultSetup({ modelId: propModelId }) {
       if (fansError) throw fansError;
       setFans(fansData || []);
 
-      // Cargar configuración actual del vault
-      const { data: modelData, error: modelError } = await supabase
-        .from('models')
-        .select('vault_fan_id')
-        .eq('model_id', currentModelId)
-        .single();
-
-      if (modelError) throw modelError;
-
       if (modelData?.vault_fan_id) {
         setSelectedVaultFan(modelData.vault_fan_id);
-        const vaultFan = fansData.find(f => f.fan_id === modelData.vault_fan_id);
+        const vaultFan = fansData?.find(f => f.fan_id === modelData.vault_fan_id);
         setCurrentVaultFan(vaultFan);
       }
 
@@ -49,6 +51,44 @@ export default function VaultSetup({ modelId: propModelId }) {
     } catch (error) {
       console.error('Error loading vault config:', error);
       setLoading(false);
+    }
+  }
+
+  async function handleSyncFans() {
+    if (!ofAccountId) {
+      alert('Primero conecta tu cuenta de OnlyFans');
+      return;
+    }
+
+    setSyncing(true);
+    try {
+      const currentModelId = modelId || user?.user_metadata?.model_id;
+      
+      const response = await fetch('/api/onlyfans/sync-fans', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          accountId: ofAccountId,
+          modelId: currentModelId
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error('Error sincronizando fans');
+      }
+
+      const data = await response.json();
+      
+      alert(`✅ ${data.synced || 0} fans sincronizados!`);
+      
+      // Recargar fans
+      await loadFansAndVaultConfig();
+      
+    } catch (error) {
+      console.error('Error syncing fans:', error);
+      alert('❌ Error al sincronizar fans');
+    } finally {
+      setSyncing(false);
     }
   }
 
@@ -95,8 +135,8 @@ export default function VaultSetup({ modelId: propModelId }) {
   return (
     <div className="bg-white rounded-xl shadow-lg p-6">
       <div className="flex items-center gap-2 mb-4">
-        <span className="text-2xl">📸</span>
-        <h2 className="text-xl font-bold text-gray-800">Vault Configuration</h2>
+        <span className="text-2xl">🔧</span>
+        <h2 className="text-xl font-bold text-gray-800">Configurar Fan de Prueba</h2>
       </div>
 
       {currentVaultFan ? (
@@ -117,7 +157,7 @@ export default function VaultSetup({ modelId: propModelId }) {
             <span className="text-yellow-600 font-semibold">⚠️ No has configurado un fan de prueba</span>
           </div>
           <p className="text-sm text-gray-700">
-            Necesitas un fan de prueba para subir contenido a tu vault.
+            Necesitas un fan de prueba para que tu contenido se capture automáticamente.
           </p>
         </div>
       )}
@@ -125,8 +165,8 @@ export default function VaultSetup({ modelId: propModelId }) {
       <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
         <h3 className="font-semibold text-blue-800 mb-2">📖 ¿Qué es el Fan de Prueba?</h3>
         <p className="text-sm text-gray-700 mb-3">
-          Para subir contenido a tu vault, necesitas enviar mensajes a una cuenta de prueba. 
-          Este contenido se guardará automáticamente en tu catálogo para usarlo después.
+          Un fan de prueba es una cuenta que usas para capturar contenido. Todo lo que le envíes 
+          se guardará automáticamente en tu catálogo.
         </p>
         <div className="text-sm text-gray-700 space-y-2">
           <p className="font-semibold">📋 Instrucciones:</p>
@@ -134,13 +174,29 @@ export default function VaultSetup({ modelId: propModelId }) {
             <li>Crea una cuenta de OnlyFans gratis (o usa una existente)</li>
             <li>Suscríbete a tu propio perfil de OnlyFans</li>
             <li>Envía un mensaje de prueba desde esa cuenta</li>
-            <li>Espera unos segundos y recarga esta página</li>
-            <li>Selecciona esa cuenta aquí abajo</li>
+            <li>Click en "🔄 Sincronizar Fans" abajo</li>
+            <li>Selecciona esa cuenta y guarda</li>
           </ol>
         </div>
       </div>
 
       <div className="space-y-4">
+        {/* Botón de Sync */}
+        {fans.length === 0 && (
+          <div className="bg-purple-50 border-l-4 border-purple-500 p-4 rounded mb-4">
+            <p className="text-sm text-purple-800 mb-3">
+              🔄 Primero sincroniza tus fans para poder seleccionar uno
+            </p>
+            <button
+              onClick={handleSyncFans}
+              disabled={syncing || !ofAccountId}
+              className="w-full px-4 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600 font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {syncing ? '🔄 Sincronizando...' : '🔄 Sincronizar Fans'}
+            </button>
+          </div>
+        )}
+
         <div>
           <label className="block text-sm font-semibold text-gray-700 mb-2">
             Selecciona tu Fan de Prueba:
@@ -150,23 +206,33 @@ export default function VaultSetup({ modelId: propModelId }) {
             <div className="text-center p-8 bg-gray-50 rounded-lg">
               <p className="text-gray-500 mb-2">No tienes fans todavía</p>
               <p className="text-sm text-gray-400">
-                Sigue las instrucciones arriba para crear tu cuenta de prueba
+                Sigue las instrucciones arriba y luego sincroniza
               </p>
             </div>
           ) : (
-            <select
-              value={selectedVaultFan}
-              onChange={(e) => setSelectedVaultFan(e.target.value)}
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="">-- Selecciona un fan --</option>
-              {fans.map((fan) => (
-                <option key={fan.fan_id} value={fan.fan_id}>
-                  {fan.display_name || fan.name}
-                  {fan.of_username && ` (@${fan.of_username})`}
-                </option>
-              ))}
-            </select>
+            <>
+              <select
+                value={selectedVaultFan}
+                onChange={(e) => setSelectedVaultFan(e.target.value)}
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 mb-2"
+              >
+                <option value="">-- Selecciona un fan --</option>
+                {fans.map((fan) => (
+                  <option key={fan.fan_id} value={fan.fan_id}>
+                    {fan.display_name || fan.name}
+                    {fan.of_username && ` (@${fan.of_username})`}
+                  </option>
+                ))}
+              </select>
+              
+              <button
+                onClick={handleSyncFans}
+                disabled={syncing}
+                className="text-sm text-purple-600 hover:text-purple-700 font-medium"
+              >
+                {syncing ? '🔄 Sincronizando...' : '🔄 Actualizar lista de fans'}
+              </button>
+            </>
           )}
         </div>
 
@@ -180,14 +246,14 @@ export default function VaultSetup({ modelId: propModelId }) {
       </div>
 
       {currentVaultFan && (
-        <div className="mt-6 p-4 bg-purple-50 border border-purple-200 rounded-lg">
+        <div className="mt-6 p-4 bg-green-50 border border-green-200 rounded-lg">
           <div className="flex items-center gap-2 mb-2">
-            <span className="text-lg">💡</span>
-            <h3 className="font-semibold text-purple-800">Siguiente paso:</h3>
+            <span className="text-lg">✅</span>
+            <h3 className="font-semibold text-green-800">¡Listo!</h3>
           </div>
           <p className="text-sm text-gray-700">
-            Ahora puedes ir a la pestaña <strong>"Vault"</strong> para subir contenido. 
-            Todo lo que subas estará disponible en el catálogo para usar en tus chats.
+            Ahora todo el contenido que envíes a <strong>{currentVaultFan.display_name || currentVaultFan.name}</strong> 
+            se guardará automáticamente en tu catálogo y estará disponible en tus chats.
           </p>
         </div>
       )}
