@@ -15,13 +15,13 @@ export default function VaultInstructions({ modelId: propModelId, onGoToSetup })
 
   async function loadVaultConfig() {
     try {
-      const modelId = user?.user_metadata?.model_id;
-      if (!modelId) return;
+      const currentModelId = modelId || user?.user_metadata?.model_id;
+      if (!currentModelId) return;
 
       const { data } = await supabase
         .from('models')
         .select('vault_fan_id')
-        .eq('model_id', modelId)
+        .eq('model_id', currentModelId)
         .single();
 
       if (data?.vault_fan_id) {
@@ -29,7 +29,7 @@ export default function VaultInstructions({ modelId: propModelId, onGoToSetup })
           .from('fans')
           .select('*')
           .eq('fan_id', data.vault_fan_id)
-          .eq('model_id', modelId)
+          .eq('model_id', currentModelId)
           .single();
 
         setVaultFan(fanData);
@@ -41,13 +41,13 @@ export default function VaultInstructions({ modelId: propModelId, onGoToSetup })
 
   async function loadCatalogCount() {
     try {
-      const modelId = user?.user_metadata?.model_id;
-      if (!modelId) return;
+      const currentModelId = modelId || user?.user_metadata?.model_id;
+      if (!currentModelId) return;
 
       const { count } = await supabase
         .from('catalog')
         .select('*', { count: 'exact', head: true })
-        .eq('model_id', modelId);
+        .eq('model_id', currentModelId);
 
       setCatalogCount(count || 0);
     } catch (error) {

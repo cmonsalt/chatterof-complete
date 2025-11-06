@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import VaultSetup from './VaultSetup';
 import VaultInstructions from './VaultInstructions';
+import CatalogView from './CatalogView';
 
 export default function VaultTab({ modelId }) {
   const [activeSubTab, setActiveSubTab] = useState('instructions');
@@ -23,6 +24,16 @@ export default function VaultTab({ modelId }) {
             📝 Instructions
           </button>
           <button
+            onClick={() => setActiveSubTab('catalog')}
+            className={`pb-3 px-2 border-b-2 transition-colors font-semibold ${
+              activeSubTab === 'catalog'
+                ? 'border-blue-500 text-blue-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            📦 Catalog
+          </button>
+          <button
             onClick={() => setActiveSubTab('setup')}
             className={`pb-3 px-2 border-b-2 transition-colors font-semibold ${
               activeSubTab === 'setup'
@@ -42,6 +53,7 @@ export default function VaultTab({ modelId }) {
           onGoToSetup={() => setActiveSubTab('setup')} 
         />
       )}
+      {activeSubTab === 'catalog' && <CatalogView modelId={modelId} />}
       {activeSubTab === 'setup' && <VaultSetup modelId={modelId} />}
     </div>
   );
