@@ -1,5 +1,5 @@
-// ✅ SEND-MESSAGE - 100% según OnlyFans API documentation
-// Ubicación: api/onlyfans/send-message.js
+// ✅ SEND-MESSAGE FINAL - Usa vault IDs directamente
+// Ubicación: api/onlyfans/send-message.js (REEMPLAZAR COMPLETO)
 
 import { createClient } from '@supabase/supabase-js';
 
@@ -38,31 +38,19 @@ export default async function handler(req, res) {
     });
   }
 
-  console.log('📥 Send message request:', { 
-    accountId, 
-    chatId, 
-    text: text.substring(0, 50),
-    price,
-    mediaFiles: mediaFiles,
-    mediaFilesType: Array.isArray(mediaFiles) ? mediaFiles.map(m => typeof m) : 'not-array'
-  });
+  console.log('📥 Send message:', { accountId, chatId, price, mediaCount: mediaFiles?.length });
 
   try {
-    // 🔥 CRÍTICO: Vault IDs deben ser NÚMEROS, no strings
-    // Según docs: [3866342509, 1234567890] NO ["3866342509", "1234567890"]
-    const finalMediaFiles = mediaFiles.map(id => {
-      // Si viene como string, convertir a número
+    // ✅ Convertir vault IDs a números (OnlyFans requiere números, no strings)
+    const finalMediaFiles = (mediaFiles || []).map(id => {
       const numId = typeof id === 'string' ? parseInt(id, 10) : id;
-      console.log(`Converting media ID: ${id} (${typeof id}) → ${numId} (${typeof numId})`);
       return numId;
     });
     
-    console.log('✅ Final media IDs (as numbers):', finalMediaFiles);
+    console.log('✅ Media IDs as numbers:', finalMediaFiles);
     
-    // Formatear texto
     const formattedText = text.startsWith('<p>') ? text : `<p>${text}</p>`;
 
-    // Payload según documentación oficial
     const payload = {
       text: formattedText,
       mediaFiles: finalMediaFiles,
@@ -71,7 +59,7 @@ export default async function handler(req, res) {
       ...(replyToText && { replyToText })
     };
 
-    console.log('📦 Payload to OnlyFans:', JSON.stringify(payload, null, 2));
+    console.log('📦 Sending to OnlyFans...');
 
     // Enviar a OnlyFans API
     const response = await fetch(
@@ -87,20 +75,18 @@ export default async function handler(req, res) {
     );
 
     const responseText = await response.text();
-    console.log('📥 OnlyFans response:', responseText);
 
     if (!response.ok) {
-      console.error('❌ OnlyFans API error:', responseText);
+      console.error('❌ OnlyFans error:', responseText);
       
       let errorMessage = `API error: ${response.status}`;
       try {
         const error = JSON.parse(responseText);
         errorMessage = error.message || errorMessage;
         if (error.onlyfans_response?.body?.errors) {
-          console.error('📋 Specific errors:', JSON.stringify(error.onlyfans_response.body.errors, null, 2));
           errorMessage = JSON.stringify(error.onlyfans_response.body.errors);
         }
-      } catch (parseError) {
+      } catch (e) {
         errorMessage = responseText.substring(0, 200);
       }
       
@@ -108,30 +94,29 @@ export default async function handler(req, res) {
     }
 
     const data = JSON.parse(responseText);
-    console.log('✅ Message sent successfully! ID:', data.id);
+    console.log('✅ Message sent! ID:', data.id);
 
-    // Obtener media info del catálogo
+    // Obtener media info del catálogo para guardar en BD
     let mediaUrl = null;
     let mediaThumb = null;
     let mediaType = null;
     
     if (mediaFiles && mediaFiles.length > 0) {
       try {
-        const firstMediaId = mediaFiles[0].toString();
-        
-        const { data: catalogItem, error: catalogError } = await supabase
+        const { data: catalogItem } = await supabase
           .from('catalog')
           .select('media_url, media_thumb, file_type, r2_url')
-          .eq('of_media_id', firstMediaId)
+          .eq('of_media_id', mediaFiles[0].toString())
           .single();
         
-        if (!catalogError && catalogItem) {
+        if (catalogItem) {
+          // Priorizar R2 URL (permanente) sobre media_url (temporal)
           mediaUrl = catalogItem.r2_url || catalogItem.media_url;
           mediaThumb = catalogItem.media_thumb;
           mediaType = catalogItem.file_type;
-          console.log('✅ Got media info from catalog');
+          console.log('✅ Got media from catalog');
         }
-      } catch (catalogErr) {
+      } catch (err) {
         console.warn('⚠️ Could not get media from catalog');
       }
     }
@@ -157,27 +142,22 @@ export default async function handler(req, res) {
       ppv_unlocked: false
     };
 
-    console.log('💾 Saving to database');
-
     const { error: dbError } = await supabase
       .from('chat')
       .insert(chatData);
 
     if (dbError) {
-      console.error('⚠️ DB save error:', dbError);
-    } else {
-      console.log('✅ Message saved to database');
+      console.error('⚠️ DB error:', dbError);
     }
 
     return res.status(200).json({ 
       success: true, 
       data,
-      saved_to_db: !dbError,
-      has_media_url: !!mediaUrl
+      saved_to_db: !dbError
     });
 
   } catch (error) {
-    console.error('❌ Send message error:', error);
+    console.error('❌ Error:', error);
     return res.status(500).json({ 
       error: error.message || 'Server Error'
     });
