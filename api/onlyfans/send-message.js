@@ -17,27 +17,20 @@ export default async function handler(req, res) {
     text, 
     mediaFiles, 
     price,
-    replyToMessageId,
-    replyToText
+    replyToMessageId,  // ðŸ”¥ REPLY
+    replyToText        // ðŸ”¥ REPLY
   } = req.body;
   
   const API_KEY = process.env.ONLYFANS_API_KEY;
 
-  console.log('📥 Send message request:', { 
-    accountId, 
-    chatId, 
-    text: text?.substring(0, 50), 
-    price, 
-    mediaFiles,
-    hasMedia: mediaFiles?.length > 0
-  });
-
+  // âœ… Validar que tenemos AMBOS IDs
   if (!accountId || !modelId || !chatId || !text) {
     return res.status(400).json({ 
       error: 'accountId, modelId, chatId, and text required' 
     });
   }
 
+  // ðŸ”¥ Validar PPV (precio requiere media)
   if (price && price > 0 && (!mediaFiles || mediaFiles.length === 0)) {
     return res.status(400).json({
       error: 'PPV messages must include media files'
@@ -45,6 +38,7 @@ export default async function handler(req, res) {
   }
 
   try {
+    // Formatear texto con HTML bÃ¡sico
     const formattedText = text.startsWith('<p>') ? text : `<p>${text}</p>`;
 
     const payload = {
@@ -53,8 +47,7 @@ export default async function handler(req, res) {
       ...(price && price > 0 && { price })
     };
 
-    console.log('📦 Full payload:', JSON.stringify(payload, null, 2));
-
+    // 1. Enviar a OnlyFans API
     const response = await fetch(
       `https://app.onlyfansapi.com/api/${accountId}/chats/${chatId}/messages`,
       {
@@ -67,31 +60,37 @@ export default async function handler(req, res) {
       }
     );
 
-    const responseText = await response.text();
-    console.log('📨 OnlyFans response:', { status: response.status, body: responseText.substring(0, 200) });
-
     if (!response.ok) {
-      const error = JSON.parse(responseText);
-      console.error('❌ OnlyFans error:', error);
+      const error = await response.json();
+      console.error('❌ OnlyFans error:', JSON.stringify(error, null, 2));
+      
+      // Si hay errores específicos, mostrarlos
+      if (error.onlyfans_response?.body?.errors) {
+        console.error('📋 Specific errors:', JSON.stringify(error.onlyfans_response.body.errors, null, 2));
+      }
+      
       throw new Error(error.message || `API error: ${response.status}`);
     }
 
-    const data = JSON.parse(responseText);
+    const data = await response.json();
 
-    let mediaType = null;
+    // ðŸ”¥ Detectar tipo de media si se enviÃ³
+    let mediaType = null
     if (mediaFiles && mediaFiles.length > 0) {
-      const firstMedia = mediaFiles[0];
+      const firstMedia = mediaFiles[0]
+      // Si viene del catÃ¡logo, puede tener el tipo
       if (typeof firstMedia === 'string') {
         if (firstMedia.includes('.mp4') || firstMedia.includes('video')) {
-          mediaType = 'video';
+          mediaType = 'video'
         } else if (firstMedia.includes('.gif')) {
-          mediaType = 'gif';
+          mediaType = 'gif'
         } else {
-          mediaType = 'photo';
+          mediaType = 'photo'
         }
       }
     }
 
+    // 2. Guardar mensaje en BD con nombres de columnas CORRECTOS
     const { error: dbError } = await supabase.from('chat').insert({
       of_message_id: data.id?.toString(),
       fan_id: chatId,
@@ -103,23 +102,31 @@ export default async function handler(req, res) {
       amount: price || null,
       media_url: mediaFiles?.[0] || null,
       media_type: mediaType,
+      // ðŸ”¥ REPLY
       reply_to_message_id: replyToMessageId || null,
       reply_to_text: replyToText || null
     });
 
     if (dbError) {
-      console.error('❌ Database error:', dbError);
+      console.error('âŒ Database error:', dbError);
       throw new Error('Failed to save message to database');
     }
 
-    console.log('✅ Message sent successfully');
+    console.log('âœ… Message sent and saved:', {
+      of_message_id: data.id,
+      fan_id: chatId,
+      model_id: modelId,
+      read: false,
+      ppv_price: price || 0,
+      has_reply: !!replyToMessageId
+    });
 
     res.status(200).json({ 
       success: true, 
       message: data 
     });
   } catch (error) {
-    console.error('❌ Send message error:', error);
+    console.error('âŒ Send message error:', error);
     res.status(500).json({ error: error.message });
   }
 }
