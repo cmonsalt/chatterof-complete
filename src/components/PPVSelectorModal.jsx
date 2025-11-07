@@ -201,6 +201,17 @@ export default function PPVSelectorModal({
                           <span className="text-xl">✓</span>
                         </div>
                       )}
+
+                      {/* Ver en Vault - Hover */}
+                      <a
+                        href={`https://onlyfans.com/my/vault/media/${item.of_media_id}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={(e) => e.stopPropagation()}
+                        className="absolute bottom-2 right-2 bg-white bg-opacity-90 hover:bg-opacity-100 text-gray-700 px-3 py-1 rounded-lg text-xs font-semibold transition-all opacity-0 group-hover:opacity-100 flex items-center gap-1"
+                      >
+                        👁️ Ver en Vault
+                      </a>
                     </div>
 
                     {/* Info */}
