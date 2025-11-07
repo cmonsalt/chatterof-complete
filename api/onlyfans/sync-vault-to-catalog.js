@@ -20,9 +20,9 @@ export default async function handler(req, res) {
   }
 
   try {
-    // 1. Obtener vault de OnlyFans
+    // 1. Obtener vault de OnlyFans usando el endpoint correcto
     const response = await fetch(
-      `https://app.onlyfansapi.com/api/${accountId}/vault`,
+      `https://app.onlyfansapi.com/api/${accountId}/vault/media?limit=1000`,
       {
         headers: { 
           'Authorization': `Bearer ${API_KEY}`
