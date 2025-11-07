@@ -1,11 +1,7 @@
 {
   "functions": {
-    "api/cloudflare/get-upload-url.js": {
-      "maxDuration": 10,
-      "memory": 512
-    },
-    "api/onlyfans/scrape-and-save.js": {
-      "maxDuration": 30,
+    "api/onlyfans/upload-direct.js": {
+      "maxDuration": 60,
       "memory": 1024
     }
   },
