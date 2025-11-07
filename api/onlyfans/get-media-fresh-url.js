@@ -31,10 +31,17 @@ export default async function handler(req, res) {
     );
 
     if (!response.ok) {
-      throw new Error(`OnlyFans API error: ${response.status}`);
+      const errorText = await response.text();
+      console.error('❌ OnlyFans API Error:', {
+        status: response.status,
+        statusText: response.statusText,
+        body: errorText
+      });
+      throw new Error(`OnlyFans API error: ${response.status} - ${errorText.substring(0, 200)}`);
     }
 
     const data = await response.json();
+    console.log('✅ OnlyFans response:', JSON.stringify(data).substring(0, 200));
     const media = data.data;
 
     if (!media) {
