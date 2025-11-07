@@ -1,7 +1,8 @@
-// ✅ SOLUCIÓN QUE SÍ FUNCIONA - Browser → Blob directo
+// ✅ UPLOAD CLIENT-SIDE DIRECTO A BLOB (sin pasar por API)
 // Ubicación: src/components/VaultUpload.jsx
 
 import { useState, useEffect } from 'react';
+import { upload } from '@vercel/blob/client';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -43,7 +44,6 @@ export default function VaultUpload() {
 
     setSelectedFile(file);
 
-    // Preview
     const reader = new FileReader();
     reader.onload = (e) => setFilePreview(e.target.result);
     reader.readAsDataURL(file);
@@ -68,26 +68,18 @@ export default function VaultUpload() {
     const currentModelId = modelId || user?.user_metadata?.model_id;
 
     try {
-      // 1️⃣ Upload directo a Vercel Blob desde el browser
-      setProgress('☁️ Step 1/3: Uploading to cloud storage...');
+      // 1️⃣ Upload DIRECTO a Vercel Blob desde el cliente (sin límite)
+      setProgress('☁️ Uploading to cloud storage...');
 
-      const blobResponse = await fetch(
-        `/api/blob/upload?filename=${encodeURIComponent(selectedFile.name)}`,
-        {
-          method: 'POST',
-          body: selectedFile,
-        }
-      );
+      const newBlob = await upload(selectedFile.name, selectedFile, {
+        access: 'public',
+        handleUploadUrl: '/api/blob/client-upload',
+      });
 
-      if (!blobResponse.ok) {
-        throw new Error('Blob upload failed');
-      }
+      console.log('✅ Uploaded to Blob:', newBlob.url);
 
-      const blob = await blobResponse.json();
-      console.log('✅ Uploaded to Blob:', blob.url);
-
-      // 2️⃣ Registrar en OnlyFans para obtener vault ID
-      setProgress('📥 Step 2/3: Registering with OnlyFans...');
+      // 2️⃣ Registrar en OnlyFans y guardar en catalog
+      setProgress('📥 Registering with OnlyFans...');
 
       const registerResponse = await fetch('/api/onlyfans/register-blob-media', {
         method: 'POST',
@@ -95,7 +87,7 @@ export default function VaultUpload() {
         body: JSON.stringify({
           accountId,
           modelId: currentModelId,
-          blobUrl: blob.url,
+          blobUrl: newBlob.url,
           filename: selectedFile.name,
           contentType: selectedFile.type,
           title,
@@ -114,7 +106,6 @@ export default function VaultUpload() {
       
       setProgress(`✅ Success! Vault ID: ${data.vaultMediaId} | Credits: ${data.creditsUsed}`);
       
-      // Reset
       setTimeout(() => {
         setSelectedFile(null);
         setFilePreview(null);
@@ -143,7 +134,7 @@ export default function VaultUpload() {
             <div>
               <h3 className="font-bold text-green-800 mb-1">Unlimited Size</h3>
               <p className="text-sm text-green-700">
-                Upload videos of any size. Files go directly to cloud storage.
+                Upload videos of any size directly to cloud storage.
               </p>
             </div>
           </div>
