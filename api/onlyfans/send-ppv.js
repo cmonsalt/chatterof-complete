@@ -66,12 +66,29 @@ export default async function handler(req, res) {
       ? (custom_message.startsWith('<p>') ? custom_message : `<p>${custom_message}</p>`)
       : `<p>💎 ${title}</p>`;
 
-    // 3. Preparar payload
+    // 3. Preparar payload con previews
+    const mediaFiles = Array.isArray(of_media_ids) 
+      ? of_media_ids.map(id => String(id)).filter(Boolean)
+      : [String(of_media_ids)].filter(Boolean);
+    
+    if (mediaFiles.length === 0) {
+      return res.status(400).json({
+        error: 'No valid media IDs provided',
+        received: of_media_ids
+      });
+    }
+
+    // Para PPV: previews debe incluir al menos el primer media
+    // El fan verá el preview gratis, pero el contenido está locked
     const payload = {
       text: messageText,
-      mediaFiles: of_media_ids,
-      price: price
+      mediaFiles: mediaFiles,
+      previews: [mediaFiles[0]], // Preview del primer media
+      price: Number(price),
+      lockedText: false // El texto sí se ve
     };
+    
+    console.log('📦 Full payload:', JSON.stringify(payload, null, 2));
 
     console.log('📤 Sending to OnlyFans:', {
       url: `https://app.onlyfansapi.com/api/${accountId}/chats/${fan_id}/messages`,
