@@ -87,15 +87,23 @@ export default async function handler(req, res) {
 
         console.log(`⬆️ Uploading ${item.of_media_id} (${(buffer.length / 1024 / 1024).toFixed(2)} MB)...`);
         
+        // Crear FormData con el archivo
+        const FormData = (await import('form-data')).default;
+        const form = new FormData();
+        form.append('file', buffer, {
+          filename: `${item.of_media_id}.${item.file_type === 'video' ? 'mp4' : 'jpg'}`,
+          contentType: contentType
+        });
+        
         const uploadResp = await fetch(
           `https://app.onlyfansapi.com/api/${accountId}/media/upload`,
           {
             method: 'POST',
             headers: {
               'Authorization': `Bearer ${API_KEY}`,
-              'Content-Type': contentType
+              ...form.getHeaders()
             },
-            body: buffer
+            body: form
           }
         );
 
