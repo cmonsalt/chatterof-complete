@@ -1,5 +1,5 @@
-// ✅ VAULT UPLOAD SIMPLIFICADO - Upload directo a OnlyFans
-// Ubicación: src/components/VaultUpload.jsx (REEMPLAZAR)
+// ✅ SOLUCIÓN QUE SÍ FUNCIONA - Browser → Blob directo
+// Ubicación: src/components/VaultUpload.jsx
 
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
@@ -48,7 +48,6 @@ export default function VaultUpload() {
     reader.onload = (e) => setFilePreview(e.target.result);
     reader.readAsDataURL(file);
 
-    // Auto-fill title
     if (!title) {
       setTitle(file.name.split('.')[0]);
     }
@@ -66,52 +65,65 @@ export default function VaultUpload() {
     }
 
     setUploading(true);
-    setProgress('📤 Uploading to OnlyFans vault...');
+    const currentModelId = modelId || user?.user_metadata?.model_id;
 
     try {
-      const currentModelId = modelId || user?.user_metadata?.model_id;
+      // 1️⃣ Upload directo a Vercel Blob desde el browser
+      setProgress('☁️ Step 1/3: Uploading to cloud storage...');
 
-      // Crear FormData
-      const formData = new FormData();
-      formData.append('file', selectedFile);
-      formData.append('accountId', accountId);
-      formData.append('modelId', currentModelId);
-      formData.append('title', title);
-      formData.append('basePrice', basePrice.toString());
-      formData.append('nivel', nivel.toString());
-      formData.append('tags', tags);
+      const blobResponse = await fetch(
+        `/api/blob/upload?filename=${encodeURIComponent(selectedFile.name)}`,
+        {
+          method: 'POST',
+          body: selectedFile,
+        }
+      );
 
-      // Upload usando Vercel Blob (sin límite de tamaño)
-      const response = await fetch('/api/onlyfans/upload-with-blob', {
-        method: 'POST',
-        body: formData
-      });
-
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || 'Upload failed');
+      if (!blobResponse.ok) {
+        throw new Error('Blob upload failed');
       }
 
-      const data = await response.json();
+      const blob = await blobResponse.json();
+      console.log('✅ Uploaded to Blob:', blob.url);
+
+      // 2️⃣ Registrar en OnlyFans para obtener vault ID
+      setProgress('📥 Step 2/3: Registering with OnlyFans...');
+
+      const registerResponse = await fetch('/api/onlyfans/register-blob-media', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          accountId,
+          modelId: currentModelId,
+          blobUrl: blob.url,
+          filename: selectedFile.name,
+          contentType: selectedFile.type,
+          title,
+          basePrice,
+          nivel,
+          tags
+        })
+      });
+
+      if (!registerResponse.ok) {
+        const error = await registerResponse.json();
+        throw new Error(error.error || 'Registration failed');
+      }
+
+      const data = await registerResponse.json();
       
-      const fileSizeMB = data.fileSizeMB || 0;
-      const creditsUsed = data.creditsUsed || 1;
+      setProgress(`✅ Success! Vault ID: ${data.vaultMediaId} | Credits: ${data.creditsUsed}`);
       
-      setProgress(`✅ Success! Vault ID: ${data.vaultMediaId} | Size: ${fileSizeMB}MB | Credits: ${creditsUsed}`);
-      
-      // Reset form
+      // Reset
       setTimeout(() => {
         setSelectedFile(null);
         setFilePreview(null);
         setTitle('');
-        setBasePrice(10);
-        setNivel(5);
-        setTags('');
         setProgress('');
-      }, 4000);
+      }, 3000);
 
     } catch (error) {
-      console.error('❌ Upload error:', error);
+      console.error('❌ Error:', error);
       setProgress(`❌ Error: ${error.message}`);
     } finally {
       setUploading(false);
@@ -125,23 +137,19 @@ export default function VaultUpload() {
           📤 Upload to Vault
         </h2>
 
-        {/* Cost Info */}
-        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6">
+        <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-6">
           <div className="flex items-start gap-3">
-            <span className="text-2xl">💰</span>
+            <span className="text-2xl">✅</span>
             <div>
-              <h3 className="font-bold text-yellow-800 mb-1">Cost: 1 credit per 6MB</h3>
-              <p className="text-sm text-yellow-700">
-                Files upload to OnlyFans CDN + backup to Cloudflare R2.
-                <br />
-                Example: 100MB video = ~17 credits
+              <h3 className="font-bold text-green-800 mb-1">Unlimited Size</h3>
+              <p className="text-sm text-green-700">
+                Upload videos of any size. Files go directly to cloud storage.
               </p>
             </div>
           </div>
         </div>
 
         <div className="space-y-4">
-          {/* File Selection */}
           <div>
             <label className="block text-sm font-semibold text-gray-700 mb-2">
               Select Media
@@ -155,46 +163,31 @@ export default function VaultUpload() {
             />
           </div>
 
-          {/* Preview */}
           {filePreview && (
             <div className="rounded-lg overflow-hidden border-2 border-gray-200">
               {selectedFile?.type.includes('video') ? (
-                <video
-                  src={filePreview}
-                  controls
-                  className="w-full max-h-64 object-contain bg-black"
-                />
+                <video src={filePreview} controls className="w-full max-h-64 object-contain bg-black" />
               ) : (
-                <img
-                  src={filePreview}
-                  alt="Preview"
-                  className="w-full max-h-64 object-contain bg-gray-100"
-                />
+                <img src={filePreview} alt="Preview" className="w-full max-h-64 object-contain bg-gray-100" />
               )}
             </div>
           )}
 
-          {/* Title */}
           <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-2">
-              Title *
-            </label>
+            <label className="block text-sm font-semibold text-gray-700 mb-2">Title *</label>
             <input
               type="text"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              placeholder="e.g., Beach Video, Sexy Outfit, etc."
+              placeholder="e.g., Beach Video"
               disabled={uploading}
               className="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
             />
           </div>
 
-          {/* Price & Level */}
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">
-                Base Price ($)
-              </label>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">Price ($)</label>
               <input
                 type="number"
                 min="1"
@@ -204,11 +197,8 @@ export default function VaultUpload() {
                 className="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
               />
             </div>
-
             <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">
-                Level (1-10)
-              </label>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">Level (1-10)</label>
               <input
                 type="number"
                 min="1"
@@ -221,22 +211,6 @@ export default function VaultUpload() {
             </div>
           </div>
 
-          {/* Tags */}
-          <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-2">
-              Tags (optional)
-            </label>
-            <input
-              type="text"
-              value={tags}
-              onChange={(e) => setTags(e.target.value)}
-              placeholder="e.g., beach, bikini, teasing"
-              disabled={uploading}
-              className="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
-            />
-          </div>
-
-          {/* Upload Button */}
           <button
             onClick={handleUpload}
             disabled={!selectedFile || !title.trim() || uploading}
@@ -255,7 +229,6 @@ export default function VaultUpload() {
             )}
           </button>
 
-          {/* Progress */}
           {progress && (
             <div className={`p-4 rounded-lg ${
               progress.includes('✅') 
@@ -268,18 +241,6 @@ export default function VaultUpload() {
             </div>
           )}
         </div>
-      </div>
-
-      {/* Info */}
-      <div className="mt-6 bg-blue-50 border border-blue-200 rounded-xl p-4">
-        <h3 className="font-bold text-blue-800 mb-2">ℹ️ How it works:</h3>
-        <ol className="text-sm text-blue-700 space-y-1 list-decimal list-inside">
-          <li>File uploads to OnlyFans CDN (1 credit per 6MB)</li>
-          <li>Automatic backup to Cloudflare R2 (free storage)</li>
-          <li>Content saved to your OnlyFans vault</li>
-          <li>Permanent vault ID added to catalog</li>
-          <li>Ready to send as PPV!</li>
-        </ol>
       </div>
     </div>
   );
