@@ -45,17 +45,17 @@ export default async function handler(req, res) {
   });
 
   try {
-    // 🔥 AUTO-CONVERT: Download from media_url and re-upload
+    // 🔥 AUTO-CONVERT: Download from R2 (permanent) or media_url (temp)
     let finalMediaFiles = mediaFiles;
     
     if (mediaFiles && mediaFiles.length > 0 && price > 0) {
-      console.log('🔄 Converting media for PPV (download from catalog URLs)...');
+      console.log('🔄 Converting media for PPV (trying R2 first)...');
       
       try {
-        // Get media URLs from catalog
+        // Get media from catalog
         const { data: catalogItems, error: catalogError } = await supabase
           .from('catalog')
-          .select('of_media_id, media_url, file_type')
+          .select('of_media_id, r2_url, media_url, file_type')
           .in('of_media_id', mediaFiles);
 
         if (catalogError) {
@@ -72,17 +72,19 @@ export default async function handler(req, res) {
         
         for (const item of catalogItems) {
           try {
-            if (!item.media_url) {
-              console.error(`❌ No media_url for ${item.of_media_id}`);
+            // Try R2 first (permanent URL), fallback to media_url
+            const downloadUrl = item.r2_url || item.media_url;
+            
+            if (!downloadUrl) {
+              console.error(`❌ No download URL for ${item.of_media_id}`);
               continue;
             }
 
-            // Download from media_url
-            console.log(`⬇️ Downloading ${item.of_media_id} from catalog URL...`);
-            const downloadResp = await fetch(item.media_url);
+            console.log(`⬇️ Downloading ${item.of_media_id} from ${item.r2_url ? 'R2' : 'OnlyFans'}...`);
+            const downloadResp = await fetch(downloadUrl);
             
             if (!downloadResp.ok) {
-              console.error(`❌ Download failed for ${item.of_media_id}`);
+              console.error(`❌ Download failed for ${item.of_media_id} - URL may have expired`);
               continue;
             }
 
@@ -131,7 +133,7 @@ export default async function handler(req, res) {
         } else {
           console.warn('⚠️ No successful conversions');
           return res.status(400).json({
-            error: 'Failed to convert media. URLs may have expired. Please upload fresh content.'
+            error: 'Failed to convert media. Please upload fresh content to vault.'
           });
         }
 

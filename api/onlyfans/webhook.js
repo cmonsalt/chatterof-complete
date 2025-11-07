@@ -1,9 +1,43 @@
 import { createClient } from '@supabase/supabase-js'
+import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3'
 
 const supabase = createClient(
   process.env.VITE_SUPABASE_URL,
   process.env.VITE_SUPABASE_ANON_KEY
 )
+
+// R2 Client for permanent storage
+const r2Client = new S3Client({
+  region: 'auto',
+  endpoint: `https://${process.env.R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
+  credentials: {
+    accessKeyId: process.env.R2_ACCESS_KEY_ID,
+    secretAccessKey: process.env.R2_SECRET_ACCESS_KEY,
+  },
+})
+
+// Helper function to upload to R2
+async function uploadToR2(buffer, mediaId, mediaType) {
+  try {
+    const ext = mediaType === 'video' ? 'mp4' : 'jpg'
+    const key = `media/${mediaId}_${Date.now()}.${ext}`
+    const contentType = mediaType === 'video' ? 'video/mp4' : 'image/jpeg'
+    
+    const command = new PutObjectCommand({
+      Bucket: process.env.R2_BUCKET_NAME,
+      Key: key,
+      Body: buffer,
+      ContentType: contentType,
+    })
+    
+    await r2Client.send(command)
+    
+    return `https://pub-c91f7a72074547ffad99c7d07cf8c8cd.r2.dev/${key}`
+  } catch (error) {
+    console.error('❌ R2 upload error:', error)
+    return null
+  }
+}
 
 function cleanHTML(text) {
   if (!text) return ''
@@ -137,6 +171,25 @@ async function handleMessage(data, modelId) {
             mediaThumb = media.files?.thumb?.url
           }
           
+          // 🔥 DOWNLOAD AND UPLOAD TO R2 FOR PERMANENT STORAGE
+          let r2Url = null
+          if (mediaUrl) {
+            try {
+              console.log(`⬇️ Downloading media ${media.id} to R2...`)
+              const downloadResponse = await fetch(mediaUrl)
+              if (downloadResponse.ok) {
+                const arrayBuffer = await downloadResponse.arrayBuffer()
+                const buffer = Buffer.from(arrayBuffer)
+                r2Url = await uploadToR2(buffer, media.id, mediaType)
+                if (r2Url) {
+                  console.log(`✅ Uploaded to R2: ${r2Url}`)
+                }
+              }
+            } catch (r2Error) {
+              console.error(`❌ R2 upload failed for media ${media.id}:`, r2Error)
+            }
+          }
+          
           // Crear un registro por cada media (UPSERT para evitar duplicados)
         const { error: catalogError } = await supabase
   .from('catalog')
@@ -150,7 +203,8 @@ async function handleMessage(data, modelId) {
     file_type: mediaType,
     media_url: mediaUrl,
     media_thumb: mediaThumb,
-    is_single: false, // ← Por defecto no es single
+    r2_url: r2Url,  // 🔥 PERMANENT R2 URL
+    is_single: false,
     created_at: new Date().toISOString()
   }, { 
     onConflict: 'of_media_id',
