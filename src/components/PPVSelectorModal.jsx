@@ -11,6 +11,7 @@ export default function PPVSelectorModal({
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('all'); // 'all', 'photo', 'video'
   const [selectedItems, setSelectedItems] = useState([]);
+  const [previewItem, setPreviewItem] = useState(null);
 
   useEffect(() => {
     if (isOpen && modelId) {
@@ -202,16 +203,18 @@ export default function PPVSelectorModal({
                         </div>
                       )}
 
-                      {/* Ver en Vault - Hover */}
-                      <a
-                        href={`https://onlyfans.com/my/vault/media/${item.of_media_id}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        onClick={(e) => e.stopPropagation()}
-                        className="absolute bottom-2 right-2 bg-white bg-opacity-90 hover:bg-opacity-100 text-gray-700 px-3 py-1 rounded-lg text-xs font-semibold transition-all opacity-0 group-hover:opacity-100 flex items-center gap-1"
-                      >
-                        👁️ Ver en Vault
-                      </a>
+                      {/* Play/View Button - Si tiene media_url */}
+                      {item.media_url && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setPreviewItem(item);
+                          }}
+                          className="absolute bottom-2 right-2 bg-purple-600 hover:bg-purple-700 text-white px-3 py-1 rounded-lg text-xs font-semibold transition-all opacity-0 group-hover:opacity-100 flex items-center gap-1 shadow-lg"
+                        >
+                          {item.file_type === 'video' ? '▶️ Play' : '👁️ View'}
+                        </button>
+                      )}
                     </div>
 
                     {/* Info */}
@@ -257,6 +260,103 @@ export default function PPVSelectorModal({
           </div>
         </div>
       </div>
+
+      {/* Preview/Play Modal */}
+      {previewItem && (
+        <div 
+          className="fixed inset-0 bg-black bg-opacity-90 flex items-center justify-center z-[60] p-4"
+          onClick={() => setPreviewItem(null)}
+        >
+          <div 
+            className="bg-white rounded-xl max-w-4xl max-h-[90vh] overflow-auto w-full"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="p-4 border-b border-gray-200 flex items-center justify-between bg-gradient-to-r from-purple-500 to-pink-500">
+              <div>
+                <h3 className="text-xl font-bold text-white">{previewItem.title}</h3>
+                <p className="text-purple-100 text-sm">
+                  {previewItem.file_type === 'video' ? '🎥 Video' : '📸 Photo'}
+                </p>
+              </div>
+              <button
+                onClick={() => setPreviewItem(null)}
+                className="text-white hover:text-gray-200 text-3xl font-bold"
+              >
+                ×
+              </button>
+            </div>
+
+            {/* Media Content */}
+            <div className="p-4 bg-black">
+              {previewItem.file_type === 'video' ? (
+                <video
+                  src={previewItem.media_url}
+                  controls
+                  autoPlay
+                  className="w-full rounded-lg"
+                  onError={(e) => {
+                    console.error('Video failed to load');
+                    e.target.parentElement.innerHTML = '<div class="flex flex-col items-center justify-center h-64 text-white"><div class="text-5xl mb-4">❌</div><p class="font-semibold">Video URL expired</p><p class="text-sm text-gray-400 mt-2">Upload new content to get fresh URLs</p></div>';
+                  }}
+                />
+              ) : (
+                <img
+                  src={previewItem.media_url}
+                  alt={previewItem.title}
+                  className="w-full rounded-lg"
+                  onError={(e) => {
+                    console.error('Image failed to load');
+                    e.target.parentElement.innerHTML = '<div class="flex flex-col items-center justify-center h-64 text-white"><div class="text-5xl mb-4">❌</div><p class="font-semibold">Image URL expired</p><p class="text-sm text-gray-400 mt-2">Upload new content to get fresh URLs</p></div>';
+                  }}
+                />
+              )}
+            </div>
+
+            {/* Info */}
+            <div className="p-4 space-y-2 bg-gray-50">
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-gray-600">
+                  <strong>Type:</strong> {previewItem.file_type}
+                </span>
+                <span className="text-lg font-bold text-purple-600">
+                  ${previewItem.base_price}
+                </span>
+              </div>
+              <p className="text-sm text-gray-600">
+                <strong>Level:</strong> {previewItem.nivel}/10
+              </p>
+              <p className="text-xs text-gray-400">
+                <strong>Media ID:</strong> {previewItem.of_media_id}
+              </p>
+              {previewItem.description && (
+                <p className="text-sm text-gray-600">
+                  <strong>Description:</strong> {previewItem.description}
+                </p>
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className="p-4 border-t border-gray-200 flex justify-end gap-2">
+              <button
+                onClick={() => setPreviewItem(null)}
+                className="px-6 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 font-semibold transition-all"
+              >
+                Close
+              </button>
+              <button
+                onClick={() => {
+                  toggleSelection(previewItem);
+                  setPreviewItem(null);
+                }}
+                className="px-6 py-2 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-lg hover:from-purple-600 hover:to-pink-600 font-semibold transition-all"
+              >
+                {selectedItems.find(i => i.id === previewItem.id) ? '✓ Selected' : 'Select for PPV'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
