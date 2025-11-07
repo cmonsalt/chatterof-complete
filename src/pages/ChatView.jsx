@@ -3,9 +3,8 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import Navbar from '../components/Navbar';
-import PPVSelectorModal from '../components/PPVSelectorModal';
-import PPVSendModal from '../components/PPVSendModal';
-import AISuggestedPPV from '../components/AISuggestedPPV';
+import PPVSelectorModal from '../components/modals/PPVSelectorModal';
+import PPVSendModal from '../components/modals/PPVSendModal';
 
 export default function ChatView({ embedded = false }) {
   const { fanId } = useParams();
@@ -37,22 +36,13 @@ export default function ChatView({ embedded = false }) {
     lastInteraction: null
   });
   
-  const [catalog, setCatalog] = useState([]);
-  const [selectedContent, setSelectedContent] = useState(null);
+  // 🔥 PPV MODALS - NEW
+  const [showPPVSelector, setShowPPVSelector] = useState(false);
+  const [showPPVSend, setShowPPVSend] = useState(false);
+  const [selectedPPVContent, setSelectedPPVContent] = useState([]);
   
   // 🔥 REPLY functionality
   const [replyingTo, setReplyingTo] = useState(null);
-  
-  // 🔥 PPV functionality  
-  const [ppvPrice, setPpvPrice] = useState(0);
-  const [showPpvInput, setShowPpvInput] = useState(false);
-  
-  // 💰 NEW PPV System
-  const [showPPVSelector, setShowPPVSelector] = useState(false);
-  const [selectedPPVContent, setSelectedPPVContent] = useState(null);
-  const [showPPVSendModal, setShowPPVSendModal] = useState(false);
-  const [sendingPPV, setSendingPPV] = useState(false);
-  const [aiSuggestedContent, setAiSuggestedContent] = useState(null);
   
   const lastCheckedMessageId = useRef(null);
   const justSentMessage = useRef(false);
@@ -68,7 +58,7 @@ export default function ChatView({ embedded = false }) {
 
   const getTierBadge = (tier) => {
     const tiers = {
-      0: { emoji: '🆕', label: 'New Fan', color: 'bg-gray-100 text-gray-700' },
+      0: { emoji: '🆓', label: 'New Fan', color: 'bg-gray-100 text-gray-700' },
       1: { emoji: '💎', label: 'VIP', color: 'bg-blue-100 text-blue-700' },
       2: { emoji: '🐋', label: 'Whale', color: 'bg-purple-100 text-purple-700' }
     }
@@ -77,7 +67,6 @@ export default function ChatView({ embedded = false }) {
 
   useEffect(() => {
     loadFanAndMessages();
-    loadCatalog();
     const interval = setInterval(loadFanAndMessages, 5000);
     return () => clearInterval(interval);
   }, [fanId, user]);
@@ -86,7 +75,7 @@ export default function ChatView({ embedded = false }) {
     if (messages.length === 0) return;
     
     if (justSentMessage.current) {
-      console.log('⏭️ Skipping read marking - just sent a message');
+      console.log('⭐️ Skipping read marking - just sent a message');
       justSentMessage.current = false;
       return;
     }
@@ -112,97 +101,28 @@ export default function ChatView({ embedded = false }) {
         .eq('model_id', currentModelId)
         .eq('from', 'model')
         .eq('read', false)
-        .lt('ts', fanMessageTime)
-        .select();
-      
-      if (error) {
-        console.error('❌ Error marking messages as read:', error);
-      } else {
-        console.log('✅ Marked as read:', data?.length || 0, 'messages');
-      }
-    } catch (err) {
-      console.error('❌ Error:', err);
-    }
-  }
+        .lt('ts', fanMessageTime);
 
-  useEffect(() => {
-    if (fan) {
-      setNicknameValue(fan.display_name || '');
-      setNotesValue(fan.notes || '');
-      setChatterNotesValue(fan.chatter_notes || '');
-    }
-  }, [fan?.fan_id]);
-
-  const handleSaveNickname = async () => {
-    if (!fan) return
-    
-    try {
-      const { error } = await supabase
-        .from('fans')
-        .update({ display_name: nicknameValue })
-        .eq('fan_id', fan.fan_id)
-      
-      if (error) throw error
-      
-      const updatedFan = { ...fan, display_name: nicknameValue }
-      setFan(updatedFan)
-      setEditingNickname(false)
-      alert('✅ Nickname saved!')
+      if (error) throw error;
+      console.log('✅ Marked model messages as read');
     } catch (error) {
-      console.error('Error saving nickname:', error)
-      alert('❌ Error saving nickname')
-    }
-  }
-
-  const handleSaveNotes = async () => {
-    if (!fan) return
-    
-    setSavingNotes(true)
-    try {
-      const { error } = await supabase
-        .from('fans')
-        .update({ notes: notesValue })
-        .eq('fan_id', fan.fan_id)
-      
-      if (error) throw error
-      
-      const updatedFan = { ...fan, notes: notesValue }
-      setFan(updatedFan)
-      alert('✅ Notes saved!')
-    } catch (error) {
-      console.error('Error saving notes:', error)
-      alert('❌ Error saving notes')
-    } finally {
-      setSavingNotes(false)
-    }
-  }
-
-  const handleSaveChatterNotes = async () => {
-    if (!fan) return
-    
-    setSavingNotes(true)
-    try {
-      const { error } = await supabase
-        .from('fans')
-        .update({ chatter_notes: chatterNotesValue })
-        .eq('fan_id', fan.fan_id)
-      
-      if (error) throw error
-      
-      const updatedFan = { ...fan, chatter_notes: chatterNotesValue }
-      setFan(updatedFan)
-      alert('✅ Chatter tips saved!')
-    } catch (error) {
-      console.error('Error saving chatter notes:', error)
-      alert('❌ Error saving chatter tips')
-    } finally {
-      setSavingNotes(false)
+      console.error('Error marking as read:', error);
     }
   }
 
   async function loadFanAndMessages() {
     const currentModelId = modelId || user?.user_metadata?.model_id;
-    if (!currentModelId) return;
+    if (!currentModelId) {
+      console.log('⚠️ No model ID');
+      setLoading(false);
+      return;
+    }
+
+    if (!fanId) {
+      console.log('⚠️ No fan ID');
+      setLoading(false);
+      return;
+    }
 
     try {
       const { data: fanData, error: fanError } = await supabase
@@ -272,21 +192,68 @@ export default function ChatView({ embedded = false }) {
     });
   }
 
-  async function loadCatalog() {
+  // 🔥 NEW: Handle PPV content selection
+  function handlePPVContentSelected(content) {
+    setSelectedPPVContent(content);
+    setShowPPVSelector(false);
+    setShowPPVSend(true);
+  }
+
+  // 🔥 NEW: Handle PPV send
+  async function handleSendPPV(ppvData) {
     const currentModelId = modelId || user?.user_metadata?.model_id;
     if (!currentModelId) return;
-    
+
+    setSending(true);
+    justSentMessage.current = true;
+
     try {
-      const { data, error } = await supabase
-        .from('catalog')
-        .select('*')
+      const { data: model } = await supabase
+        .from('models')
+        .select('of_account_id')
         .eq('model_id', currentModelId)
-        .order('created_at', { ascending: false });
+        .single();
+
+      if (!model?.of_account_id) {
+        alert('Model not connected to OnlyFans');
+        justSentMessage.current = false;
+        return;
+      }
+
+      const response = await fetch('/api/onlyfans/send-message', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          accountId: model.of_account_id,
+          modelId: currentModelId,
+          chatId: fanId,
+          text: ppvData.text,
+          mediaFiles: ppvData.mediaFiles,
+          price: ppvData.price,
+          replyToMessageId: replyingTo?.id || null,
+          replyToText: replyingTo?.message || null
+        })
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to send message');
+      }
+
+      // Reset states
+      setSelectedPPVContent([]);
+      setShowPPVSend(false);
+      setReplyingTo(null);
       
-      if (error) throw error;
-      setCatalog(data || []);
+      await new Promise(resolve => setTimeout(resolve, 500));
+      await loadFanAndMessages();
+      
     } catch (error) {
-      console.error('Error loading catalog:', error);
+      console.error('❌ Error sending PPV:', error);
+      alert('Error sending PPV: ' + error.message);
+      justSentMessage.current = false;
+    } finally {
+      setSending(false);
     }
   }
 
@@ -320,9 +287,8 @@ export default function ChatView({ embedded = false }) {
           modelId: currentModelId,
           chatId: fanId,
           text: newMessage,
-          mediaFiles: selectedContent ? [selectedContent] : [],
-          price: ppvPrice || 0,  // 🔥 PPV
-          // 🔥 REPLY
+          mediaFiles: [],
+          price: 0,
           replyToMessageId: replyingTo?.id || null,
           replyToText: replyingTo?.message || null
         })
@@ -334,10 +300,7 @@ export default function ChatView({ embedded = false }) {
       }
 
       setNewMessage('');
-      setSelectedContent(null);
-      setReplyingTo(null);     // 🔥 Limpiar reply
-      setPpvPrice(0);          // 🔥 Limpiar PPV
-      setShowPpvInput(false);  // 🔥 Ocultar input PPV
+      setReplyingTo(null);
       
       await new Promise(resolve => setTimeout(resolve, 500));
       await loadFanAndMessages();
@@ -400,70 +363,61 @@ Conversación:\n${JSON.stringify(conversacion, null, 2)}`
     }
   }
 
-  // 💰 NEW: Función para enviar PPV usando send-message
-  async function handleSendPPV(content) {
-    setSendingPPV(true);
-    
+  async function handleSaveNotes() {
+    setSavingNotes(true);
     try {
-      // Obtener account_id
-      const { data: modelData } = await supabase
-        .from('models')
-        .select('of_account_id')
-        .eq('model_id', modelId || user?.user_metadata?.model_id)
-        .single();
+      const { error } = await supabase
+        .from('fans')
+        .update({ notes: notesValue })
+        .eq('fan_id', fanId)
+        .eq('model_id', modelId || user?.user_metadata?.model_id);
 
-      if (!modelData?.of_account_id) {
-        throw new Error('Account not found');
-      }
-
-      // Usar el endpoint send-message que ya funciona
-      const response = await fetch('/api/onlyfans/send-message', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          accountId: modelData.of_account_id,
-          modelId: modelId || user?.user_metadata?.model_id,
-          chatId: fanId,
-          text: content.custom_message || `💎 ${content.title}`,
-          mediaFiles: content.of_media_ids.map(id => String(id)),
-          price: content.final_price
-        })
-      });
-
-      const result = await response.json();
-
-      if (result.success) {
-        alert('✅ PPV sent successfully!');
-        setShowPPVSendModal(false);
-        setSelectedPPVContent(null);
-        setAiSuggestedContent(null);
-        
-        // Guardar en content_offers para tracking
-        await supabase.from('content_offers').insert({
-          fan_id: fanId,
-          model_id: modelId || user?.user_metadata?.model_id,
-          catalog_id: content.catalog_id,
-          session_id: content.session_id || null,
-          step_number: content.part_number || null,
-          offered_at: new Date().toISOString(),
-          offer_method: 'manual_send',
-          offer_price: content.final_price,
-          status: 'pending',
-          custom_message: content.custom_message
-        });
-        
-        // Recargar mensajes
-        loadFanAndMessages();
-      } else {
-        throw new Error(result.error || 'Failed to send PPV');
-      }
+      if (error) throw error;
+      setFan(prev => ({ ...prev, notes: notesValue }));
     } catch (error) {
-      console.error('Error sending PPV:', error);
-      alert('❌ Error sending PPV: ' + error.message);
+      console.error('Error saving notes:', error);
+      alert('Error saving notes');
     } finally {
-      setSendingPPV(false);
+      setSavingNotes(false);
+    }
+  }
+
+  async function handleSaveChatterNotes() {
+    setSavingNotes(true);
+    try {
+      const { error } = await supabase
+        .from('fans')
+        .update({ chatter_notes: chatterNotesValue })
+        .eq('fan_id', fanId)
+        .eq('model_id', modelId || user?.user_metadata?.model_id);
+
+      if (error) throw error;
+      setFan(prev => ({ ...prev, chatter_notes: chatterNotesValue }));
+    } catch (error) {
+      console.error('Error saving chatter notes:', error);
+      alert('Error saving chatter notes');
+    } finally {
+      setSavingNotes(false);
+    }
+  }
+
+  async function handleSaveNickname() {
+    setSavingNotes(true);
+    try {
+      const { error } = await supabase
+        .from('fans')
+        .update({ nickname: nicknameValue })
+        .eq('fan_id', fanId)
+        .eq('model_id', modelId || user?.user_metadata?.model_id);
+
+      if (error) throw error;
+      setFan(prev => ({ ...prev, nickname: nicknameValue }));
+      setEditingNickname(false);
+    } catch (error) {
+      console.error('Error saving nickname:', error);
+      alert('Error saving nickname');
+    } finally {
+      setSavingNotes(false);
     }
   }
 
@@ -487,7 +441,7 @@ Conversación:\n${JSON.stringify(conversacion, null, 2)}`
         {!embedded && <Navbar />}
         <div className="flex items-center justify-center min-h-screen">
           <div className="text-center">
-            <div className="text-5xl mb-4">❌</div>
+            <div className="text-5xl mb-4">😕</div>
             <p className="text-gray-500 font-semibold">Fan not found</p>
             <button
               onClick={() => navigate('/dashboard')}
@@ -501,178 +455,182 @@ Conversación:\n${JSON.stringify(conversacion, null, 2)}`
     );
   }
 
-  const tierBadge = getTierBadge(fan.tier || 0);
+  const tierInfo = getTierBadge(fan.tier || 0);
 
   return (
     <>
       {!embedded && <Navbar />}
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-purple-50">
-        <div className="max-w-7xl mx-auto px-4 py-8">
-          <div className="bg-white rounded-xl shadow-lg p-6 mb-6">
+      <div className={`flex ${embedded ? 'h-full' : 'min-h-screen pt-16'}`}>
+        <div className="flex-1 flex flex-col">
+          {/* Header */}
+          <div className="bg-white border-b border-gray-200 px-6 py-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-4">
-                <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-purple-500 rounded-full flex items-center justify-center text-white text-2xl font-bold">
-                  {(fan.display_name || fan.name || 'F')[0].toUpperCase()}
-                </div>
+                {!embedded && (
+                  <button
+                    onClick={() => navigate('/dashboard')}
+                    className="text-gray-400 hover:text-gray-600"
+                  >
+                    ← Back
+                  </button>
+                )}
                 <div>
-                  <h1 className="text-2xl font-bold text-gray-800">
-                    {fan.display_name || fan.name || 'Fan'}
-                  </h1>
-                  <p className="text-sm text-gray-500">@{fan.of_username || fan.fan_id}</p>
+                  <div className="flex items-center gap-3">
+                    <h1 className="text-2xl font-bold text-gray-800">
+                      {fan.nickname || fan.of_username || 'Fan'}
+                    </h1>
+                    <span className={`px-3 py-1 rounded-full text-sm font-semibold ${tierInfo.color}`}>
+                      {tierInfo.emoji} {tierInfo.label}
+                    </span>
+                  </div>
+                  <p className="text-sm text-gray-500">@{fan.of_username}</p>
                 </div>
-                <span className={`ml-4 px-3 py-1 rounded-full text-sm font-semibold ${tierBadge.color}`}>
-                  {tierBadge.emoji} {tierBadge.label}
-                </span>
               </div>
-              
-              <div className="flex gap-4">
-                <div className="text-center">
-                  <p className="text-2xl font-bold text-green-600">${fan.spent_total || 0}</p>
-                  <p className="text-xs text-gray-500">Total Spent</p>
+
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => setShowIaPanel(!showIaPanel)}
+                  className="px-4 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600 font-semibold"
+                >
+                  🤖 AI Analysis
+                </button>
+                <button
+                  onClick={() => setShowNotesSidebar(!showNotesSidebar)}
+                  className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 font-semibold"
+                >
+                  📝 Notes
+                </button>
+              </div>
+            </div>
+
+            {/* Stats */}
+            <div className="grid grid-cols-4 gap-4 mt-4">
+              <div className="bg-green-50 rounded-lg p-3 border border-green-200">
+                <div className="text-2xl font-bold text-green-600">
+                  ${fanStats.totalTips.toFixed(2)}
                 </div>
-                <div className="text-center">
-                  <p className="text-2xl font-bold text-blue-600">{fanStats.tipsCount}</p>
-                  <p className="text-xs text-gray-500">Tips</p>
+                <div className="text-sm text-gray-600">Tips ({fanStats.tipsCount})</div>
+              </div>
+              <div className="bg-purple-50 rounded-lg p-3 border border-purple-200">
+                <div className="text-2xl font-bold text-purple-600">
+                  ${fanStats.ppvUnlocked.toFixed(2)}
                 </div>
-                <div className="text-center">
-                  <p className="text-2xl font-bold text-purple-600">{fanStats.ppvCount}</p>
-                  <p className="text-xs text-gray-500">PPV</p>
+                <div className="text-sm text-gray-600">PPV ({fanStats.ppvCount})</div>
+              </div>
+              <div className="bg-blue-50 rounded-lg p-3 border border-blue-200">
+                <div className="text-2xl font-bold text-blue-600">
+                  ${(fanStats.totalTips + fanStats.ppvUnlocked).toFixed(2)}
+                </div>
+                <div className="text-sm text-gray-600">Total Revenue</div>
+              </div>
+              <div className="bg-gray-50 rounded-lg p-3 border border-gray-200">
+                <div className="text-sm font-semibold text-gray-700">Last Activity</div>
+                <div className="text-xs text-gray-500">
+                  {fanStats.lastInteraction 
+                    ? new Date(fanStats.lastInteraction).toLocaleDateString()
+                    : 'Never'}
                 </div>
               </div>
             </div>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <div className={showNotesSidebar ? 'lg:col-span-2' : 'lg:col-span-3'}>
-              <div className="bg-white rounded-xl shadow-lg p-6 flex flex-col h-[600px]">
+          <div className="flex-1 flex gap-4 p-6">
+            {/* AI Panel */}
+            {showIaPanel && (
+              <div className="w-80 bg-gradient-to-br from-purple-50 to-pink-50 rounded-xl shadow-lg p-6 border border-purple-200">
+                <h2 className="text-xl font-bold text-gray-800 mb-4">🤖 AI Assistant</h2>
+                
                 <button
                   onClick={analizarConIA}
                   disabled={iaLoading}
-                  className="mb-4 w-full px-4 py-2 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-lg hover:from-purple-600 hover:to-pink-600 font-semibold disabled:opacity-50"
+                  className="w-full px-4 py-3 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-lg hover:from-purple-600 hover:to-pink-600 font-semibold disabled:opacity-50 mb-4"
                 >
-                  {iaLoading ? '🤖 Analyzing...' : '🤖 Analyze with AI'}
+                  {iaLoading ? '⏳ Analyzing...' : '🔍 Analyze Conversation'}
                 </button>
 
-                {iaAnalisis && showIaPanel && (
-                  <div className="mb-4 p-4 bg-purple-50 rounded-lg border-2 border-purple-200">
-                    <div className="flex justify-between items-start mb-2">
-                      <h3 className="font-bold text-purple-700">💡 AI Analysis</h3>
-                      <button
-                        onClick={() => setShowIaPanel(false)}
-                        className="text-purple-400 hover:text-purple-600"
-                      >
-                        ✕
-                      </button>
-                    </div>
-                    <div className="text-sm text-gray-700 whitespace-pre-wrap">{iaAnalisis}</div>
+                {iaAnalisis && (
+                  <div className="bg-white rounded-lg p-4 border border-purple-200 max-h-96 overflow-y-auto">
+                    <pre className="text-sm text-gray-700 whitespace-pre-wrap">{iaAnalisis}</pre>
                   </div>
                 )}
+              </div>
+            )}
 
-                <div className="flex-1 overflow-y-auto mb-4 space-y-4">
-                  {messages.map((msg) => (
+            {/* Chat */}
+            <div className="flex-1 bg-white rounded-xl shadow-lg flex flex-col">
+              <div className="flex-1 overflow-y-auto p-6 space-y-4">
+                {messages.map((msg) => (
+                  <div
+                    key={msg.id}
+                    className={`flex ${msg.from === 'model' ? 'justify-end' : 'justify-start'}`}
+                  >
                     <div
-                      key={msg.id}
-                      className={`flex ${msg.from === 'model' ? 'justify-end' : 'justify-start'}`}
+                      className={`max-w-[70%] rounded-2xl px-4 py-3 ${
+                        msg.from === 'model'
+                          ? 'bg-blue-500 text-white'
+                          : 'bg-gray-100 text-gray-800'
+                      }`}
                     >
-                      <div className={`flex flex-col max-w-[70%] ${msg.from === 'model' ? 'items-end' : 'items-start'}`}>
-                        <span className={`text-xs font-semibold mb-1 ${
-                          msg.from === 'model' ? 'text-blue-600' : 'text-gray-500'
-                        }`}>
-                          {msg.from === 'model' ? '💙 You' : '👤 ' + (fan.display_name || fan.name || 'Fan')}
-                        </span>
-                        
-                        <div
-                          className={`px-4 py-2 rounded-lg relative group ${
-                            msg.from === 'model'
-                              ? 'bg-blue-500 text-white'
-                              : 'bg-gray-100 text-gray-800'
-                          }`}
-                        >
-                          {/* 🔥 REPLY CONTEXT */}
-                          {msg.reply_to_text && (
-                            <div className={`text-xs p-2 rounded mb-2 border-l-2 ${
-                              msg.from === 'model' 
-                                ? 'bg-blue-600 border-blue-300' 
-                                : 'bg-gray-200 border-gray-400'
-                            }`}>
-                              <div className="opacity-70 mb-1">↩️ Respondiendo a:</div>
-                              <div className="italic">
-                                {msg.reply_to_text.slice(0, 60)}{msg.reply_to_text.length > 60 ? '...' : ''}
-                              </div>
-                            </div>
-                          )}
-
-                          {msg.media_url && (
-                            <>
-                              {msg.media_type === 'video' ? (
-                                <div className="relative mb-2">
-                                  <video 
-                                    controls 
-                                    poster={msg.media_thumb}
-                                    className="rounded max-w-full max-h-64 bg-black"
-                                    preload="metadata"
-                                  >
-                                    <source src={msg.media_url} type="video/mp4" />
-                                    Tu navegador no soporta reproducción de video
-                                  </video>
-                                </div>
-                              ) : msg.media_type === 'gif' ? (
-                                <img 
-                                  src={msg.media_url} 
-                                  alt="gif" 
-                                  className="rounded mb-2 max-w-full max-h-64 object-contain cursor-pointer"
-                                  onClick={() => window.open(msg.media_url, '_blank')}
-                                />
-                              ) : (
-                                <img 
-                                  src={msg.media_url} 
-                                  alt="photo" 
-                                  className="rounded mb-2 max-w-full max-h-64 object-cover cursor-pointer hover:opacity-90"
-                                  onClick={() => window.open(msg.media_url, '_blank')}
-                                />
-                              )}
-                            </>
-                          )}
-                          <p className="text-sm">{msg.message}</p>
-                          
-                          {/* 🔥 PPV BADGE */}
-                          {msg.amount > 0 && (
-                            <div className="bg-green-500 text-white text-xs px-2 py-1 rounded-full inline-block mt-1">
-                              💰 ${msg.amount}
-                            </div>
-                          )}
-
-                          <div className="flex items-center justify-end gap-2 text-xs opacity-70 mt-1">
-                            <span>{new Date(msg.ts).toLocaleTimeString()}</span>
-                            {msg.from === 'model' && (
-                              <span className={msg.read ? 'text-blue-200' : 'text-white/60'}>
-                                {msg.read ? '✓✓' : '✓'}
-                              </span>
-                            )}
+                      {msg.reply_to_text && (
+                        <div className="mb-2 pb-2 border-b border-opacity-30 border-white">
+                          <div className="text-xs opacity-75">↩️ Reply to:</div>
+                          <div className="text-xs italic opacity-90">
+                            {msg.reply_to_text.slice(0, 50)}...
                           </div>
+                        </div>
+                      )}
 
-                          {/* 🔥 BOTÓN REPLY */}
-                          {msg.from === 'fan' && (
-                            <button
-                              onClick={() => setReplyingTo(msg)}
-                              className="absolute -bottom-8 right-0 opacity-0 group-hover:opacity-100 transition-opacity bg-gray-700 text-white text-xs px-3 py-1 rounded-full hover:bg-gray-600"
-                            >
-                              ↩️ Reply
-                            </button>
+                      <p className="text-sm">{msg.message}</p>
+
+                      {msg.media_url && (
+                        <div className="mt-2">
+                          {msg.media_type === 'video' ? (
+                            <video
+                              src={msg.media_url}
+                              controls
+                              className="rounded-lg max-w-full"
+                            />
+                          ) : (
+                            <img
+                              src={msg.media_url}
+                              alt="Media"
+                              className="rounded-lg max-w-full"
+                            />
+                          )}
+                          {msg.amount > 0 && (
+                            <div className="mt-1 text-xs">
+                              💰 PPV: ${msg.amount}
+                            </div>
                           )}
                         </div>
-                      </div>
-                    </div>
-                  ))}
-                  <div ref={messagesEndRef} />
-                </div>
+                      )}
 
-                {/* 🔥 REPLY PREVIEW */}
+                      <div className="text-xs opacity-75 mt-1">
+                        {new Date(msg.ts).toLocaleTimeString()}
+                        {msg.from === 'model' && msg.read && ' • Read ✓'}
+                      </div>
+
+                      {msg.from === 'fan' && (
+                        <button
+                          onClick={() => setReplyingTo(msg)}
+                          className="text-xs underline opacity-75 hover:opacity-100 mt-1"
+                        >
+                          Reply
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                ))}
+                <div ref={messagesEndRef} />
+              </div>
+
+              {/* Input Area */}
+              <div className="border-t border-gray-200 p-4">
                 {replyingTo && (
-                  <div className="mb-2 bg-blue-50 border-l-4 border-blue-500 p-3 rounded flex justify-between items-start">
+                  <div className="mb-3 bg-blue-50 border-l-4 border-blue-500 p-3 rounded flex items-start justify-between">
                     <div className="flex-1">
-                      <div className="text-xs text-blue-600 font-semibold mb-1">
-                        ↩️ Respondiendo a:
+                      <div className="text-xs font-semibold text-blue-700 mb-1">
+                        ↩️ Replying to:
                       </div>
                       <div className="text-sm text-gray-700">
                         {replyingTo.message.slice(0, 80)}{replyingTo.message.length > 80 ? '...' : ''}
@@ -687,44 +645,23 @@ Conversación:\n${JSON.stringify(conversacion, null, 2)}`
                   </div>
                 )}
 
-                {catalog.length > 0 && (
-                  <div className="mb-3">
-                    <select
-                      value={selectedContent || ''}
-                      onChange={(e) => setSelectedContent(e.target.value)}
-                      className="w-full px-3 py-2 border rounded-lg text-sm"
-                    >
-                      <option value="">📎 Select content from catalog</option>
-                      {catalog.map((item) => (
-                        <option key={item.id} value={item.media_url}>
-                          {item.title || item.media_type}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                )}
-
                 <div className="flex gap-2 items-end">
                   <input
                     type="text"
                     value={newMessage}
                     onChange={(e) => setNewMessage(e.target.value)}
                     onKeyPress={(e) => e.key === 'Enter' && !sending && enviarMensaje()}
-                    placeholder={replyingTo ? "Escribe tu respuesta..." : "Type your message..."}
+                    placeholder={replyingTo ? "Write your reply..." : "Type your message..."}
                     disabled={sending}
                     className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
                   />
                   
-                  {/* 🔥 BOTÓN PPV */}
+                  {/* 🔥 NEW PPV BUTTON */}
                   <button
-                    onClick={() => setShowPpvInput(!showPpvInput)}
-                    className={`px-4 py-2 rounded-lg font-semibold transition-all ${
-                      showPpvInput 
-                        ? 'bg-green-500 text-white' 
-                        : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                    }`}
+                    onClick={() => setShowPPVSelector(true)}
+                    className="px-4 py-2 bg-gradient-to-r from-green-500 to-emerald-500 text-white rounded-lg hover:from-green-600 hover:to-emerald-600 font-semibold transition-all"
                   >
-                    💰 {ppvPrice > 0 ? `$${ppvPrice}` : 'PPV'}
+                    💰 PPV
                   </button>
 
                   <button
@@ -735,48 +672,14 @@ Conversación:\n${JSON.stringify(conversacion, null, 2)}`
                     {sending ? '⏳' : 'Send'}
                   </button>
                 </div>
-
-                {/* 🔥 PPV INPUT */}
-                {showPpvInput && (
-                  <div className="mt-2 bg-green-50 border border-green-200 rounded-lg p-3">
-                    <label className="text-sm font-semibold text-green-700 mb-2 block">
-                      💰 Precio PPV (Pay-Per-View):
-                    </label>
-                    <div className="flex gap-2 items-center">
-                      <span className="text-gray-600">$</span>
-                      <input
-                        type="number"
-                        min="0"
-                        step="1"
-                        value={ppvPrice}
-                        onChange={(e) => setPpvPrice(parseFloat(e.target.value) || 0)}
-                        placeholder="10"
-                        className="flex-1 px-3 py-2 border border-green-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
-                      />
-                      <button
-                        onClick={() => {
-                          setPpvPrice(0);
-                          setShowPpvInput(false);
-                        }}
-                        className="text-gray-400 hover:text-gray-600"
-                      >
-                        ✕
-                      </button>
-                    </div>
-                    <p className="text-xs text-gray-500 mt-2">
-                      {ppvPrice > 0 
-                        ? `El fan deberá pagar $${ppvPrice} para ver este contenido` 
-                        : 'Ingresa el precio para bloquear el contenido'}
-                    </p>
-                  </div>
-                )}
               </div>
             </div>
 
+            {/* Notes Sidebar */}
             {showNotesSidebar && (
-              <div className="bg-white rounded-xl shadow-lg p-6 max-h-[700px] overflow-y-auto">
-                <div className="flex items-center justify-between mb-4 pb-3 border-b sticky top-0 bg-white">
-                  <h3 className="font-bold text-lg">👤 Fan Profile</h3>
+              <div className="bg-white rounded-xl shadow-lg p-6 max-h-[700px] overflow-y-auto" style={{ width: '320px' }}>
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="text-xl font-bold text-gray-800">📝 Notes</h2>
                   <button
                     onClick={() => setShowNotesSidebar(false)}
                     className="text-gray-400 hover:text-gray-600"
@@ -785,38 +688,34 @@ Conversación:\n${JSON.stringify(conversacion, null, 2)}`
                   </button>
                 </div>
 
-                <div className="mb-4">
-                  <p className="text-xs text-gray-500 mb-1">OnlyFans Username</p>
-                  <p className="text-sm font-mono bg-gray-50 px-3 py-2 rounded break-all">
-                    {fan.of_username || fan.fan_id}
-                  </p>
-                </div>
-
-                <div className="mb-4">
-                  <p className="text-xs text-gray-500 mb-1">✏️ Nickname</p>
+                {/* Nickname */}
+                <div className="mb-6">
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    Nickname
+                  </label>
                   {editingNickname ? (
                     <div className="space-y-2">
                       <input
                         type="text"
                         value={nicknameValue}
                         onChange={(e) => setNicknameValue(e.target.value)}
-                        className="w-full px-3 py-2 border rounded text-sm"
-                        placeholder="e.g., John VIP"
-                        autoFocus
+                        className="w-full px-3 py-2 border rounded text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                        placeholder="Give this fan a nickname..."
                       />
                       <div className="flex gap-2">
                         <button
                           onClick={handleSaveNickname}
-                          className="flex-1 px-3 py-2 bg-blue-500 text-white rounded text-sm hover:bg-blue-600"
+                          disabled={savingNotes}
+                          className="flex-1 px-3 py-1 bg-blue-500 text-white rounded text-sm hover:bg-blue-600 disabled:opacity-50"
                         >
-                          💾 Save
+                          Save
                         </button>
                         <button
                           onClick={() => {
-                            setEditingNickname(false)
-                            setNicknameValue(fan.display_name || '')
+                            setEditingNickname(false);
+                            setNicknameValue(fan.nickname || '');
                           }}
-                          className="px-3 py-2 bg-gray-200 rounded text-sm hover:bg-gray-300"
+                          className="flex-1 px-3 py-1 bg-gray-200 text-gray-700 rounded text-sm hover:bg-gray-300"
                         >
                           Cancel
                         </button>
@@ -824,44 +723,28 @@ Conversación:\n${JSON.stringify(conversacion, null, 2)}`
                     </div>
                   ) : (
                     <div
-                      onClick={() => setEditingNickname(true)}
-                      className="px-3 py-2 bg-gray-50 rounded cursor-pointer hover:bg-gray-100 text-sm border border-dashed border-gray-300"
+                      onClick={() => {
+                        setEditingNickname(true);
+                        setNicknameValue(fan.nickname || '');
+                      }}
+                      className="px-3 py-2 bg-gray-50 border rounded text-sm cursor-pointer hover:bg-gray-100"
                     >
-                      {fan.display_name || <span className="text-gray-400 italic">Click to add nickname</span>}
+                      {fan.nickname || 'Click to add nickname...'}
                     </div>
                   )}
                 </div>
 
-                <div className="grid grid-cols-2 gap-3 mb-4">
-                  <div>
-                    <p className="text-xs text-gray-500 mb-1">Tier</p>
-                    <div className={`px-3 py-2 rounded text-center text-sm font-semibold ${tierBadge.color}`}>
-                      {tierBadge.emoji} {tierBadge.label}
-                    </div>
-                  </div>
-                  <div>
-                    <p className="text-xs text-gray-500 mb-1">Total Spent</p>
-                    <div className="px-3 py-2 bg-green-50 text-green-700 rounded text-center text-sm font-bold">
-                      ${fan.spent_total || 0}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="mb-4 pb-4 border-b">
-                  <p className="text-xs text-gray-500 mb-1">📅 Last seen</p>
-                  <p className="text-sm text-gray-700">
-                    {fan.last_seen ? new Date(fan.last_seen).toLocaleString() : 'Unknown'}
-                  </p>
-                </div>
-
-                <div className="mb-4">
-                  <p className="text-sm font-semibold mb-2">📝 General Notes</p>
+                {/* Personal Notes */}
+                <div className="mb-6">
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    💭 Personal Notes
+                  </label>
                   <textarea
                     value={notesValue}
                     onChange={(e) => setNotesValue(e.target.value)}
                     className="w-full px-3 py-2 border rounded text-sm resize-none focus:ring-2 focus:ring-blue-500 focus:outline-none"
                     rows="4"
-                    placeholder="Preferences, birthday, family info, etc."
+                    placeholder="What they like, preferences, personal info, etc."
                   />
                   <button
                     onClick={handleSaveNotes}
@@ -872,8 +755,11 @@ Conversación:\n${JSON.stringify(conversacion, null, 2)}`
                   </button>
                 </div>
 
+                {/* Chatter Tips */}
                 <div>
-                  <p className="text-sm font-semibold mb-2">💡 Chatter Tips</p>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    💡 Chatter Tips
+                  </label>
                   <textarea
                     value={chatterNotesValue}
                     onChange={(e) => setChatterNotesValue(e.target.value)}
@@ -901,57 +787,29 @@ Conversación:\n${JSON.stringify(conversacion, null, 2)}`
               📝
             </button>
           )}
-
-          {/* 💰 Botón flotante Send PPV */}
-          <button
-            onClick={() => setShowPPVSelector(true)}
-            className="fixed bottom-24 right-6 w-14 h-14 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-full shadow-lg hover:shadow-xl transition-all flex items-center justify-center text-2xl z-40"
-            title="Send PPV Content"
-          >
-            💰
-          </button>
-
-          {/* 💰 PPV Modals */}
-          <PPVSelectorModal
-            isOpen={showPPVSelector}
-            onClose={() => setShowPPVSelector(false)}
-            onSelect={(content) => {
-              setSelectedPPVContent(content)
-              setShowPPVSelector(false)
-              setShowPPVSendModal(true)
-            }}
-            modelId={modelId || user?.user_metadata?.model_id}
-            fanTier={fan?.tier || 0}
-          />
-
-          <PPVSendModal
-            isOpen={showPPVSendModal}
-            onClose={() => {
-              setShowPPVSendModal(false)
-              setSelectedPPVContent(null)
-            }}
-            onConfirm={handleSendPPV}
-            content={selectedPPVContent}
-            fanName={fan?.display_name || fan?.username || 'Fan'}
-            fanTier={fan?.tier || 0}
-            sending={sendingPPV}
-          />
-
-          {/* 🤖 AI Suggested PPV (aparece en el área de mensajes) */}
-          {aiSuggestedContent && (
-            <div className="fixed bottom-32 right-20 max-w-md z-30">
-              <AISuggestedPPV
-                content={aiSuggestedContent}
-                onSend={(content) => {
-                  setSelectedPPVContent(content)
-                  setShowPPVSendModal(true)
-                }}
-                onDismiss={() => setAiSuggestedContent(null)}
-              />
-            </div>
-          )}
         </div>
       </div>
+
+      {/* 🔥 PPV MODALS */}
+      <PPVSelectorModal
+        isOpen={showPPVSelector}
+        onClose={() => setShowPPVSelector(false)}
+        modelId={modelId || user?.user_metadata?.model_id}
+        onSelectContent={handlePPVContentSelected}
+      />
+
+      <PPVSendModal
+        isOpen={showPPVSend}
+        onClose={() => {
+          setShowPPVSend(false);
+          setSelectedPPVContent([]);
+        }}
+        selectedContent={selectedPPVContent}
+        fanTier={fan?.tier || 0}
+        fanId={fanId}
+        modelId={modelId || user?.user_metadata?.model_id}
+        onSendPPV={handleSendPPV}
+      />
     </>
   );
 }

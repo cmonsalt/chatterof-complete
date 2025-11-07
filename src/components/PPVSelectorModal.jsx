@@ -1,341 +1,297 @@
-import { useState, useEffect } from 'react'
-import { createClient } from '@supabase/supabase-js'
+import { useState, useEffect } from 'react';
+import { supabase } from '../lib/supabase';
 
-const supabase = createClient(
-  import.meta.env.VITE_SUPABASE_URL,
-  import.meta.env.VITE_SUPABASE_ANON_KEY
-)
-
-export default function PPVSelectorModal({ isOpen, onClose, onSelect, modelId, fanTier = 0 }) {
-  const [activeTab, setActiveTab] = useState('sessions')
-  const [sessions, setSessions] = useState([])
-  const [singles, setSingles] = useState([])
-  const [loading, setLoading] = useState(true)
+export default function PPVSelectorModal({ 
+  isOpen, 
+  onClose, 
+  modelId, 
+  onSelectContent 
+}) {
+  const [catalog, setCatalog] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [filter, setFilter] = useState('all'); // 'all', 'photo', 'video'
+  const [selectedItems, setSelectedItems] = useState([]);
+  const [previewItem, setPreviewItem] = useState(null);
 
   useEffect(() => {
-    if (isOpen) {
-      loadCatalog()
+    if (isOpen && modelId) {
+      loadCatalog();
     }
-  }, [isOpen, modelId])
+  }, [isOpen, modelId]);
 
-  const loadCatalog = async () => {
-    setLoading(true)
+  async function loadCatalog() {
+    setLoading(true);
     try {
       const { data, error } = await supabase
         .from('catalog')
         .select('*')
         .eq('model_id', modelId)
-        .order('created_at', { ascending: false })
-
-      if (error) throw error
-
-      // Agrupar sessions
-      const sessionsMap = new Map()
-      const singlesArray = []
-
-      data.forEach(item => {
-        if (item.session_id && item.step_number != null) {
-          if (!sessionsMap.has(item.session_id)) {
-            sessionsMap.set(item.session_id, {
-              session_id: item.session_id,
-              session_name: item.session_name,
-              session_description: item.session_description,
-              parts: []
-            })
-          }
-          sessionsMap.get(item.session_id).parts.push(item)
-        }
-        
-        if (item.is_single) {
-          singlesArray.push(item)
-        }
-      })
-
-      sessionsMap.forEach(session => {
-        session.parts.sort((a, b) => (a.step_number || 0) - (b.step_number || 0))
-      })
-
-      setSessions(Array.from(sessionsMap.values()))
-      setSingles(singlesArray)
-
+        .eq('parent_type', 'single') // Solo singles por ahora
+        .order('created_at', { ascending: false });
+      
+      if (error) throw error;
+      setCatalog(data || []);
     } catch (error) {
-      console.error('Error loading catalog:', error)
+      console.error('Error loading catalog:', error);
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
   }
 
-  const calculatePrice = (basePrice) => {
-    const multipliers = {
-      0: 1.0,   // Free
-      1: 1.2,   // VIP
-      2: 1.5    // Whale
-    }
-    return Math.round(basePrice * (multipliers[fanTier] || 1.0))
+  function toggleSelection(item) {
+    setSelectedItems(prev => {
+      const exists = prev.find(i => i.id === item.id);
+      if (exists) {
+        return prev.filter(i => i.id !== item.id);
+      } else {
+        return [...prev, item];
+      }
+    });
   }
 
-  const getNivelBadge = (nivel) => {
-    const badges = {
-      1: { label: '🟢 Tease', color: 'bg-green-100 text-green-800' },
-      2: { label: '🟢 Soft', color: 'bg-green-100 text-green-800' },
-      3: { label: '🟢 Innocent', color: 'bg-green-100 text-green-800' },
-      4: { label: '🟡 Bikini', color: 'bg-yellow-100 text-yellow-800' },
-      5: { label: '🟡 Lingerie', color: 'bg-yellow-100 text-yellow-800' },
-      6: { label: '🟡 Topless', color: 'bg-yellow-100 text-yellow-800' },
-      7: { label: '🟠 Nude', color: 'bg-orange-100 text-orange-800' },
-      8: { label: '🟠 Solo Play', color: 'bg-orange-100 text-orange-800' },
-      9: { label: '🔴 Explicit', color: 'bg-red-100 text-red-800' },
-      10: { label: '⚫ Hardcore', color: 'bg-gray-900 text-white' }
-    }
-    return badges[nivel] || badges[1]
+  function handleConfirm() {
+    if (selectedItems.length === 0) return;
+    onSelectContent(selectedItems);
+    onClose();
   }
 
-  if (!isOpen) return null
+  const filteredCatalog = filter === 'all' 
+    ? catalog 
+    : catalog.filter(item => item.file_type === filter);
+
+  if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-xl shadow-2xl w-full max-w-5xl max-h-[90vh] overflow-hidden flex flex-col">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-xl shadow-2xl max-w-6xl w-full max-h-[90vh] overflow-hidden flex flex-col">
         
         {/* Header */}
-        <div className="bg-gradient-to-r from-purple-600 to-pink-600 text-white p-6">
+        <div className="px-6 py-4 border-b border-gray-200 bg-gradient-to-r from-purple-500 to-pink-500">
           <div className="flex items-center justify-between">
             <div>
-              <h2 className="text-2xl font-bold">💰 Select PPV Content</h2>
-              <p className="text-sm text-purple-100 mt-1">
-                Choose content to send to fan
+              <h2 className="text-2xl font-bold text-white">💰 Select PPV Content</h2>
+              <p className="text-purple-100 text-sm mt-1">
+                Choose content to send as Pay-Per-View
               </p>
             </div>
             <button
               onClick={onClose}
-              className="text-white hover:bg-white/20 rounded-lg p-2 transition-all"
+              className="text-white hover:text-gray-200 text-3xl font-bold transition-colors"
             >
-              ✕
+              ×
             </button>
           </div>
         </div>
 
-        {/* Tabs */}
-        <div className="border-b border-gray-200 px-6">
-          <div className="flex gap-4">
+        {/* Filters */}
+        <div className="px-6 py-4 border-b border-gray-200 bg-gray-50">
+          <div className="flex items-center gap-3">
+            <span className="text-sm font-semibold text-gray-700">Filter:</span>
             <button
-              onClick={() => setActiveTab('sessions')}
-              className={`pb-3 px-4 font-semibold border-b-2 transition-colors ${
-                activeTab === 'sessions'
-                  ? 'border-purple-600 text-purple-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700'
+              onClick={() => setFilter('all')}
+              className={`px-4 py-2 rounded-lg font-semibold transition-all ${
+                filter === 'all'
+                  ? 'bg-purple-500 text-white'
+                  : 'bg-white text-gray-700 hover:bg-gray-100'
               }`}
             >
-              📁 Sessions ({sessions.length})
+              All ({catalog.length})
             </button>
             <button
-              onClick={() => setActiveTab('singles')}
-              className={`pb-3 px-4 font-semibold border-b-2 transition-colors ${
-                activeTab === 'singles'
-                  ? 'border-purple-600 text-purple-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700'
+              onClick={() => setFilter('photo')}
+              className={`px-4 py-2 rounded-lg font-semibold transition-all ${
+                filter === 'photo'
+                  ? 'bg-purple-500 text-white'
+                  : 'bg-white text-gray-700 hover:bg-gray-100'
               }`}
             >
-              💎 Singles ({singles.length})
+              📸 Photos ({catalog.filter(i => i.file_type === 'photo').length})
+            </button>
+            <button
+              onClick={() => setFilter('video')}
+              className={`px-4 py-2 rounded-lg font-semibold transition-all ${
+                filter === 'video'
+                  ? 'bg-purple-500 text-white'
+                  : 'bg-white text-gray-700 hover:bg-gray-100'
+              }`}
+            >
+              🎥 Videos ({catalog.filter(i => i.file_type === 'video').length})
             </button>
           </div>
-        </div>
 
-        {/* Content */}
-        <div className="flex-1 overflow-auto p-6">
-          {loading ? (
-            <div className="flex items-center justify-center py-12">
-              <div className="text-center">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600 mx-auto mb-4"></div>
-                <p className="text-gray-600">Loading content...</p>
-              </div>
+          {selectedItems.length > 0 && (
+            <div className="mt-3 bg-green-50 border border-green-200 rounded-lg p-3">
+              <p className="text-sm font-semibold text-green-700">
+                ✅ {selectedItems.length} item{selectedItems.length > 1 ? 's' : ''} selected
+              </p>
             </div>
-          ) : activeTab === 'sessions' ? (
-            <div className="space-y-4">
-              {sessions.length === 0 ? (
-                <div className="text-center py-12 text-gray-500">
-                  <p className="text-lg">📁 No sessions yet</p>
-                  <p className="text-sm mt-2">Create sessions in Vault tab</p>
-                </div>
-              ) : (
-                sessions.map(session => (
-                  <div
-                    key={session.session_id}
-                    className="border-2 border-purple-200 rounded-lg overflow-hidden bg-white"
-                  >
-                    <div className="bg-gradient-to-r from-purple-50 to-pink-50 p-4">
-                      <h3 className="text-lg font-bold text-gray-900 mb-1">
-                        📁 {session.session_name}
-                      </h3>
-                      <p className="text-sm text-gray-600">
-                        {session.parts.length} parts • {session.session_description}
-                      </p>
-                    </div>
+          )}
+        </div>
 
-                    <div className="p-4 space-y-3">
-                      {session.parts.map(part => {
-                        const nivelBadge = getNivelBadge(part.nivel || 1)
-                        const finalPrice = calculatePrice(part.base_price)
-                        
-                        return (
-                          <div
-                            key={part.id}
-                            onClick={() => onSelect({
-                              type: 'session',
-                              session_id: session.session_id,
-                              session_name: session.session_name,
-                              part_number: part.step_number,
-                              catalog_id: part.id,
-                              title: part.title,
-                              base_price: part.base_price,
-                              final_price: finalPrice,
-                              nivel: part.nivel,
-                              media_thumb: part.media_thumb,
-                              media_url: part.media_url,
-                              of_media_ids: part.of_media_ids || [part.of_media_id],
-                              description: part.description || session.session_description
-                            })}
-                            className="flex items-center gap-4 p-3 border border-gray-200 rounded-lg hover:border-purple-500 hover:shadow-md transition-all cursor-pointer group"
-                          >
-                            {/* Thumbnail */}
-                            <div className="w-24 h-24 rounded-lg overflow-hidden bg-gray-100 flex-shrink-0">
-                              {part.media_thumb ? (
-                                <img
-                                  src={part.media_thumb}
-                                  alt={part.title}
-                                  className="w-full h-full object-cover"
-                                />
-                              ) : (
-                                <div className="w-full h-full flex items-center justify-center text-gray-400 text-2xl">
-                                  {part.file_type === 'video' ? '🎥' : '📷'}
-                                </div>
-                              )}
-                            </div>
-
-                            {/* Info */}
-                            <div className="flex-1">
-                              <div className="flex items-start justify-between mb-2">
-                                <div>
-                                  <p className="font-semibold text-gray-900 mb-1">
-                                    Part {part.step_number}: {part.title}
-                                  </p>
-                                  <div className="flex items-center gap-2 text-sm">
-                                    <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${nivelBadge.color}`}>
-                                      {nivelBadge.label}
-                                    </span>
-                                    <span className="text-gray-500">
-                                      {part.of_media_ids?.length || 1} media(s)
-                                    </span>
-                                  </div>
-                                </div>
-                                <div className="text-right">
-                                  <p className="text-sm text-gray-500">Base: ${part.base_price}</p>
-                                  <p className="text-lg font-bold text-purple-600">
-                                    ${finalPrice}
-                                  </p>
-                                </div>
-                              </div>
-                            </div>
-
-                            {/* Select indicator */}
-                            <div className="text-purple-600 opacity-0 group-hover:opacity-100 transition-all">
-                              →
-                            </div>
-                          </div>
-                        )
-                      })}
-                    </div>
-                  </div>
-                ))
-              )}
+        {/* Content Grid */}
+        <div className="flex-1 overflow-y-auto p-6">
+          {loading ? (
+            <div className="flex flex-col items-center justify-center h-64">
+              <div className="text-5xl mb-4">⏳</div>
+              <p className="text-gray-500 font-semibold">Loading content...</p>
+            </div>
+          ) : filteredCatalog.length === 0 ? (
+            <div className="flex flex-col items-center justify-center h-64">
+              <div className="text-5xl mb-4">📭</div>
+              <p className="text-gray-500 font-semibold">No content available</p>
+              <p className="text-gray-400 text-sm mt-2">
+                Sync your vault first to see content here
+              </p>
             </div>
           ) : (
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-              {singles.length === 0 ? (
-                <div className="col-span-full text-center py-12 text-gray-500">
-                  <p className="text-lg">💎 No singles yet</p>
-                  <p className="text-sm mt-2">Add singles in Vault tab</p>
-                </div>
-              ) : (
-                singles.map(single => {
-                  const nivelBadge = getNivelBadge(single.nivel || 1)
-                  const finalPrice = calculatePrice(single.base_price)
-                  
-                  return (
-                    <div
-                      key={single.id}
-                      onClick={() => onSelect({
-                        type: 'single',
-                        catalog_id: single.id,
-                        title: single.title,
-                        base_price: single.base_price,
-                        final_price: finalPrice,
-                        nivel: single.nivel,
-                        media_thumb: single.media_thumb,
-                        media_url: single.media_url,
-                        of_media_ids: [single.of_media_id],
-                        description: single.description,
-                        keywords: single.keywords
-                      })}
-                      className="border-2 border-gray-200 rounded-lg overflow-hidden hover:border-green-500 hover:shadow-lg transition-all cursor-pointer group"
-                    >
-                      {/* Thumbnail */}
-                      <div className="aspect-square bg-gray-100 relative">
-                        {single.media_thumb ? (
-                          <img
-                            src={single.media_thumb}
-                            alt={single.title}
-                            className="w-full h-full object-cover"
-                          />
-                        ) : (
-                          <div className="w-full h-full flex items-center justify-center text-gray-400 text-4xl">
-                            {single.file_type === 'video' ? '🎥' : '📷'}
-                          </div>
-                        )}
-                        
-                        {/* Hover overlay */}
-                        <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-40 transition-all flex items-center justify-center">
-                          <span className="text-white font-semibold opacity-0 group-hover:opacity-100 transition-all">
-                            ✓ Select
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+              {filteredCatalog.map((item) => {
+                const isSelected = selectedItems.find(i => i.id === item.id);
+                return (
+                  <div
+                    key={item.id}
+                    className={`relative group cursor-pointer rounded-xl overflow-hidden transition-all ${
+                      isSelected
+                        ? 'ring-4 ring-green-500 shadow-xl'
+                        : 'hover:shadow-lg hover:scale-105'
+                    }`}
+                    onClick={() => toggleSelection(item)}
+                  >
+                    {/* Thumbnail */}
+                    <div className="aspect-square bg-gray-200 relative">
+                      {item.media_thumb ? (
+                        <img
+                          src={item.media_thumb}
+                          alt={item.title}
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-purple-400 to-pink-400">
+                          <span className="text-6xl">
+                            {item.file_type === 'video' ? '🎥' : '📸'}
                           </span>
                         </div>
+                      )}
+
+                      {/* Type Badge */}
+                      <div className="absolute top-2 left-2 bg-black bg-opacity-70 text-white px-2 py-1 rounded text-xs font-bold">
+                        {item.file_type === 'video' ? '🎥 VIDEO' : '📸 PHOTO'}
                       </div>
 
-                      {/* Info */}
-                      <div className="p-3">
-                        <p className="font-semibold text-gray-900 text-sm mb-2 truncate">
-                          {single.title}
-                        </p>
-                        <div className="flex items-center justify-between mb-2">
-                          <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${nivelBadge.color}`}>
-                            {nivelBadge.label}
-                          </span>
+                      {/* Selected Badge */}
+                      {isSelected && (
+                        <div className="absolute top-2 right-2 bg-green-500 text-white rounded-full w-8 h-8 flex items-center justify-center">
+                          <span className="text-xl">✓</span>
                         </div>
-                        <div className="flex items-center justify-between">
-                          <span className="text-xs text-gray-500">Base: ${single.base_price}</span>
-                          <span className="text-lg font-bold text-green-600">
-                            ${finalPrice}
-                          </span>
-                        </div>
+                      )}
+
+                      {/* Preview Button */}
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setPreviewItem(item);
+                        }}
+                        className="absolute bottom-2 right-2 bg-white bg-opacity-90 hover:bg-opacity-100 text-gray-700 px-3 py-1 rounded-lg text-xs font-semibold transition-all opacity-0 group-hover:opacity-100"
+                      >
+                        👁️ Preview
+                      </button>
+                    </div>
+
+                    {/* Info */}
+                    <div className="p-3 bg-white">
+                      <h3 className="font-semibold text-sm text-gray-800 truncate">
+                        {item.title}
+                      </h3>
+                      <div className="flex items-center justify-between mt-2">
+                        <span className="text-xs text-gray-500">
+                          Level {item.nivel}/10
+                        </span>
+                        <span className="text-sm font-bold text-purple-600">
+                          ${item.base_price}
+                        </span>
                       </div>
                     </div>
-                  )
-                })
-              )}
+                  </div>
+                );
+              })}
             </div>
           )}
         </div>
 
         {/* Footer */}
-        <div className="border-t p-4 bg-gray-50">
-          <button
-            onClick={onClose}
-            className="w-full px-4 py-2 bg-gray-200 text-gray-700 rounded-lg font-semibold hover:bg-gray-300"
-          >
-            Cancel
-          </button>
+        <div className="px-6 py-4 border-t border-gray-200 bg-gray-50">
+          <div className="flex items-center justify-between">
+            <button
+              onClick={onClose}
+              className="px-6 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 font-semibold transition-all"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleConfirm}
+              disabled={selectedItems.length === 0}
+              className="px-6 py-2 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-lg hover:from-purple-600 hover:to-pink-600 font-semibold disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+            >
+              Continue with {selectedItems.length} item{selectedItems.length !== 1 ? 's' : ''} →
+            </button>
+          </div>
         </div>
-
       </div>
+
+      {/* Preview Modal */}
+      {previewItem && (
+        <div 
+          className="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center z-[60] p-4"
+          onClick={() => setPreviewItem(null)}
+        >
+          <div 
+            className="bg-white rounded-xl max-w-4xl max-h-[90vh] overflow-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="p-4 border-b border-gray-200 flex items-center justify-between">
+              <h3 className="text-xl font-bold text-gray-800">{previewItem.title}</h3>
+              <button
+                onClick={() => setPreviewItem(null)}
+                className="text-gray-400 hover:text-gray-600 text-2xl font-bold"
+              >
+                ×
+              </button>
+            </div>
+            <div className="p-4">
+              {previewItem.file_type === 'video' ? (
+                <video
+                  src={previewItem.media_url}
+                  controls
+                  className="w-full rounded-lg"
+                  autoPlay
+                />
+              ) : (
+                <img
+                  src={previewItem.media_url}
+                  alt={previewItem.title}
+                  className="w-full rounded-lg"
+                />
+              )}
+              <div className="mt-4 space-y-2">
+                <p className="text-sm text-gray-600">
+                  <strong>Type:</strong> {previewItem.file_type}
+                </p>
+                <p className="text-sm text-gray-600">
+                  <strong>Base Price:</strong> ${previewItem.base_price}
+                </p>
+                <p className="text-sm text-gray-600">
+                  <strong>Level:</strong> {previewItem.nivel}/10
+                </p>
+                {previewItem.description && (
+                  <p className="text-sm text-gray-600">
+                    <strong>Description:</strong> {previewItem.description}
+                  </p>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
-  )
+  );
 }

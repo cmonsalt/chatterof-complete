@@ -1,232 +1,310 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react';
+import { supabase } from '../lib/supabase';
 
 export default function PPVSendModal({ 
   isOpen, 
   onClose, 
-  onConfirm, 
-  content, 
-  fanName,
+  selectedContent,
   fanTier = 0,
-  sending = false 
+  fanId,
+  modelId,
+  onSendPPV 
 }) {
-  const [message, setMessage] = useState('')
+  const [tiers, setTiers] = useState([]);
+  const [message, setMessage] = useState('');
+  const [sending, setSending] = useState(false);
+  const [customPrice, setCustomPrice] = useState(null);
 
-  if (!isOpen || !content) return null
-
-  const getTierBadge = (tier) => {
-    const tiers = {
-      0: { emoji: '🆓', label: 'Free', color: 'bg-gray-100 text-gray-700' },
-      1: { emoji: '🎁', label: 'VIP', color: 'bg-blue-100 text-blue-700' },
-      2: { emoji: '🐋', label: 'Whale', color: 'bg-purple-100 text-purple-700' }
+  useEffect(() => {
+    if (isOpen && modelId) {
+      loadTiers();
     }
-    return tiers[tier] || tiers[0]
-  }
+  }, [isOpen, modelId]);
 
-  const getNivelBadge = (nivel) => {
-    const badges = {
-      1: { label: '🟢 Tease', color: 'bg-green-100 text-green-800' },
-      2: { label: '🟢 Soft', color: 'bg-green-100 text-green-800' },
-      3: { label: '🟢 Innocent', color: 'bg-green-100 text-green-800' },
-      4: { label: '🟡 Bikini', color: 'bg-yellow-100 text-yellow-800' },
-      5: { label: '🟡 Lingerie', color: 'bg-yellow-100 text-yellow-800' },
-      6: { label: '🟡 Topless', color: 'bg-yellow-100 text-yellow-800' },
-      7: { label: '🟠 Nude', color: 'bg-orange-100 text-orange-800' },
-      8: { label: '🟠 Solo Play', color: 'bg-orange-100 text-orange-800' },
-      9: { label: '🔴 Explicit', color: 'bg-red-100 text-red-800' },
-      10: { label: '⚫ Hardcore', color: 'bg-gray-900 text-white' }
+  async function loadTiers() {
+    try {
+      const { data, error } = await supabase
+        .from('tiers')
+        .select('*')
+        .eq('model_id', modelId)
+        .order('tier_number', { ascending: true });
+      
+      if (error) throw error;
+      setTiers(data || []);
+    } catch (error) {
+      console.error('Error loading tiers:', error);
+      // Fallback a tiers por defecto
+      setTiers([
+        { tier_number: 0, tier_name: 'FREE', multiplier: 1.0, emoji: '🆓' },
+        { tier_number: 1, tier_name: 'VIP', multiplier: 1.2, emoji: '💎' },
+        { tier_number: 2, tier_name: 'WHALE', multiplier: 1.5, emoji: '🐋' }
+      ]);
     }
-    return badges[nivel] || badges[1]
   }
 
-  const tierBadge = getTierBadge(fanTier)
-  const nivelBadge = getNivelBadge(content.nivel || 1)
-
-  const handleSend = () => {
-    onConfirm({
-      ...content,
-      custom_message: message
-    })
+  function calculatePrice() {
+    if (!selectedContent || selectedContent.length === 0) return 0;
+    
+    const basePrice = selectedContent.reduce((sum, item) => sum + (item.base_price || 0), 0);
+    const currentTier = tiers.find(t => t.tier_number === fanTier) || tiers[0];
+    const multiplier = currentTier?.multiplier || 1.0;
+    
+    return customPrice !== null ? customPrice : Math.round(basePrice * multiplier);
   }
+
+  async function handleSend() {
+    if (!message.trim()) {
+      alert('Please write a message to send with the PPV');
+      return;
+    }
+
+    setSending(true);
+    try {
+      const price = calculatePrice();
+      const mediaFiles = selectedContent.map(item => item.of_media_id);
+
+      await onSendPPV({
+        text: message,
+        mediaFiles,
+        price
+      });
+
+      onClose();
+    } catch (error) {
+      console.error('Error sending PPV:', error);
+      alert('Error sending PPV: ' + error.message);
+    } finally {
+      setSending(false);
+    }
+  }
+
+  if (!isOpen || !selectedContent || selectedContent.length === 0) return null;
+
+  const finalPrice = calculatePrice();
+  const currentTier = tiers.find(t => t.tier_number === fanTier) || tiers[0];
+  const baseTotal = selectedContent.reduce((sum, item) => sum + (item.base_price || 0), 0);
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-xl shadow-2xl max-w-3xl w-full max-h-[90vh] overflow-hidden flex flex-col">
         
         {/* Header */}
-        <div className="bg-gradient-to-r from-green-600 to-emerald-600 text-white p-6">
+        <div className="px-6 py-4 border-b border-gray-200 bg-gradient-to-r from-green-500 to-emerald-500">
           <div className="flex items-center justify-between">
             <div>
-              <h2 className="text-2xl font-bold">📤 Send PPV Content</h2>
-              <p className="text-sm text-green-100 mt-1">
-                Preview and confirm before sending
+              <h2 className="text-2xl font-bold text-white">💰 Send PPV Content</h2>
+              <p className="text-green-100 text-sm mt-1">
+                Review and send Pay-Per-View content to fan
               </p>
             </div>
             <button
               onClick={onClose}
-              className="text-white hover:bg-white/20 rounded-lg p-2 transition-all"
-              disabled={sending}
+              className="text-white hover:text-gray-200 text-3xl font-bold transition-colors"
             >
-              ✕
+              ×
             </button>
           </div>
         </div>
 
-        {/* Content Preview */}
-        <div className="flex-1 overflow-auto p-6 space-y-6">
+        {/* Content */}
+        <div className="flex-1 overflow-y-auto p-6 space-y-6">
           
-          {/* Fan Info */}
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-            <p className="text-sm font-semibold text-blue-900 mb-2">
-              📤 Sending to:
-            </p>
-            <div className="flex items-center gap-2">
-              <span className="text-lg font-bold text-gray-900">{fanName}</span>
-              <span className={`px-3 py-1 rounded-full text-xs font-bold ${tierBadge.color}`}>
-                {tierBadge.emoji} {tierBadge.label}
-              </span>
-            </div>
-          </div>
-
-          {/* Content Card */}
-          <div className="border-2 border-purple-200 rounded-lg overflow-hidden">
-            
-            {/* Thumbnail */}
-            <div className="relative aspect-video bg-gray-100">
-              {content.media_thumb ? (
-                <img
-                  src={content.media_thumb}
-                  alt={content.title}
-                  className="w-full h-full object-cover"
-                />
-              ) : (
-                <div className="w-full h-full flex items-center justify-center text-gray-400 text-6xl">
-                  {content.file_type === 'video' ? '🎥' : '📷'}
-                </div>
-              )}
-              
-              {/* Lock overlay */}
-              <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center">
-                <div className="text-center text-white">
-                  <div className="text-6xl mb-2">🔒</div>
-                  <p className="text-lg font-bold">Locked Content</p>
-                  <p className="text-sm">Fan will see this thumbnail</p>
-                </div>
-              </div>
-            </div>
-
-            {/* Info */}
-            <div className="p-4 bg-gradient-to-r from-purple-50 to-pink-50">
-              <div className="flex items-start justify-between mb-3">
-                <div className="flex-1">
-                  <h3 className="text-lg font-bold text-gray-900 mb-2">
-                    {content.title}
-                  </h3>
-                  {content.description && (
-                    <p className="text-sm text-gray-600 mb-3">
-                      {content.description}
-                    </p>
-                  )}
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className={`px-3 py-1 rounded-full text-xs font-semibold ${nivelBadge.color}`}>
-                      {nivelBadge.label}
-                    </span>
-                    {content.type === 'session' && (
-                      <span className="px-3 py-1 bg-purple-100 text-purple-800 rounded-full text-xs font-semibold">
-                        📁 Part {content.part_number}
-                      </span>
-                    )}
-                    <span className="px-3 py-1 bg-gray-100 text-gray-700 rounded-full text-xs font-semibold">
-                      {content.of_media_ids?.length || 1} media(s)
-                    </span>
-                  </div>
-                </div>
-                
-                {/* Price */}
-                <div className="text-right ml-4">
-                  <p className="text-sm text-gray-500 mb-1">Price for fan:</p>
-                  <p className="text-3xl font-bold text-green-600">
-                    ${content.final_price}
-                  </p>
-                  {content.base_price !== content.final_price && (
-                    <p className="text-xs text-gray-500">
-                      Base: ${content.base_price}
-                    </p>
-                  )}
-                </div>
-              </div>
-
-              {/* Keywords (if single) */}
-              {content.keywords && content.keywords.length > 0 && (
-                <div className="border-t border-purple-200 pt-3 mt-3">
-                  <p className="text-xs text-gray-600 mb-2">Keywords:</p>
-                  <div className="flex flex-wrap gap-1">
-                    {content.keywords.map((kw, i) => (
-                      <span key={i} className="px-2 py-0.5 bg-purple-100 text-purple-700 rounded text-xs">
-                        #{kw}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Custom Message */}
+          {/* Selected Content Preview */}
           <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-2">
-              💬 Message (optional):
+            <h3 className="text-lg font-bold text-gray-800 mb-3">
+              📦 Selected Content ({selectedContent.length})
+            </h3>
+            <div className="grid grid-cols-3 gap-3">
+              {selectedContent.map((item) => (
+                <div
+                  key={item.id}
+                  className="relative rounded-lg overflow-hidden border-2 border-gray-200"
+                >
+                  <div className="aspect-square bg-gray-200">
+                    {item.media_thumb ? (
+                      <img
+                        src={item.media_thumb}
+                        alt={item.title}
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-green-400 to-emerald-400">
+                        <span className="text-4xl">
+                          {item.file_type === 'video' ? '🎥' : '📸'}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                  <div className="p-2 bg-white">
+                    <p className="text-xs font-semibold text-gray-700 truncate">
+                      {item.title}
+                    </p>
+                    <p className="text-xs text-gray-500">
+                      Base: ${item.base_price}
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Pricing Breakdown */}
+          <div className="bg-gradient-to-br from-green-50 to-emerald-50 border-2 border-green-200 rounded-xl p-4">
+            <h3 className="text-lg font-bold text-gray-800 mb-3">💵 Pricing</h3>
+            
+            <div className="space-y-2 mb-4">
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-gray-600">Base Price Total:</span>
+                <span className="font-semibold text-gray-800">${baseTotal}</span>
+              </div>
+              
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-gray-600">Fan Tier:</span>
+                <span className="font-semibold text-gray-800">
+                  {currentTier?.emoji} {currentTier?.tier_name} ({currentTier?.multiplier}x)
+                </span>
+              </div>
+              
+              <div className="border-t border-green-300 pt-2 mt-2">
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-gray-800">Final Price:</span>
+                  <span className="font-bold text-2xl text-green-600">
+                    ${finalPrice}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* All Tier Prices */}
+            <div className="bg-white rounded-lg p-3 border border-green-200">
+              <p className="text-xs font-semibold text-gray-600 mb-2">Prices by tier:</p>
+              <div className="flex items-center gap-3">
+                {tiers.map((tier) => {
+                  const tierPrice = Math.round(baseTotal * tier.multiplier);
+                  const isCurrent = tier.tier_number === fanTier;
+                  return (
+                    <div
+                      key={tier.tier_number}
+                      className={`flex-1 text-center p-2 rounded-lg ${
+                        isCurrent
+                          ? 'bg-green-100 border-2 border-green-500'
+                          : 'bg-gray-50 border border-gray-200'
+                      }`}
+                    >
+                      <div className="text-lg">{tier.emoji}</div>
+                      <div className={`text-xs font-semibold ${
+                        isCurrent ? 'text-green-700' : 'text-gray-600'
+                      }`}>
+                        {tier.tier_name}
+                      </div>
+                      <div className={`text-sm font-bold ${
+                        isCurrent ? 'text-green-600' : 'text-gray-700'
+                      }`}>
+                        ${tierPrice}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Custom Price Override */}
+            <div className="mt-3">
+              <label className="flex items-center gap-2 text-sm text-gray-700 mb-2">
+                <input
+                  type="checkbox"
+                  checked={customPrice !== null}
+                  onChange={(e) => {
+                    if (e.target.checked) {
+                      setCustomPrice(finalPrice);
+                    } else {
+                      setCustomPrice(null);
+                    }
+                  }}
+                  className="rounded"
+                />
+                <span className="font-semibold">Override with custom price</span>
+              </label>
+              {customPrice !== null && (
+                <div className="flex items-center gap-2">
+                  <span className="text-gray-600">$</span>
+                  <input
+                    type="number"
+                    min="1"
+                    step="1"
+                    value={customPrice}
+                    onChange={(e) => setCustomPrice(parseInt(e.target.value) || 0)}
+                    className="flex-1 px-3 py-2 border-2 border-green-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                  />
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Message */}
+          <div>
+            <label className="block text-lg font-bold text-gray-800 mb-2">
+              💬 Message to Fan
             </label>
             <textarea
               value={message}
               onChange={(e) => setMessage(e.target.value)}
-              placeholder="Add a personal message to go with the content..."
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent resize-none"
-              rows="3"
-              disabled={sending}
+              placeholder="Write a teasing message to send with the PPV content..."
+              rows={4}
+              className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 resize-none"
             />
             <p className="text-xs text-gray-500 mt-1">
-              Example: "here's that special content you asked for 😘"
+              💡 Tip: Be flirty and create anticipation to increase purchase rate
             </p>
           </div>
 
-          {/* Info Box */}
-          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-            <p className="text-sm font-semibold text-yellow-900 mb-2">ℹ️ What fan will see:</p>
-            <div className="text-sm text-yellow-800 space-y-1">
-              <p>• <strong>Thumbnail</strong> visible for free</p>
-              <p>• <strong>Content locked</strong> until they pay ${content.final_price}</p>
-              <p>• <strong>Your message</strong> {message ? 'with your custom text' : '(if you add one)'}</p>
+          {/* Warning */}
+          <div className="bg-yellow-50 border-2 border-yellow-300 rounded-lg p-4">
+            <div className="flex items-start gap-3">
+              <span className="text-2xl">⚠️</span>
+              <div className="flex-1">
+                <p className="text-sm font-semibold text-yellow-800 mb-1">
+                  Content will be locked until fan pays
+                </p>
+                <p className="text-xs text-yellow-700">
+                  The fan will need to pay ${finalPrice} to unlock and view this content.
+                  Make sure your message creates enough desire to drive the purchase!
+                </p>
+              </div>
             </div>
           </div>
-
         </div>
 
         {/* Footer */}
-        <div className="border-t p-4 bg-gray-50 flex gap-3">
-          <button
-            onClick={onClose}
-            className="flex-1 px-4 py-3 bg-gray-200 text-gray-700 rounded-lg font-semibold hover:bg-gray-300 disabled:opacity-50"
-            disabled={sending}
-          >
-            Cancel
-          </button>
-          <button
-            onClick={handleSend}
-            className="flex-1 px-4 py-3 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-lg font-semibold hover:shadow-lg transition-all disabled:opacity-50"
-            disabled={sending}
-          >
-            {sending ? (
-              <>
-                <span className="inline-block animate-spin mr-2">⏳</span>
-                Sending...
-              </>
-            ) : (
-              <>✉️ Send PPV (${ content.final_price})</>
-            )}
-          </button>
+        <div className="px-6 py-4 border-t border-gray-200 bg-gray-50">
+          <div className="flex items-center justify-between">
+            <button
+              onClick={onClose}
+              disabled={sending}
+              className="px-6 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 font-semibold transition-all disabled:opacity-50"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleSend}
+              disabled={!message.trim() || sending}
+              className="px-8 py-3 bg-gradient-to-r from-green-500 to-emerald-500 text-white rounded-lg hover:from-green-600 hover:to-emerald-600 font-bold disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center gap-2"
+            >
+              {sending ? (
+                <>
+                  <span className="animate-spin">⏳</span>
+                  <span>Sending...</span>
+                </>
+              ) : (
+                <>
+                  <span>💰</span>
+                  <span>Send PPV for ${finalPrice}</span>
+                </>
+              )}
+            </button>
+          </div>
         </div>
-
       </div>
     </div>
-  )
+  );
 }
