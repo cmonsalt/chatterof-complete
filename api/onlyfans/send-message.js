@@ -1,6 +1,5 @@
-// 🔥 SEND-MESSAGE MINIMAL FIX - Solo arregla media_url
+// 🔥 SEND-MESSAGE SIMPLE - Usa vault IDs directamente
 // Ubicación: api/onlyfans/send-message.js (REEMPLAZAR)
-// Este archivo mantiene TODO tu código original y solo cambia la sección final
 
 import { createClient } from '@supabase/supabase-js';
 
@@ -49,105 +48,10 @@ export default async function handler(req, res) {
   });
 
   try {
-    // 🔥 AUTO-CONVERT: Download from R2 (permanent) or media_url (temp)
+    // 🔥 SIMPLE: Usar IDs de vault directamente (sin conversión)
     let finalMediaFiles = mediaFiles;
     
-    if (mediaFiles && mediaFiles.length > 0 && price > 0) {
-      console.log('🔄 Converting media for PPV (trying R2 first)...');
-      
-      try {
-        // Get media from catalog
-        const { data: catalogItems, error: catalogError } = await supabase
-          .from('catalog')
-          .select('of_media_id, r2_url, media_url, file_type')
-          .in('of_media_id', mediaFiles);
-
-        if (catalogError) {
-          throw new Error('Failed to get media from catalog: ' + catalogError.message);
-        }
-
-        if (!catalogItems || catalogItems.length === 0) {
-          throw new Error('No media found in catalog');
-        }
-
-        console.log(`📦 Found ${catalogItems.length} items in catalog`);
-
-        const conversions = [];
-        
-        for (const item of catalogItems) {
-          try {
-            // Try R2 first (permanent URL), fallback to media_url
-            const downloadUrl = item.r2_url || item.media_url;
-            
-            if (!downloadUrl) {
-              console.error(`❌ No download URL for ${item.of_media_id}`);
-              continue;
-            }
-
-            console.log(`⬇️ Downloading ${item.of_media_id} from ${item.r2_url ? 'R2' : 'OnlyFans'}...`);
-            const downloadResp = await fetch(downloadUrl);
-            
-            if (!downloadResp.ok) {
-              console.error(`❌ Download failed for ${item.of_media_id} - URL may have expired`);
-              continue;
-            }
-
-            const buffer = Buffer.from(await downloadResp.arrayBuffer());
-            const contentType = item.file_type === 'video' ? 'video/mp4' : 'image/jpeg';
-
-            console.log(`⬆️ Re-uploading ${item.of_media_id} (${buffer.length} bytes)...`);
-            
-            // Re-upload to get prefixed_id
-            const uploadResp = await fetch(
-              `https://app.onlyfansapi.com/api/${accountId}/upload`,
-              {
-                method: 'POST',
-                headers: {
-                  'Authorization': `Bearer ${API_KEY}`,
-                  'Content-Type': contentType
-                },
-                body: buffer
-              }
-            );
-
-            if (!uploadResp.ok) {
-              const uploadError = await uploadResp.text();
-              console.error(`❌ Upload failed for ${item.of_media_id}:`, uploadError);
-              continue;
-            }
-
-            const uploadData = await uploadResp.json();
-            const prefixedId = uploadData.data?.prefixed_id || uploadData.prefixed_id;
-
-            if (prefixedId) {
-              conversions.push(prefixedId);
-              console.log(`✅ Converted ${item.of_media_id} → ${prefixedId}`);
-            } else {
-              console.error(`❌ No prefixed_id returned for ${item.of_media_id}`);
-            }
-
-          } catch (mediaError) {
-            console.error(`❌ Error converting ${item.of_media_id}:`, mediaError.message);
-          }
-        }
-
-        if (conversions.length > 0) {
-          finalMediaFiles = conversions;
-          console.log(`✅ Successfully converted ${conversions.length}/${mediaFiles.length} medias`);
-        } else {
-          console.warn('⚠️ No successful conversions');
-          return res.status(400).json({
-            error: 'Failed to convert media. Please upload fresh content to vault.'
-          });
-        }
-
-      } catch (conversionError) {
-        console.error('❌ Conversion process failed:', conversionError);
-        return res.status(500).json({
-          error: 'Media conversion failed: ' + conversionError.message
-        });
-      }
-    }
+    console.log('✅ Using vault IDs directly:', finalMediaFiles);
     
     // Formatear texto con HTML básico
     const formattedText = text.startsWith('<p>') ? text : `<p>${text}</p>`;
@@ -179,46 +83,60 @@ export default async function handler(req, res) {
       const errorText = await response.text();
       console.error('❌ OnlyFans error:', errorText);
       
+      let errorMessage = `API error: ${response.status}`;
       try {
         const error = JSON.parse(errorText);
+        errorMessage = error.message || errorMessage;
         if (error.onlyfans_response?.body?.errors) {
           console.error('📋 Specific errors:', JSON.stringify(error.onlyfans_response.body.errors, null, 2));
         }
-        throw new Error(error.message || `API error: ${response.status}`);
       } catch (parseError) {
-        throw new Error(`API error ${response.status}: ${errorText.substring(0, 200)}`);
+        errorMessage = errorText.substring(0, 200);
       }
+      
+      throw new Error(errorMessage);
     }
 
     const data = await response.json();
+    console.log('✅ Message sent to OnlyFans, ID:', data.id);
 
-    // 🔥 NUEVO: Obtener media_url del catálogo ANTES de guardar
+    // 🔥 Obtener media_url del catálogo para guardar en BD
     let mediaUrl = null;
     let mediaThumb = null;
     let mediaType = null;
     
     if (mediaFiles && mediaFiles.length > 0) {
       try {
-        const firstMediaId = mediaFiles[0]; // ID original del catálogo
+        console.log('🔍 Getting media info from catalog...');
+        const firstMediaId = mediaFiles[0];
         
-        const { data: catalogItem } = await supabase
+        const { data: catalogItem, error: catalogError } = await supabase
           .from('catalog')
           .select('media_url, media_thumb, file_type, r2_url')
           .eq('of_media_id', firstMediaId)
           .single();
         
-        if (catalogItem) {
+        if (catalogError) {
+          console.warn('⚠️ Could not get media from catalog:', catalogError.message);
+        } else if (catalogItem) {
           mediaUrl = catalogItem.r2_url || catalogItem.media_url;
           mediaThumb = catalogItem.media_thumb;
           mediaType = catalogItem.file_type;
+          console.log('✅ Got media info:', { 
+            has_url: !!mediaUrl, 
+            type: mediaType,
+            from: catalogItem.r2_url ? 'R2' : 'OnlyFans'
+          });
+        } else {
+          console.warn('⚠️ Media not found in catalog');
         }
       } catch (catalogErr) {
-        console.warn('⚠️ Could not get media from catalog:', catalogErr);
+        console.error('❌ Error getting media from catalog:', catalogErr);
       }
     }
 
-    // 🔥 ACTUALIZADO: Guardar con media_url y campos PPV
-    const { error: dbError } = await supabase.from('chat').insert({
+    // 🔥 Guardar mensaje en BD con media_url
+    const chatData = {
       of_message_id: data.id?.toString(),
       fan_id: chatId,
       model_id: modelId,
@@ -227,26 +145,44 @@ export default async function handler(req, res) {
       from: 'model',
       read: true,
       source: 'api',
-      // 🔥 CAMPOS DE MEDIA (AHORA CON URL REAL)
+      // Campos de media
       media_url: mediaUrl,
       media_thumb: mediaThumb,
       media_type: mediaType,
-      // 🔥 CAMPOS DE PPV
+      // Campos de PPV
       is_ppv: price > 0,
       ppv_price: price || 0,
       amount: price || 0,
       is_locked: price > 0,
-      is_purchased: false
+      is_purchased: false,
+      ppv_unlocked: false
+    };
+
+    console.log('💾 Saving to database:', {
+      of_message_id: chatData.of_message_id,
+      is_ppv: chatData.is_ppv,
+      ppv_price: chatData.ppv_price,
+      has_media_url: !!chatData.media_url,
+      media_type: chatData.media_type
     });
+
+    const { error: dbError } = await supabase
+      .from('chat')
+      .insert(chatData);
 
     if (dbError) {
       console.error('⚠️ DB save error:', dbError);
     } else {
-      console.log('✅ Message saved to DB with media_url:', mediaUrl ? 'Yes' : 'No');
+      console.log('✅ Message saved to database');
     }
 
-    console.log('✅ Message sent successfully');
-    return res.status(200).json({ success: true, data });
+    console.log('✅ Send message complete');
+    return res.status(200).json({ 
+      success: true, 
+      data,
+      saved_to_db: !dbError,
+      has_media_url: !!mediaUrl
+    });
 
   } catch (error) {
     console.error('❌ Send message error:', error);
