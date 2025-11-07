@@ -161,7 +161,7 @@ export default async function handler(req, res) {
     }
 
     console.log('📤 Sending to OnlyFans:', {
-      endpoint: `https://app.onlyfansapi.com/api/${accountId}/chat/${chatId}/message`,
+      endpoint: `https://app.onlyfansapi.com/api/${accountId}/chats/${chatId}/messages`,
       payload: {
         ...payload,
         media: payload.media ? `[${payload.media.length} items]` : undefined
@@ -170,7 +170,7 @@ export default async function handler(req, res) {
 
     // Enviar mensaje a OnlyFans
     const response = await fetch(
-      `https://app.onlyfansapi.com/api/${accountId}/chat/${chatId}/message`,
+      `https://app.onlyfansapi.com/api/${accountId}/chats/${chatId}/messages`,
       {
         method: 'POST',
         headers: {
