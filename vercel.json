@@ -1,10 +1,20 @@
 {
   "functions": {
-    "api/onlyfans/upload-to-vault.js": {
-      "maxDuration": 60,
+    "api/cloudflare/get-upload-url.js": {
+      "maxDuration": 10,
+      "memory": 512
+    },
+    "api/onlyfans/scrape-and-save.js": {
+      "maxDuration": 30,
       "memory": 1024
     }
   },
+  "rewrites": [
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
+  ],
   "crons": [{
     "path": "/api/onlyfans/cron-check-notifications",
     "schedule": "*/5 * * * *"
