@@ -1,4 +1,4 @@
-// ✅ SEND-MESSAGE FINAL - Vault IDs directamente (según OnlyFans API docs)
+// ✅ SEND-MESSAGE - 100% según OnlyFans API documentation
 // Ubicación: api/onlyfans/send-message.js
 
 import { createClient } from '@supabase/supabase-js';
@@ -38,28 +38,42 @@ export default async function handler(req, res) {
     });
   }
 
-  console.log('📥 Send message:', { accountId, chatId, price, mediaFiles });
+  console.log('📥 Send message request:', { 
+    accountId, 
+    chatId, 
+    text: text.substring(0, 50),
+    price,
+    mediaFiles: mediaFiles,
+    mediaFilesType: Array.isArray(mediaFiles) ? mediaFiles.map(m => typeof m) : 'not-array'
+  });
 
   try {
-    // ✅ Según docs: vault IDs funcionan directamente en mediaFiles
-    // Ejemplo: [3866342509, "ofapi_media_123"] - ambos formatos funcionan
-    const finalMediaFiles = mediaFiles;
+    // 🔥 CRÍTICO: Vault IDs deben ser NÚMEROS, no strings
+    // Según docs: [3866342509, 1234567890] NO ["3866342509", "1234567890"]
+    const finalMediaFiles = mediaFiles.map(id => {
+      // Si viene como string, convertir a número
+      const numId = typeof id === 'string' ? parseInt(id, 10) : id;
+      console.log(`Converting media ID: ${id} (${typeof id}) → ${numId} (${typeof numId})`);
+      return numId;
+    });
     
-    console.log('✅ Using vault IDs directly:', finalMediaFiles);
+    console.log('✅ Final media IDs (as numbers):', finalMediaFiles);
     
+    // Formatear texto
     const formattedText = text.startsWith('<p>') ? text : `<p>${text}</p>`;
 
+    // Payload según documentación oficial
     const payload = {
       text: formattedText,
-      ...(finalMediaFiles && finalMediaFiles.length > 0 && { mediaFiles: finalMediaFiles }),
+      mediaFiles: finalMediaFiles,
       ...(price && price > 0 && { price }),
       ...(replyToMessageId && { replyToMessageId }),
       ...(replyToText && { replyToText })
     };
 
-    console.log('📦 Payload:', JSON.stringify(payload, null, 2));
+    console.log('📦 Payload to OnlyFans:', JSON.stringify(payload, null, 2));
 
-    // Enviar a OnlyFans
+    // Enviar a OnlyFans API
     const response = await fetch(
       `https://app.onlyfansapi.com/api/${accountId}/chats/${chatId}/messages`,
       {
@@ -72,43 +86,52 @@ export default async function handler(req, res) {
       }
     );
 
+    const responseText = await response.text();
+    console.log('📥 OnlyFans response:', responseText);
+
     if (!response.ok) {
-      const errorText = await response.text();
-      console.error('❌ OnlyFans error:', errorText);
+      console.error('❌ OnlyFans API error:', responseText);
       
       let errorMessage = `API error: ${response.status}`;
       try {
-        const error = JSON.parse(errorText);
+        const error = JSON.parse(responseText);
         errorMessage = error.message || errorMessage;
-      } catch (e) {
-        errorMessage = errorText.substring(0, 200);
+        if (error.onlyfans_response?.body?.errors) {
+          console.error('📋 Specific errors:', JSON.stringify(error.onlyfans_response.body.errors, null, 2));
+          errorMessage = JSON.stringify(error.onlyfans_response.body.errors);
+        }
+      } catch (parseError) {
+        errorMessage = responseText.substring(0, 200);
       }
       
       return res.status(response.status).json({ error: errorMessage });
     }
 
-    const data = await response.json();
-    console.log('✅ Sent! ID:', data.id);
+    const data = JSON.parse(responseText);
+    console.log('✅ Message sent successfully! ID:', data.id);
 
-    // Obtener info de media para guardar en BD
+    // Obtener media info del catálogo
     let mediaUrl = null;
     let mediaThumb = null;
     let mediaType = null;
     
     if (mediaFiles && mediaFiles.length > 0) {
       try {
-        const { data: catalogItem } = await supabase
+        const firstMediaId = mediaFiles[0].toString();
+        
+        const { data: catalogItem, error: catalogError } = await supabase
           .from('catalog')
           .select('media_url, media_thumb, file_type, r2_url')
-          .eq('of_media_id', mediaFiles[0])
+          .eq('of_media_id', firstMediaId)
           .single();
         
-        if (catalogItem) {
+        if (!catalogError && catalogItem) {
           mediaUrl = catalogItem.r2_url || catalogItem.media_url;
           mediaThumb = catalogItem.media_thumb;
           mediaType = catalogItem.file_type;
+          console.log('✅ Got media info from catalog');
         }
-      } catch (err) {
+      } catch (catalogErr) {
         console.warn('⚠️ Could not get media from catalog');
       }
     }
@@ -134,22 +157,27 @@ export default async function handler(req, res) {
       ppv_unlocked: false
     };
 
+    console.log('💾 Saving to database');
+
     const { error: dbError } = await supabase
       .from('chat')
       .insert(chatData);
 
     if (dbError) {
-      console.error('⚠️ DB error:', dbError);
+      console.error('⚠️ DB save error:', dbError);
+    } else {
+      console.log('✅ Message saved to database');
     }
 
     return res.status(200).json({ 
       success: true, 
       data,
-      saved_to_db: !dbError
+      saved_to_db: !dbError,
+      has_media_url: !!mediaUrl
     });
 
   } catch (error) {
-    console.error('❌ Error:', error);
+    console.error('❌ Send message error:', error);
     return res.status(500).json({ 
       error: error.message || 'Server Error'
     });
