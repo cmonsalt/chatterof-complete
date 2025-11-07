@@ -81,8 +81,8 @@ export default function VaultUpload() {
       formData.append('nivel', nivel.toString());
       formData.append('tags', tags);
 
-      // Upload
-      const response = await fetch('/api/onlyfans/upload-direct', {
+      // Upload usando Vercel Blob (sin límite de tamaño)
+      const response = await fetch('/api/onlyfans/upload-with-blob', {
         method: 'POST',
         body: formData
       });
