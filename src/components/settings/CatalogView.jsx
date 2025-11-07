@@ -18,6 +18,8 @@ export default function CatalogView({ modelId }) {
   const [expandedSessions, setExpandedSessions] = useState(new Set())
   const [previewMedia, setPreviewMedia] = useState(null)
   const [editingSingle, setEditingSingle] = useState(null)
+  const [showAddSingleSelector, setShowAddSingleSelector] = useState(false)
+  const [availableMedias, setAvailableMedias] = useState([])
 
   useEffect(() => {
     loadCatalog()
@@ -142,6 +144,34 @@ export default function CatalogView({ modelId }) {
     setEditingSingle(single)
   }
 
+  const loadAvailableMedias = async () => {
+    try {
+      // Cargar medias sin organizar (sin session_id y no son singles)
+      const { data, error } = await supabase
+        .from('catalog')
+        .select('*')
+        .eq('model_id', modelId)
+        .is('session_id', null)
+        .eq('is_single', false)
+        .order('created_at', { ascending: false })
+
+      if (error) throw error
+      setAvailableMedias(data || [])
+    } catch (error) {
+      console.error('Error loading available medias:', error)
+    }
+  }
+
+  const handleAddSingle = async () => {
+    await loadAvailableMedias()
+    setShowAddSingleSelector(true)
+  }
+
+  const handleSelectMediaForSingle = (media) => {
+    setEditingSingle(media)
+    setShowAddSingleSelector(false)
+  }
+
   const getNivelBadge = (nivel) => {
     const badges = {
       1: { label: '🟢 Tease', color: 'bg-green-100 text-green-800' },
@@ -195,20 +225,23 @@ export default function CatalogView({ modelId }) {
             💎 Singles ({singles.length})
           </button>
         </div>
-
-        <button
-          onClick={() => {
-            setEditingSession(null)
-            setShowSessionManager(true)
-          }}
-          className="px-6 py-2 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-lg font-semibold hover:shadow-lg transition-all"
-        >
-          ✨ Create Session
-        </button>
       </div>
 
       {activeTab === 'sessions' ? (
         <div className="space-y-4">
+          {/* Botón Create Session */}
+          <div className="flex justify-end">
+            <button
+              onClick={() => {
+                setEditingSession(null)
+                setShowSessionManager(true)
+              }}
+              className="px-6 py-2 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-lg font-semibold hover:shadow-lg transition-all"
+            >
+              ✨ Create Session
+            </button>
+          </div>
+
           {sessions.length === 0 ? (
             <div className="text-center py-12 bg-gray-50 rounded-lg border-2 border-dashed border-gray-300">
               <p className="text-gray-500 text-lg">📁 No sessions yet</p>
@@ -216,7 +249,10 @@ export default function CatalogView({ modelId }) {
                 Create sessions from Inbox content
               </p>
               <button
-                onClick={() => setShowSessionManager(true)}
+                onClick={() => {
+                  setEditingSession(null)
+                  setShowSessionManager(true)
+                }}
                 className="mt-4 px-6 py-2 bg-purple-600 text-white rounded-lg font-semibold hover:bg-purple-700"
               >
                 Create First Session
@@ -351,10 +387,7 @@ export default function CatalogView({ modelId }) {
           {/* Add Single Button */}
           <div className="flex justify-end">
             <button
-              onClick={() => {
-                // Buscar un item sin organizar para agregarlo como single
-                alert('Para agregar Singles: ve a Inbox, busca el contenido que quieres, y configúralo desde Catalog. Próximamente: selector directo aquí.')
-              }}
+              onClick={handleAddSingle}
               className="px-4 py-2 bg-green-600 text-white rounded-lg font-semibold hover:bg-green-700"
             >
               ➕ Add Single
@@ -485,6 +518,100 @@ export default function CatalogView({ modelId }) {
         />
       )}
 
+      {/* Add Single Selector Modal */}
+      {showAddSingleSelector && (
+        <MediaSelectorModal
+          medias={availableMedias}
+          onSelect={handleSelectMediaForSingle}
+          onClose={() => setShowAddSingleSelector(false)}
+        />
+      )}
+
+    </div>
+  )
+}
+
+// Modal selector de medias
+function MediaSelectorModal({ medias, onSelect, onClose }) {
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-xl shadow-2xl w-full max-w-5xl max-h-[90vh] overflow-hidden flex flex-col">
+        
+        <div className="bg-gradient-to-r from-green-600 to-emerald-600 text-white p-4 flex items-center justify-between">
+          <div>
+            <h3 className="text-lg font-bold">💎 Select Media for Single</h3>
+            <p className="text-sm text-green-100">
+              Choose content to mark as Single
+            </p>
+          </div>
+          <button
+            onClick={onClose}
+            className="text-white hover:bg-white/20 rounded-lg p-2"
+          >
+            ✕
+          </button>
+        </div>
+
+        <div className="flex-1 overflow-auto p-6">
+          {medias.length === 0 ? (
+            <div className="text-center py-12">
+              <p className="text-gray-500 text-lg">📭 No available content</p>
+              <p className="text-gray-400 text-sm mt-2">
+                All content is already organized in Sessions or Singles
+              </p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+              {medias.map(media => (
+                <div
+                  key={media.id}
+                  onClick={() => onSelect(media)}
+                  className="relative border-2 border-gray-200 rounded-lg overflow-hidden hover:shadow-lg hover:border-green-500 transition-all cursor-pointer group"
+                >
+                  <div className="aspect-square bg-gray-100">
+                    {media.media_thumb ? (
+                      <img
+                        src={media.media_thumb}
+                        alt={media.title || 'Media'}
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center text-gray-400 text-3xl">
+                        {media.file_type === 'video' ? '🎥' : '📷'}
+                      </div>
+                    )}
+                  </div>
+                  
+                  <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-40 transition-all flex items-center justify-center">
+                    <span className="text-white text-sm font-semibold opacity-0 group-hover:opacity-100 transition-all">
+                      ✓ Select
+                    </span>
+                  </div>
+
+                  <div className="p-2 bg-white">
+                    <p className="text-xs font-semibold text-gray-900 truncate">
+                      {media.title || 'Untitled'}
+                    </p>
+                    <p className="text-xs text-gray-500">
+                      {media.file_type === 'video' ? '🎥' : '📷'}
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div className="border-t p-4 bg-gray-50">
+          <button
+            onClick={onClose}
+            className="w-full px-4 py-2 bg-gray-200 text-gray-700 rounded-lg font-semibold hover:bg-gray-300"
+          >
+            Cancel
+          </button>
+        </div>
+
+      </div>
     </div>
   )
 }
