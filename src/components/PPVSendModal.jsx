@@ -24,10 +24,10 @@ export default function PPVSendModal({
   async function loadTiers() {
     try {
       const { data, error } = await supabase
-        .from('tiers')
+        .from('tier_rules')
         .select('*')
         .eq('model_id', modelId)
-        .order('tier_number', { ascending: true });
+        .order('min_spent', { ascending: true });
       
       if (error) throw error;
       setTiers(data || []);
