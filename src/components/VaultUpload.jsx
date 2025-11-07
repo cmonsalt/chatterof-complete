@@ -1,5 +1,5 @@
-// ✅ VAULT UPLOAD - DIRECTO A R2 (sin pasar por Vercel)
-// Ubicación: src/components/VaultUpload.jsx (REEMPLAZAR COMPLETO)
+// ✅ VAULT UPLOAD SIMPLIFICADO - Upload directo a OnlyFans
+// Ubicación: src/components/VaultUpload.jsx (REEMPLAZAR)
 
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
@@ -66,79 +66,38 @@ export default function VaultUpload() {
     }
 
     setUploading(true);
-    setProgress('📤 Step 1/3: Uploading to Cloudflare R2...');
+    setProgress('📤 Uploading to OnlyFans vault...');
 
     try {
       const currentModelId = modelId || user?.user_metadata?.model_id;
 
-      // 1️⃣ Subir DIRECTO a R2 usando Presigned URL
-      const fileType = selectedFile.type.includes('video') ? 'video' : 'photo';
-      const ext = fileType === 'video' ? 'mp4' : 'jpg';
-      const timestamp = Date.now();
-      const key = `model_${currentModelId}/vault/${timestamp}_${selectedFile.name.replace(/[^a-zA-Z0-9]/g, '_')}.${ext}`;
+      // Crear FormData
+      const formData = new FormData();
+      formData.append('file', selectedFile);
+      formData.append('accountId', accountId);
+      formData.append('modelId', currentModelId);
+      formData.append('title', title);
+      formData.append('basePrice', basePrice.toString());
+      formData.append('nivel', nivel.toString());
+      formData.append('tags', tags);
 
-      // Obtener presigned URL de tu backend
-      setProgress('☁️ Step 1/3: Getting upload URL...');
-      
-      const urlResponse = await fetch('/api/cloudflare/get-upload-url', {
+      // Upload
+      const response = await fetch('/api/onlyfans/upload-direct', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          key: key,
-          contentType: selectedFile.type
-        })
+        body: formData
       });
 
-      if (!urlResponse.ok) {
-        throw new Error('Failed to get upload URL');
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Upload failed');
       }
 
-      const { uploadUrl } = await urlResponse.json();
-
-      // Upload directo a R2
-      setProgress('☁️ Step 2/3: Uploading file to cloud...');
+      const data = await response.json();
       
-      const uploadResponse = await fetch(uploadUrl, {
-        method: 'PUT',
-        body: selectedFile,
-        headers: {
-          'Content-Type': selectedFile.type
-        }
-      });
-
-      if (!uploadResponse.ok) {
-        throw new Error('R2 upload failed');
-      }
-
-      const r2Url = `https://${import.meta.env.VITE_R2_PUBLIC_DOMAIN}/${key}`;
-      console.log('✅ Uploaded to R2:', r2Url);
-
-      // 2️⃣ OnlyFans scrape desde R2
-      setProgress('🌐 Step 3/3: Processing with OnlyFans... (1 credit)');
-
-      const scrapeResponse = await fetch('/api/onlyfans/scrape-and-save', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          accountId: accountId,
-          modelId: currentModelId,
-          r2Url: r2Url,
-          title: title,
-          basePrice: basePrice,
-          nivel: nivel,
-          tags: tags,
-          fileType: fileType
-        })
-      });
-
-      if (!scrapeResponse.ok) {
-        const error = await scrapeResponse.json();
-        throw new Error(error.error || 'Scrape failed');
-      }
-
-      const data = await scrapeResponse.json();
+      const fileSizeMB = data.fileSizeMB || 0;
+      const creditsUsed = data.creditsUsed || 1;
       
-      setProgress(`✅ Success! Vault ID: ${data.vaultMediaId} (Used 1 credit)`);
+      setProgress(`✅ Success! Vault ID: ${data.vaultMediaId} | Size: ${fileSizeMB}MB | Credits: ${creditsUsed}`);
       
       // Reset form
       setTimeout(() => {
@@ -149,7 +108,7 @@ export default function VaultUpload() {
         setNivel(5);
         setTags('');
         setProgress('');
-      }, 3000);
+      }, 4000);
 
     } catch (error) {
       console.error('❌ Upload error:', error);
@@ -167,15 +126,15 @@ export default function VaultUpload() {
         </h2>
 
         {/* Cost Info */}
-        <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-6">
+        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6">
           <div className="flex items-start gap-3">
             <span className="text-2xl">💰</span>
             <div>
-              <h3 className="font-bold text-green-800 mb-1">Cost: Only 1 Credit</h3>
-              <p className="text-sm text-green-700">
-                Files upload directly to Cloudflare (free, unlimited size).
+              <h3 className="font-bold text-yellow-800 mb-1">Cost: 1 credit per 6MB</h3>
+              <p className="text-sm text-yellow-700">
+                Files upload to OnlyFans CDN + backup to Cloudflare R2.
                 <br />
-                OnlyFans then scrapes from there - <strong>just 1 credit</strong>, any size!
+                Example: 100MB video = ~17 credits
               </p>
             </div>
           </div>
@@ -291,7 +250,7 @@ export default function VaultUpload() {
             ) : (
               <>
                 <span>📤</span>
-                <span>Upload to Vault (1 credit)</span>
+                <span>Upload to Vault</span>
               </>
             )}
           </button>
@@ -315,8 +274,8 @@ export default function VaultUpload() {
       <div className="mt-6 bg-blue-50 border border-blue-200 rounded-xl p-4">
         <h3 className="font-bold text-blue-800 mb-2">ℹ️ How it works:</h3>
         <ol className="text-sm text-blue-700 space-y-1 list-decimal list-inside">
-          <li>File uploads DIRECTLY to Cloudflare R2 (unlimited size)</li>
-          <li>OnlyFans scrapes from R2 (costs only 1 credit)</li>
+          <li>File uploads to OnlyFans CDN (1 credit per 6MB)</li>
+          <li>Automatic backup to Cloudflare R2 (free storage)</li>
           <li>Content saved to your OnlyFans vault</li>
           <li>Permanent vault ID added to catalog</li>
           <li>Ready to send as PPV!</li>
