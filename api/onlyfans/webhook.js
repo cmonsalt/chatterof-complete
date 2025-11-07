@@ -235,6 +235,23 @@ async function handleMessage(data, modelId) {
         source: 'webhook'
       }, { onConflict: 'of_message_id' })
       
+      // 🔥 CREAR NOTIFICACIÓN PARA VAULT UPLOAD
+      if (savedCount > 0) {
+        const fanName = data.fromUser?.name || data.user?.name || 'Vault Fan'
+        const notifMessage = savedCount === 1 
+          ? `📸 ${mediaType === 'video' ? 'Video' : 'Photo'} uploaded to vault`
+          : `📦 ${savedCount} items uploaded to vault`
+        
+        await createNotification(
+          modelId,
+          fanId,
+          'vault_upload',
+          `${fanName} - Vault Upload`,
+          notifMessage
+        )
+        console.log('🔔 Vault notification created')
+      }
+      
       console.log(`✅ Vault: ${savedCount} items saved to catalog`)
       return
     }
