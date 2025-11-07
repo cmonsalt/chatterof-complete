@@ -1,7 +1,7 @@
-// ✅ VAULT UPLOAD COMPONENT - Frontend para subir contenido
-// Ubicación: src/components/VaultUpload.jsx (NUEVO)
+// ✅ VAULT UPLOAD - DIRECTO A R2 (sin pasar por Vercel)
+// Ubicación: src/components/VaultUpload.jsx (REEMPLAZAR COMPLETO)
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -18,8 +18,7 @@ export default function VaultUpload() {
   const [progress, setProgress] = useState('');
   const [accountId, setAccountId] = useState(null);
 
-  // Cargar account_id al montar
-  useState(() => {
+  useEffect(() => {
     loadAccountId();
   }, [modelId]);
 
@@ -67,37 +66,79 @@ export default function VaultUpload() {
     }
 
     setUploading(true);
-    setProgress('📤 Step 1/2: Preparing upload...');
+    setProgress('📤 Step 1/3: Uploading to Cloudflare R2...');
 
     try {
       const currentModelId = modelId || user?.user_metadata?.model_id;
 
-      // ✅ Usar FormData para evitar límite de Vercel
-      const formData = new FormData();
-      formData.append('file', selectedFile);
-      formData.append('accountId', accountId);
-      formData.append('modelId', currentModelId);
-      formData.append('title', title);
-      formData.append('basePrice', basePrice.toString());
-      formData.append('nivel', nivel.toString());
-      formData.append('tags', tags);
+      // 1️⃣ Subir DIRECTO a R2 usando Presigned URL
+      const fileType = selectedFile.type.includes('video') ? 'video' : 'photo';
+      const ext = fileType === 'video' ? 'mp4' : 'jpg';
+      const timestamp = Date.now();
+      const key = `model_${currentModelId}/vault/${timestamp}_${selectedFile.name.replace(/[^a-zA-Z0-9]/g, '_')}.${ext}`;
 
-      setProgress('☁️ Step 2/2: Uploading to vault...');
-
-      // Subir usando FormData (sin Content-Type para que el browser lo ponga)
-      const response = await fetch('/api/onlyfans/upload-to-vault', {
+      // Obtener presigned URL de tu backend
+      setProgress('☁️ Step 1/3: Getting upload URL...');
+      
+      const urlResponse = await fetch('/api/cloudflare/get-upload-url', {
         method: 'POST',
-        body: formData  // ✅ FormData en lugar de JSON
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          key: key,
+          contentType: selectedFile.type
+        })
       });
 
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || 'Upload failed');
+      if (!urlResponse.ok) {
+        throw new Error('Failed to get upload URL');
       }
 
-      const data = await response.json();
+      const { uploadUrl } = await urlResponse.json();
+
+      // Upload directo a R2
+      setProgress('☁️ Step 2/3: Uploading file to cloud...');
       
-      setProgress(`✅ Success! Vault ID: ${data.vaultMediaId} (Used ${data.creditsUsed} credit)`);
+      const uploadResponse = await fetch(uploadUrl, {
+        method: 'PUT',
+        body: selectedFile,
+        headers: {
+          'Content-Type': selectedFile.type
+        }
+      });
+
+      if (!uploadResponse.ok) {
+        throw new Error('R2 upload failed');
+      }
+
+      const r2Url = `https://${import.meta.env.VITE_R2_PUBLIC_DOMAIN}/${key}`;
+      console.log('✅ Uploaded to R2:', r2Url);
+
+      // 2️⃣ OnlyFans scrape desde R2
+      setProgress('🌐 Step 3/3: Processing with OnlyFans... (1 credit)');
+
+      const scrapeResponse = await fetch('/api/onlyfans/scrape-and-save', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          accountId: accountId,
+          modelId: currentModelId,
+          r2Url: r2Url,
+          title: title,
+          basePrice: basePrice,
+          nivel: nivel,
+          tags: tags,
+          fileType: fileType
+        })
+      });
+
+      if (!scrapeResponse.ok) {
+        const error = await scrapeResponse.json();
+        throw new Error(error.error || 'Scrape failed');
+      }
+
+      const data = await scrapeResponse.json();
+      
+      setProgress(`✅ Success! Vault ID: ${data.vaultMediaId} (Used 1 credit)`);
       
       // Reset form
       setTimeout(() => {
@@ -132,9 +173,9 @@ export default function VaultUpload() {
             <div>
               <h3 className="font-bold text-green-800 mb-1">Cost: Only 1 Credit</h3>
               <p className="text-sm text-green-700">
-                Files upload to Cloudflare (free), then OnlyFans scrapes from there.
+                Files upload directly to Cloudflare (free, unlimited size).
                 <br />
-                No matter the file size, it always costs just <strong>1 credit</strong>!
+                OnlyFans then scrapes from there - <strong>just 1 credit</strong>, any size!
               </p>
             </div>
           </div>
@@ -274,11 +315,11 @@ export default function VaultUpload() {
       <div className="mt-6 bg-blue-50 border border-blue-200 rounded-xl p-4">
         <h3 className="font-bold text-blue-800 mb-2">ℹ️ How it works:</h3>
         <ol className="text-sm text-blue-700 space-y-1 list-decimal list-inside">
-          <li>File uploads to Cloudflare R2 (free, unlimited storage)</li>
+          <li>File uploads DIRECTLY to Cloudflare R2 (unlimited size)</li>
           <li>OnlyFans scrapes from R2 (costs only 1 credit)</li>
-          <li>Content is saved to your OnlyFans vault</li>
-          <li>You get a permanent vault ID to use in PPVs</li>
-          <li>Ready to send to fans!</li>
+          <li>Content saved to your OnlyFans vault</li>
+          <li>Permanent vault ID added to catalog</li>
+          <li>Ready to send as PPV!</li>
         </ol>
       </div>
     </div>
