@@ -143,7 +143,7 @@ export default async function handler(req, res) {
 
     // Agregar media si existe
     if (finalMediaFiles && finalMediaFiles.length > 0) {
-      payload.media = final MediaFiles;
+      payload.media = finalMediaFiles;
     }
 
     // Agregar precio si es PPV
