@@ -45,56 +45,53 @@ export default async function handler(req, res) {
   });
 
   try {
-    // 🔥 AUTO-CONVERT VAULT IDs TO PREFIXED IDs FOR PPV
+    // 🔥 AUTO-CONVERT: Download from media_url and re-upload
     let finalMediaFiles = mediaFiles;
     
     if (mediaFiles && mediaFiles.length > 0 && price > 0) {
-      console.log('🔄 Auto-converting vault IDs to prefixed IDs for PPV...');
+      console.log('🔄 Converting media for PPV (download from catalog URLs)...');
       
       try {
-        // Download and re-upload each media to get prefixed_id
+        // Get media URLs from catalog
+        const { data: catalogItems, error: catalogError } = await supabase
+          .from('catalog')
+          .select('of_media_id, media_url, file_type')
+          .in('of_media_id', mediaFiles);
+
+        if (catalogError) {
+          throw new Error('Failed to get media from catalog: ' + catalogError.message);
+        }
+
+        if (!catalogItems || catalogItems.length === 0) {
+          throw new Error('No media found in catalog');
+        }
+
+        console.log(`📦 Found ${catalogItems.length} items in catalog`);
+
         const conversions = [];
         
-        for (const vaultId of mediaFiles) {
+        for (const item of catalogItems) {
           try {
-            // 1. Get media info from vault
-            const infoResp = await fetch(
-              `https://app.onlyfansapi.com/api/${accountId}/media/vault/${vaultId}`,
-              {
-                headers: { 
-                  'Authorization': `Bearer ${API_KEY}`,
-                  'Content-Type': 'application/json'
-                }
-              }
-            );
-
-            if (!infoResp.ok) {
-              console.error(`❌ Failed to get info for vault ID ${vaultId}`);
+            if (!item.media_url) {
+              console.error(`❌ No media_url for ${item.of_media_id}`);
               continue;
             }
 
-            const infoData = await infoResp.json();
-            const media = infoData.data;
-            const downloadUrl = media.files?.full?.url || media.files?.source?.url;
-
-            if (!downloadUrl) {
-              console.error(`❌ No download URL for vault ID ${vaultId}`);
-              continue;
-            }
-
-            // 2. Download media
-            console.log(`⬇️ Downloading vault media ${vaultId}...`);
-            const downloadResp = await fetch(downloadUrl);
+            // Download from media_url
+            console.log(`⬇️ Downloading ${item.of_media_id} from catalog URL...`);
+            const downloadResp = await fetch(item.media_url);
+            
             if (!downloadResp.ok) {
-              console.error(`❌ Download failed for ${vaultId}`);
+              console.error(`❌ Download failed for ${item.of_media_id}`);
               continue;
             }
 
             const buffer = Buffer.from(await downloadResp.arrayBuffer());
-            const contentType = media.type === 'video' ? 'video/mp4' : 'image/jpeg';
+            const contentType = item.file_type === 'video' ? 'video/mp4' : 'image/jpeg';
 
-            // 3. Re-upload to get prefixed_id
-            console.log(`⬆️ Re-uploading ${vaultId} (${buffer.length} bytes)...`);
+            console.log(`⬆️ Re-uploading ${item.of_media_id} (${buffer.length} bytes)...`);
+            
+            // Re-upload to get prefixed_id
             const uploadResp = await fetch(
               `https://app.onlyfansapi.com/api/${accountId}/upload`,
               {
@@ -108,7 +105,8 @@ export default async function handler(req, res) {
             );
 
             if (!uploadResp.ok) {
-              console.error(`❌ Upload failed for ${vaultId}`);
+              const uploadError = await uploadResp.text();
+              console.error(`❌ Upload failed for ${item.of_media_id}:`, uploadError);
               continue;
             }
 
@@ -117,11 +115,13 @@ export default async function handler(req, res) {
 
             if (prefixedId) {
               conversions.push(prefixedId);
-              console.log(`✅ Converted ${vaultId} → ${prefixedId}`);
+              console.log(`✅ Converted ${item.of_media_id} → ${prefixedId}`);
+            } else {
+              console.error(`❌ No prefixed_id returned for ${item.of_media_id}`);
             }
 
           } catch (mediaError) {
-            console.error(`❌ Error converting ${vaultId}:`, mediaError.message);
+            console.error(`❌ Error converting ${item.of_media_id}:`, mediaError.message);
           }
         }
 
@@ -129,9 +129,9 @@ export default async function handler(req, res) {
           finalMediaFiles = conversions;
           console.log(`✅ Successfully converted ${conversions.length}/${mediaFiles.length} medias`);
         } else {
-          console.warn('⚠️ No successful conversions, cannot send PPV without valid media');
+          console.warn('⚠️ No successful conversions');
           return res.status(400).json({
-            error: 'Failed to convert vault media IDs. Please try uploading fresh content.'
+            error: 'Failed to convert media. URLs may have expired. Please upload fresh content.'
           });
         }
 
