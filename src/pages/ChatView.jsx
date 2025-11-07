@@ -400,27 +400,35 @@ Conversación:\n${JSON.stringify(conversacion, null, 2)}`
     }
   }
 
-  // 💰 NEW: Función para enviar PPV
+  // 💰 NEW: Función para enviar PPV usando send-message
   async function handleSendPPV(content) {
     setSendingPPV(true);
     
     try {
-      const response = await fetch('/api/onlyfans/send-ppv', {
+      // Obtener account_id
+      const { data: modelData } = await supabase
+        .from('models')
+        .select('of_account_id')
+        .eq('model_id', modelId || user?.user_metadata?.model_id)
+        .single();
+
+      if (!modelData?.of_account_id) {
+        throw new Error('Account not found');
+      }
+
+      // Usar el endpoint send-message que ya funciona
+      const response = await fetch('/api/onlyfans/send-message', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          fan_id: fanId,
-          model_id: modelId || user?.user_metadata?.model_id,
-          catalog_id: content.catalog_id,
-          session_id: content.session_id || null,
-          part_number: content.part_number || null,
-          of_media_ids: content.of_media_ids,
-          price: content.final_price,
-          custom_message: content.custom_message || '',
-          content_type: content.type,
-          title: content.title
+          accountId: modelData.of_account_id,
+          modelId: modelId || user?.user_metadata?.model_id,
+          chatId: fanId,
+          text: content.custom_message || `💎 ${content.title}`,
+          mediaFiles: content.of_media_ids.map(id => String(id)),
+          price: content.final_price
         })
       });
 
@@ -431,6 +439,21 @@ Conversación:\n${JSON.stringify(conversacion, null, 2)}`
         setShowPPVSendModal(false);
         setSelectedPPVContent(null);
         setAiSuggestedContent(null);
+        
+        // Guardar en content_offers para tracking
+        await supabase.from('content_offers').insert({
+          fan_id: fanId,
+          model_id: modelId || user?.user_metadata?.model_id,
+          catalog_id: content.catalog_id,
+          session_id: content.session_id || null,
+          step_number: content.part_number || null,
+          offered_at: new Date().toISOString(),
+          offer_method: 'manual_send',
+          offer_price: content.final_price,
+          status: 'pending',
+          custom_message: content.custom_message
+        });
+        
         // Recargar mensajes
         loadFanAndMessages();
       } else {
