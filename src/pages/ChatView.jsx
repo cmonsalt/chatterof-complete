@@ -583,18 +583,18 @@ Conversación:\n${JSON.stringify(conversacion, null, 2)}`
                       <p className="text-sm">{msg.message}</p>
 
                       {msg.media_url && (
-                        <div className="mt-2">
+                        <div className="mt-2 max-w-xs">
                           {msg.media_type === 'video' ? (
                             <video
                               src={msg.media_url}
                               controls
-                              className="rounded-lg max-w-full"
+                              className="rounded-lg w-full max-h-60 object-cover"
                             />
                           ) : (
                             <img
                               src={msg.media_url}
                               alt="Media"
-                              className="rounded-lg max-w-full"
+                              className="rounded-lg w-full max-h-60 object-cover"
                             />
                           )}
                           {msg.amount > 0 && (

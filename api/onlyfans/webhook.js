@@ -109,6 +109,9 @@ export default async function handler(req, res) {
         break
 
       case 'purchases.created':
+        await handlePurchase(data, modelId)
+        break
+
       case 'tips.received':
         await handleTransaction(data, modelId)
         break
@@ -450,6 +453,84 @@ async function handleTransaction(data, modelId) {
 
   } catch (error) {
     console.error('💥 Error handling transaction:', error)
+  }
+}
+
+async function handlePurchase(data, modelId) {
+  try {
+    console.log('💰 Processing PPV purchase...')
+    
+    const messageId = data.responseType === 'message' ? data.id : null
+    const fanId = data.fromUser?.id?.toString() || data.user?.id?.toString()
+    
+    if (!messageId || !fanId) {
+      console.log('⚠️ Purchase without message ID or fan ID')
+      return
+    }
+
+    // 1. Actualizar el mensaje PPV en la BD
+    const { data: message, error: fetchError } = await supabase
+      .from('chat')
+      .select('*')
+      .eq('of_message_id', messageId)
+      .single()
+
+    if (fetchError || !message) {
+      console.warn('⚠️ Message not found for purchase:', messageId)
+      return
+    }
+
+    // Actualizar a desbloqueado
+    const { error: updateError } = await supabase
+      .from('chat')
+      .update({
+        is_purchased: true,
+        is_locked: false,
+        ppv_unlocked: true
+      })
+      .eq('of_message_id', messageId)
+
+    if (updateError) {
+      console.error('❌ Error updating message:', updateError)
+      return
+    }
+
+    console.log('✅ PPV unlocked:', messageId)
+
+    // 2. Actualizar spent_total del fan
+    const purchaseAmount = parseFloat(data.price || 0)
+    
+    if (purchaseAmount > 0) {
+      const { error: fanError } = await supabase.rpc('increment_fan_spent', {
+        p_fan_id: fanId,
+        p_model_id: modelId,
+        p_amount: purchaseAmount
+      })
+
+      if (fanError) {
+        console.error('❌ Error updating fan spent:', fanError)
+      } else {
+        console.log(`✅ Fan spent updated: +$${purchaseAmount}`)
+      }
+    }
+
+    // 3. Crear notificación de compra
+    const fanName = data.fromUser?.name || data.user?.name || 'A fan'
+    await createNotification(
+      modelId,
+      fanId,
+      'ppv_purchased',
+      `${fanName} - PPV Purchase`,
+      `💰 ${fanName} purchased PPV for $${purchaseAmount}`,
+      purchaseAmount,
+      {
+        message_id: messageId,
+        purchase_type: data.responseType
+      }
+    )
+
+  } catch (error) {
+    console.error('💥 Error handling purchase:', error)
   }
 }
 
