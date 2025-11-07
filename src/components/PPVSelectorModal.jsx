@@ -45,7 +45,7 @@ export default function PPVSelectorModal({
         .from('catalog')
         .select('*')
         .eq('model_id', modelId)
-        .eq('parent_type', 'single')
+        // Sin filtro parent_type - muestra todo el contenido
         .order('created_at', { ascending: false });
       
       if (error) throw error;
