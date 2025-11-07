@@ -17,20 +17,27 @@ export default async function handler(req, res) {
     text, 
     mediaFiles, 
     price,
-    replyToMessageId,  // 🔥 REPLY
-    replyToText        // 🔥 REPLY
+    replyToMessageId,
+    replyToText
   } = req.body;
   
   const API_KEY = process.env.ONLYFANS_API_KEY;
 
-  // ✅ Validar que tenemos AMBOS IDs
+  console.log('📥 Send message request:', { 
+    accountId, 
+    chatId, 
+    text: text?.substring(0, 50), 
+    price, 
+    mediaFiles,
+    hasMedia: mediaFiles?.length > 0
+  });
+
   if (!accountId || !modelId || !chatId || !text) {
     return res.status(400).json({ 
       error: 'accountId, modelId, chatId, and text required' 
     });
   }
 
-  // 🔥 Validar PPV (precio requiere media)
   if (price && price > 0 && (!mediaFiles || mediaFiles.length === 0)) {
     return res.status(400).json({
       error: 'PPV messages must include media files'
@@ -38,7 +45,6 @@ export default async function handler(req, res) {
   }
 
   try {
-    // Formatear texto con HTML básico
     const formattedText = text.startsWith('<p>') ? text : `<p>${text}</p>`;
 
     const payload = {
@@ -47,7 +53,8 @@ export default async function handler(req, res) {
       ...(price && price > 0 && { price })
     };
 
-    // 1. Enviar a OnlyFans API
+    console.log('📦 Full payload:', JSON.stringify(payload, null, 2));
+
     const response = await fetch(
       `https://app.onlyfansapi.com/api/${accountId}/chats/${chatId}/messages`,
       {
@@ -60,30 +67,31 @@ export default async function handler(req, res) {
       }
     );
 
+    const responseText = await response.text();
+    console.log('📨 OnlyFans response:', { status: response.status, body: responseText.substring(0, 200) });
+
     if (!response.ok) {
-      const error = await response.json();
+      const error = JSON.parse(responseText);
+      console.error('❌ OnlyFans error:', error);
       throw new Error(error.message || `API error: ${response.status}`);
     }
 
-    const data = await response.json();
+    const data = JSON.parse(responseText);
 
-    // 🔥 Detectar tipo de media si se envió
-    let mediaType = null
+    let mediaType = null;
     if (mediaFiles && mediaFiles.length > 0) {
-      const firstMedia = mediaFiles[0]
-      // Si viene del catálogo, puede tener el tipo
+      const firstMedia = mediaFiles[0];
       if (typeof firstMedia === 'string') {
         if (firstMedia.includes('.mp4') || firstMedia.includes('video')) {
-          mediaType = 'video'
+          mediaType = 'video';
         } else if (firstMedia.includes('.gif')) {
-          mediaType = 'gif'
+          mediaType = 'gif';
         } else {
-          mediaType = 'photo'
+          mediaType = 'photo';
         }
       }
     }
 
-    // 2. Guardar mensaje en BD con nombres de columnas CORRECTOS
     const { error: dbError } = await supabase.from('chat').insert({
       of_message_id: data.id?.toString(),
       fan_id: chatId,
@@ -95,7 +103,6 @@ export default async function handler(req, res) {
       amount: price || null,
       media_url: mediaFiles?.[0] || null,
       media_type: mediaType,
-      // 🔥 REPLY
       reply_to_message_id: replyToMessageId || null,
       reply_to_text: replyToText || null
     });
@@ -105,14 +112,7 @@ export default async function handler(req, res) {
       throw new Error('Failed to save message to database');
     }
 
-    console.log('✅ Message sent and saved:', {
-      of_message_id: data.id,
-      fan_id: chatId,
-      model_id: modelId,
-      read: false,
-      ppv_price: price || 0,
-      has_reply: !!replyToMessageId
-    });
+    console.log('✅ Message sent successfully');
 
     res.status(200).json({ 
       success: true, 
