@@ -19,8 +19,9 @@ export default async function handler(req, res) {
     console.log(`🔍 Getting fresh URL for media ${mediaId}`);
 
     // Llamar a OnlyFans API para obtener info del media
+    // El accountId puede ser formato acct_xxx o numérico
     const response = await fetch(
-      `https://app.onlyfansapi.com/api/${accountId}/media/vault/${mediaId}`,
+      `https://app.onlyfansapi.com/api/${accountId}/vault/media/${mediaId}`,
       {
         headers: { 
           'Authorization': `Bearer ${API_KEY}`,
@@ -51,7 +52,7 @@ export default async function handler(req, res) {
 
     console.log(`✅ Fresh URL obtained for media ${mediaId}`);
 
-    // Devolver URLs frescass
+    // Devolver URLs frescas
     res.status(200).json({
       success: true,
       mediaId: media.id,
