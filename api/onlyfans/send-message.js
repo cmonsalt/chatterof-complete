@@ -45,96 +45,8 @@ export default async function handler(req, res) {
   });
 
   try {
-    let finalMediaFiles = mediaFiles;
-    
-    // 🔥 CONVERTIR MEDIA USANDO SCRAPE (solo si es PPV)
-    if (mediaFiles && mediaFiles.length > 0 && price > 0) {
-      console.log('🔄 Converting media using R2 scrape method...');
-      
-      try {
-        // Obtener URLs de R2 desde catalog
-        const { data: catalogItems, error: catalogError } = await supabase
-          .from('catalog')
-          .select('of_media_id, r2_url, file_type')
-          .in('of_media_id', mediaFiles);
-
-        if (catalogError) {
-          throw new Error('Failed to fetch catalog items: ' + catalogError.message);
-        }
-
-        if (!catalogItems || catalogItems.length === 0) {
-          throw new Error('No media found in catalog');
-        }
-
-        console.log(`📦 Found ${catalogItems.length} items in catalog`);
-
-        const conversions = [];
-        
-        for (const item of catalogItems) {
-          try {
-            if (!item.r2_url) {
-              console.warn(`⚠️ No R2 URL for ${item.of_media_id}, skipping`);
-              continue;
-            }
-
-            console.log(`🌐 Scraping ${item.of_media_id} from R2...`);
-            console.log(`   URL: ${item.r2_url}`);
-            
-            // 🔥 USAR SCRAPE en lugar de UPLOAD (1 crédito sin importar tamaño)
-            const scrapeResp = await fetch(
-              `https://app.onlyfansapi.com/api/${accountId}/media/scrape`,
-              {
-                method: 'POST',
-                headers: {
-                  'Authorization': `Bearer ${API_KEY}`,
-                  'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                  url: item.r2_url
-                })
-              }
-            );
-
-            if (!scrapeResp.ok) {
-              const scrapeError = await scrapeResp.text();
-              console.error(`❌ Scrape failed for ${item.of_media_id}:`, scrapeError);
-              continue;
-            }
-
-            const scrapeData = await scrapeResp.json();
-            
-            // El scrape devuelve un prefixed_id que podemos usar
-            const prefixedId = scrapeData.data?.prefixed_id || scrapeData.prefixed_id;
-
-            if (prefixedId) {
-              conversions.push(prefixedId);
-              console.log(`✅ Scraped ${item.of_media_id} → ${prefixedId} (1 crédito)`);
-            } else {
-              console.error(`❌ No prefixed_id returned for ${item.of_media_id}`);
-            }
-
-          } catch (mediaError) {
-            console.error(`❌ Error scraping ${item.of_media_id}:`, mediaError.message);
-          }
-        }
-
-        if (conversions.length > 0) {
-          finalMediaFiles = conversions;
-          console.log(`✅ Successfully scraped ${conversions.length}/${mediaFiles.length} medias`);
-        } else {
-          console.error('❌ No successful conversions');
-          return res.status(400).json({
-            error: 'Failed to convert media. Please check R2 URLs are accessible.'
-          });
-        }
-
-      } catch (conversionError) {
-        console.error('❌ Conversion process failed:', conversionError);
-        return res.status(500).json({
-          error: 'Media conversion failed: ' + conversionError.message
-        });
-      }
-    }
+    // 🔥 USAR VAULT IDs DIRECTAMENTE (sin conversión)
+    console.log('✅ Using Vault Media IDs directly:', mediaFiles);
     
     // Formatear texto con HTML básico
     const formattedText = text.startsWith('<p>') ? text : `<p>${text}</p>`;
@@ -145,9 +57,10 @@ export default async function handler(req, res) {
       isCouplePeopleMedia: false
     };
 
-    // Agregar media si existe
-    if (finalMediaFiles && finalMediaFiles.length > 0) {
-      payload.mediaFiles = finalMediaFiles;  // 🔥 OnlyFans API espera "mediaFiles" no "media"
+    // 🔥 Agregar mediaFiles directamente (Vault IDs)
+    if (mediaFiles && mediaFiles.length > 0) {
+      payload.mediaFiles = mediaFiles.map(id => parseInt(id));  // Convertir a números
+      console.log('📦 MediaFiles as integers:', payload.mediaFiles);
     }
 
     // Agregar precio si es PPV
@@ -166,8 +79,9 @@ export default async function handler(req, res) {
     console.log('📤 Sending to OnlyFans:', {
       endpoint: `https://app.onlyfansapi.com/api/${accountId}/chats/${chatId}/messages`,
       payload: {
-        ...payload,
-        mediaFiles: payload.mediaFiles ? `[${payload.mediaFiles.length} items]` : undefined
+        text: payload.text.substring(0, 50),
+        mediaFiles: payload.mediaFiles,
+        price: payload.price
       }
     });
 
@@ -195,6 +109,7 @@ export default async function handler(req, res) {
 
     const data = await response.json();
     console.log('✅ Message sent successfully!');
+    console.log('📨 Response:', JSON.stringify(data, null, 2));
 
     // Guardar en BD
     const messageData = {
@@ -214,8 +129,8 @@ export default async function handler(req, res) {
       messageData.is_purchased = false;
     }
 
-    if (finalMediaFiles && finalMediaFiles.length > 0) {
-      messageData.media = JSON.stringify(finalMediaFiles);
+    if (mediaFiles && mediaFiles.length > 0) {
+      messageData.media = JSON.stringify(mediaFiles);
     }
 
     if (replyToMessageId) {
