@@ -12,12 +12,31 @@ export default function PPVSelectorModal({
   const [filter, setFilter] = useState('all'); // 'all', 'photo', 'video'
   const [selectedItems, setSelectedItems] = useState([]);
   const [previewItem, setPreviewItem] = useState(null);
+  const [loadingPreview, setLoadingPreview] = useState(false);
+  const [previewUrl, setPreviewUrl] = useState(null);
+  const [accountId, setAccountId] = useState(null);
 
   useEffect(() => {
     if (isOpen && modelId) {
       loadCatalog();
+      loadAccountId();
     }
   }, [isOpen, modelId]);
+
+  async function loadAccountId() {
+    try {
+      const { data, error } = await supabase
+        .from('models')
+        .select('of_account_id')
+        .eq('model_id', modelId)
+        .single();
+      
+      if (error) throw error;
+      setAccountId(data?.of_account_id);
+    } catch (error) {
+      console.error('Error loading account ID:', error);
+    }
+  }
 
   async function loadCatalog() {
     setLoading(true);
@@ -26,7 +45,7 @@ export default function PPVSelectorModal({
         .from('catalog')
         .select('*')
         .eq('model_id', modelId)
-        .eq('parent_type', 'single') // Solo singles por ahora
+        .eq('parent_type', 'single')
         .order('created_at', { ascending: false });
       
       if (error) throw error;
@@ -47,6 +66,42 @@ export default function PPVSelectorModal({
         return [...prev, item];
       }
     });
+  }
+
+  async function handlePreview(item) {
+    if (!accountId) {
+      alert('Account ID not found');
+      return;
+    }
+
+    setPreviewItem(item);
+    setLoadingPreview(true);
+    setPreviewUrl(null);
+
+    try {
+      // 🔥 Llamar al nuevo endpoint para obtener URL fresca
+      const response = await fetch(
+        `/api/onlyfans/get-media-fresh-url?mediaId=${item.of_media_id}&accountId=${accountId}`
+      );
+
+      if (!response.ok) {
+        throw new Error('Failed to get fresh URL');
+      }
+
+      const data = await response.json();
+
+      if (data.success && data.url) {
+        setPreviewUrl(data.url);
+      } else {
+        throw new Error('No URL available');
+      }
+    } catch (error) {
+      console.error('Error loading preview:', error);
+      alert('Error loading preview: ' + error.message);
+      setPreviewItem(null);
+    } finally {
+      setLoadingPreview(false);
+    }
   }
 
   function handleConfirm() {
@@ -140,7 +195,7 @@ export default function PPVSelectorModal({
               <div className="text-5xl mb-4">📭</div>
               <p className="text-gray-500 font-semibold">No content available</p>
               <p className="text-gray-400 text-sm mt-2">
-                Sync your vault first to see content here
+                Upload content to your vault to see it here
               </p>
             </div>
           ) : (
@@ -157,21 +212,11 @@ export default function PPVSelectorModal({
                     }`}
                     onClick={() => toggleSelection(item)}
                   >
-                    {/* Thumbnail */}
-                    <div className="aspect-square bg-gray-200 relative">
-                      {item.media_thumb ? (
-                        <img
-                          src={item.media_thumb}
-                          alt={item.title}
-                          className="w-full h-full object-cover"
-                        />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-purple-400 to-pink-400">
-                          <span className="text-6xl">
-                            {item.file_type === 'video' ? '🎥' : '📸'}
-                          </span>
-                        </div>
-                      )}
+                    {/* Thumbnail - ESTÁTICO */}
+                    <div className="aspect-square bg-gradient-to-br from-purple-400 to-pink-400 relative flex items-center justify-center">
+                      <span className="text-6xl">
+                        {item.file_type === 'video' ? '🎥' : '📸'}
+                      </span>
 
                       {/* Type Badge */}
                       <div className="absolute top-2 left-2 bg-black bg-opacity-70 text-white px-2 py-1 rounded text-xs font-bold">
@@ -185,11 +230,11 @@ export default function PPVSelectorModal({
                         </div>
                       )}
 
-                      {/* Preview Button */}
+                      {/* Preview Button - ON-DEMAND */}
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
-                          setPreviewItem(item);
+                          handlePreview(item);
                         }}
                         className="absolute bottom-2 right-2 bg-white bg-opacity-90 hover:bg-opacity-100 text-gray-700 px-3 py-1 rounded-lg text-xs font-semibold transition-all opacity-0 group-hover:opacity-100"
                       >
@@ -209,6 +254,9 @@ export default function PPVSelectorModal({
                         <span className="text-sm font-bold text-purple-600">
                           ${item.base_price}
                         </span>
+                      </div>
+                      <div className="text-xs text-gray-400 mt-1">
+                        ID: {item.of_media_id}
                       </div>
                     </div>
                   </div>
@@ -238,11 +286,14 @@ export default function PPVSelectorModal({
         </div>
       </div>
 
-      {/* Preview Modal */}
+      {/* Preview Modal - CON URL FRESCA */}
       {previewItem && (
         <div 
           className="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center z-[60] p-4"
-          onClick={() => setPreviewItem(null)}
+          onClick={() => {
+            setPreviewItem(null);
+            setPreviewUrl(null);
+          }}
         >
           <div 
             className="bg-white rounded-xl max-w-4xl max-h-[90vh] overflow-auto"
@@ -251,43 +302,64 @@ export default function PPVSelectorModal({
             <div className="p-4 border-b border-gray-200 flex items-center justify-between">
               <h3 className="text-xl font-bold text-gray-800">{previewItem.title}</h3>
               <button
-                onClick={() => setPreviewItem(null)}
+                onClick={() => {
+                  setPreviewItem(null);
+                  setPreviewUrl(null);
+                }}
                 className="text-gray-400 hover:text-gray-600 text-2xl font-bold"
               >
                 ×
               </button>
             </div>
             <div className="p-4">
-              {previewItem.file_type === 'video' ? (
-                <video
-                  src={previewItem.media_url}
-                  controls
-                  className="w-full rounded-lg"
-                  autoPlay
-                />
+              {loadingPreview ? (
+                <div className="flex flex-col items-center justify-center h-64">
+                  <div className="text-5xl mb-4">⏳</div>
+                  <p className="text-gray-500 font-semibold">Loading preview...</p>
+                  <p className="text-xs text-gray-400 mt-2">Getting fresh URL from OnlyFans</p>
+                </div>
+              ) : previewUrl ? (
+                <>
+                  {previewItem.file_type === 'video' ? (
+                    <video
+                      src={previewUrl}
+                      controls
+                      className="w-full rounded-lg"
+                      autoPlay
+                    />
+                  ) : (
+                    <img
+                      src={previewUrl}
+                      alt={previewItem.title}
+                      className="w-full rounded-lg"
+                    />
+                  )}
+                  <div className="mt-4 space-y-2">
+                    <p className="text-sm text-gray-600">
+                      <strong>Type:</strong> {previewItem.file_type}
+                    </p>
+                    <p className="text-sm text-gray-600">
+                      <strong>Base Price:</strong> ${previewItem.base_price}
+                    </p>
+                    <p className="text-sm text-gray-600">
+                      <strong>Level:</strong> {previewItem.nivel}/10
+                    </p>
+                    <p className="text-sm text-gray-600">
+                      <strong>Media ID:</strong> {previewItem.of_media_id}
+                    </p>
+                    {previewItem.description && (
+                      <p className="text-sm text-gray-600">
+                        <strong>Description:</strong> {previewItem.description}
+                      </p>
+                    )}
+                  </div>
+                </>
               ) : (
-                <img
-                  src={previewItem.media_url}
-                  alt={previewItem.title}
-                  className="w-full rounded-lg"
-                />
+                <div className="flex flex-col items-center justify-center h-64">
+                  <div className="text-5xl mb-4">❌</div>
+                  <p className="text-gray-500 font-semibold">Failed to load preview</p>
+                </div>
               )}
-              <div className="mt-4 space-y-2">
-                <p className="text-sm text-gray-600">
-                  <strong>Type:</strong> {previewItem.file_type}
-                </p>
-                <p className="text-sm text-gray-600">
-                  <strong>Base Price:</strong> ${previewItem.base_price}
-                </p>
-                <p className="text-sm text-gray-600">
-                  <strong>Level:</strong> {previewItem.nivel}/10
-                </p>
-                {previewItem.description && (
-                  <p className="text-sm text-gray-600">
-                    <strong>Description:</strong> {previewItem.description}
-                  </p>
-                )}
-              </div>
             </div>
           </div>
         </div>
