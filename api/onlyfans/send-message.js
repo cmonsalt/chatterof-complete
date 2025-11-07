@@ -1,4 +1,4 @@
-// 🔥 SEND-MESSAGE SIMPLE - Usa vault IDs directamente
+// 🔥 SEND-MESSAGE CON CONVERSIÓN R2
 // Ubicación: api/onlyfans/send-message.js (REEMPLAZAR)
 
 import { createClient } from '@supabase/supabase-js';
@@ -48,10 +48,105 @@ export default async function handler(req, res) {
   });
 
   try {
-    // 🔥 SIMPLE: Usar IDs de vault directamente (sin conversión)
     let finalMediaFiles = mediaFiles;
     
-    console.log('✅ Using vault IDs directly:', finalMediaFiles);
+    // 🔥 CONVERTIR MEDIA DESDE R2 (solo si es PPV)
+    if (mediaFiles && mediaFiles.length > 0 && price > 0) {
+      console.log('🔄 Converting media from R2...');
+      
+      try {
+        // Obtener datos del catálogo
+        const { data: catalogItems, error: catalogError } = await supabase
+          .from('catalog')
+          .select('of_media_id, r2_url, media_url, file_type')
+          .in('of_media_id', mediaFiles);
+
+        if (catalogError) {
+          throw new Error('Failed to get media from catalog: ' + catalogError.message);
+        }
+
+        if (!catalogItems || catalogItems.length === 0) {
+          throw new Error('No media found in catalog');
+        }
+
+        console.log(`📦 Found ${catalogItems.length} items in catalog`);
+
+        const conversions = [];
+        
+        for (const item of catalogItems) {
+          try {
+            // Prioridad: R2 (permanente) > media_url (temporal)
+            const downloadUrl = item.r2_url || item.media_url;
+            
+            if (!downloadUrl) {
+              console.error(`❌ No download URL for ${item.of_media_id}`);
+              continue;
+            }
+
+            console.log(`⬇️ Downloading ${item.of_media_id} from ${item.r2_url ? 'R2' : 'OnlyFans'}...`);
+            const downloadResp = await fetch(downloadUrl);
+            
+            if (!downloadResp.ok) {
+              console.error(`❌ Download failed for ${item.of_media_id} - Status: ${downloadResp.status}`);
+              continue;
+            }
+
+            const buffer = Buffer.from(await downloadResp.arrayBuffer());
+            const contentType = item.file_type === 'video' ? 'video/mp4' : 'image/jpeg';
+
+            console.log(`⬆️ Re-uploading ${item.of_media_id} (${(buffer.length / 1024 / 1024).toFixed(2)} MB)...`);
+            
+            // Re-subir a OnlyFans para obtener prefixed_id
+            const uploadResp = await fetch(
+              `https://app.onlyfansapi.com/api/${accountId}/upload`,
+              {
+                method: 'POST',
+                headers: {
+                  'Authorization': `Bearer ${API_KEY}`,
+                  'Content-Type': contentType
+                },
+                body: buffer
+              }
+            );
+
+            if (!uploadResp.ok) {
+              const uploadError = await uploadResp.text();
+              console.error(`❌ Upload failed for ${item.of_media_id}:`, uploadError);
+              continue;
+            }
+
+            const uploadData = await uploadResp.json();
+            const prefixedId = uploadData.data?.prefixed_id || uploadData.prefixed_id;
+
+            if (prefixedId) {
+              conversions.push(prefixedId);
+              console.log(`✅ Converted ${item.of_media_id} → ${prefixedId}`);
+            } else {
+              console.error(`❌ No prefixed_id returned for ${item.of_media_id}`);
+            }
+
+          } catch (mediaError) {
+            console.error(`❌ Error converting ${item.of_media_id}:`, mediaError.message);
+          }
+        }
+
+        if (conversions.length > 0) {
+          finalMediaFiles = conversions;
+          console.log(`✅ Successfully converted ${conversions.length}/${mediaFiles.length} media files`);
+        } else {
+          console.warn('⚠️ No successful conversions');
+          return res.status(400).json({
+            error: 'Failed to convert media. Please try again or upload fresh content.'
+          });
+        }
+
+      } catch (conversionError) {
+        console.error('❌ Conversion process failed:', conversionError);
+        return res.status(500).json({
+          error: 'Media conversion failed: ' + conversionError.message
+        });
+      }
+    }
     
     // Formatear texto con HTML básico
     const formattedText = text.startsWith('<p>') ? text : `<p>${text}</p>`;
@@ -135,7 +230,7 @@ export default async function handler(req, res) {
       }
     }
 
-    // 🔥 Guardar mensaje en BD con media_url
+    // 🔥 Guardar mensaje en BD con todos los campos PPV
     const chatData = {
       of_message_id: data.id?.toString(),
       fan_id: chatId,
@@ -181,7 +276,8 @@ export default async function handler(req, res) {
       success: true, 
       data,
       saved_to_db: !dbError,
-      has_media_url: !!mediaUrl
+      has_media_url: !!mediaUrl,
+      converted_media: price > 0 ? conversions.length : 0
     });
 
   } catch (error) {
