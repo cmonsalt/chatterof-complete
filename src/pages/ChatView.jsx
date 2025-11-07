@@ -3,8 +3,8 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import Navbar from '../components/Navbar';
-import PPVSelectorModal from '../components/modals/PPVSelectorModal';
-import PPVSendModal from '../components/modals/PPVSendModal';
+import PPVSelectorModal from '../components/PPVSelectorModal';
+import PPVSendModal from '../components/PPVSendModal';
 
 export default function ChatView({ embedded = false }) {
   const { fanId } = useParams();
