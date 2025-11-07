@@ -3,6 +3,9 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import Navbar from '../components/Navbar';
+import PPVSelectorModal from '../components/PPVSelectorModal';
+import PPVSendModal from '../components/PPVSendModal';
+import AISuggestedPPV from '../components/AISuggestedPPV';
 
 export default function ChatView({ embedded = false }) {
   const { fanId } = useParams();
@@ -43,6 +46,13 @@ export default function ChatView({ embedded = false }) {
   // 🔥 PPV functionality  
   const [ppvPrice, setPpvPrice] = useState(0);
   const [showPpvInput, setShowPpvInput] = useState(false);
+  
+  // 💰 NEW PPV System
+  const [showPPVSelector, setShowPPVSelector] = useState(false);
+  const [selectedPPVContent, setSelectedPPVContent] = useState(null);
+  const [showPPVSendModal, setShowPPVSendModal] = useState(false);
+  const [sendingPPV, setSendingPPV] = useState(false);
+  const [aiSuggestedContent, setAiSuggestedContent] = useState(null);
   
   const lastCheckedMessageId = useRef(null);
   const justSentMessage = useRef(false);
@@ -387,6 +397,50 @@ Conversación:\n${JSON.stringify(conversacion, null, 2)}`
       alert('Error al analizar con IA');
     } finally {
       setIaLoading(false);
+    }
+  }
+
+  // 💰 NEW: Función para enviar PPV
+  async function handleSendPPV(content) {
+    setSendingPPV(true);
+    
+    try {
+      const response = await fetch('/api/onlyfans/send-ppv', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          fan_id: fanId,
+          model_id: modelId || user?.user_metadata?.model_id,
+          catalog_id: content.catalog_id,
+          session_id: content.session_id || null,
+          part_number: content.part_number || null,
+          of_media_ids: content.of_media_ids,
+          price: content.final_price,
+          custom_message: content.custom_message || '',
+          content_type: content.type,
+          title: content.title
+        })
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        alert('✅ PPV sent successfully!');
+        setShowPPVSendModal(false);
+        setSelectedPPVContent(null);
+        setAiSuggestedContent(null);
+        // Recargar mensajes
+        loadFanAndMessages();
+      } else {
+        throw new Error(result.error || 'Failed to send PPV');
+      }
+    } catch (error) {
+      console.error('Error sending PPV:', error);
+      alert('❌ Error sending PPV: ' + error.message);
+    } finally {
+      setSendingPPV(false);
     }
   }
 
@@ -823,6 +877,55 @@ Conversación:\n${JSON.stringify(conversacion, null, 2)}`
             >
               📝
             </button>
+          )}
+
+          {/* 💰 Botón flotante Send PPV */}
+          <button
+            onClick={() => setShowPPVSelector(true)}
+            className="fixed bottom-24 right-6 w-14 h-14 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-full shadow-lg hover:shadow-xl transition-all flex items-center justify-center text-2xl z-40"
+            title="Send PPV Content"
+          >
+            💰
+          </button>
+
+          {/* 💰 PPV Modals */}
+          <PPVSelectorModal
+            isOpen={showPPVSelector}
+            onClose={() => setShowPPVSelector(false)}
+            onSelect={(content) => {
+              setSelectedPPVContent(content)
+              setShowPPVSelector(false)
+              setShowPPVSendModal(true)
+            }}
+            modelId={modelId || user?.user_metadata?.model_id}
+            fanTier={fan?.tier || 0}
+          />
+
+          <PPVSendModal
+            isOpen={showPPVSendModal}
+            onClose={() => {
+              setShowPPVSendModal(false)
+              setSelectedPPVContent(null)
+            }}
+            onConfirm={handleSendPPV}
+            content={selectedPPVContent}
+            fanName={fan?.display_name || fan?.username || 'Fan'}
+            fanTier={fan?.tier || 0}
+            sending={sendingPPV}
+          />
+
+          {/* 🤖 AI Suggested PPV (aparece en el área de mensajes) */}
+          {aiSuggestedContent && (
+            <div className="fixed bottom-32 right-20 max-w-md z-30">
+              <AISuggestedPPV
+                content={aiSuggestedContent}
+                onSend={(content) => {
+                  setSelectedPPVContent(content)
+                  setShowPPVSendModal(true)
+                }}
+                onDismiss={() => setAiSuggestedContent(null)}
+              />
+            </div>
           )}
         </div>
       </div>
