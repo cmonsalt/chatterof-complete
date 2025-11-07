@@ -24,49 +24,64 @@ export default async function handler(req, res) {
       title
     } = req.body;
 
+    console.log('📥 PPV Request:', { fan_id, model_id, catalog_id, price });
+
     // Validar campos requeridos
     if (!fan_id || !model_id || !catalog_id || !of_media_ids || !price) {
       return res.status(400).json({ 
-        error: 'Missing required fields',
-        required: ['fan_id', 'model_id', 'catalog_id', 'of_media_ids', 'price']
+        error: 'Missing required fields'
+      });
+    }
+
+    if (!Array.isArray(of_media_ids) || of_media_ids.length === 0) {
+      return res.status(400).json({ 
+        error: 'of_media_ids must be a non-empty array'
       });
     }
 
     const API_KEY = process.env.ONLYFANS_API_KEY;
 
-    // 1. Obtener account_id del model
-    const { data: accountData, error: accountError } = await supabase
-      .from('onlyfans_accounts')
-      .select('account_id')
+    // 1. Obtener of_account_id de la tabla models
+    const { data: modelData, error: modelError } = await supabase
+      .from('models')
+      .select('of_account_id')
       .eq('model_id', model_id)
       .single();
 
-    if (accountError || !accountData?.account_id) {
-      return res.status(404).json({ error: 'Model OnlyFans account not found' });
+    console.log('🔍 Model lookup:', { found: !!modelData, error: modelError });
+
+    if (modelError || !modelData?.of_account_id) {
+      console.error('❌ Model not found');
+      return res.status(404).json({ 
+        error: 'Model OnlyFans account not found',
+        model_id
+      });
     }
+
+    const accountId = modelData.of_account_id;
+    console.log('✅ Account ID found:', accountId);
 
     // 2. Construir el mensaje
     const messageText = custom_message 
-      ? `<p>${custom_message}</p>` 
+      ? (custom_message.startsWith('<p>') ? custom_message : `<p>${custom_message}</p>`)
       : `<p>💎 ${title}</p>`;
 
-    // 3. Preparar payload para OnlyFans API
+    // 3. Preparar payload
     const payload = {
       text: messageText,
-      mediaFiles: of_media_ids, // Array de IDs directamente
-      price: price // Ya en dólares, el API wrapper lo maneja
+      mediaFiles: of_media_ids,
+      price: price
     };
 
-    console.log('📤 Sending PPV:', {
-      account_id: accountData.account_id,
-      fan_id,
-      price,
-      media_count: of_media_ids.length
+    console.log('📤 Sending to OnlyFans:', {
+      url: `https://app.onlyfansapi.com/api/${accountId}/chats/${fan_id}/messages`,
+      media_count: of_media_ids.length,
+      price
     });
 
     // 4. Enviar a OnlyFans API
     const response = await fetch(
-      `https://app.onlyfansapi.com/api/${accountData.account_id}/chats/${fan_id}/messages`,
+      `https://app.onlyfansapi.com/api/${accountId}/chats/${fan_id}/messages`,
       {
         method: 'POST',
         headers: { 
@@ -77,19 +92,25 @@ export default async function handler(req, res) {
       }
     );
 
+    const responseText = await response.text();
+    console.log('📨 OnlyFans response:', { 
+      status: response.status, 
+      body: responseText.substring(0, 200) 
+    });
+
     if (!response.ok) {
-      const errorText = await response.text();
-      console.error('❌ OnlyFans API error:', errorText);
+      console.error('❌ OnlyFans API error');
       return res.status(500).json({ 
         error: 'Failed to send PPV to OnlyFans',
-        details: errorText
+        status: response.status,
+        details: responseText
       });
     }
 
-    const ofResult = await response.json();
-    console.log('✅ OnlyFans response:', ofResult);
+    const ofResult = JSON.parse(responseText);
+    console.log('✅ PPV sent successfully');
 
-    // 5. Guardar en content_offers (tracking)
+    // 5. Guardar en content_offers
     const { error: offerError } = await supabase
       .from('content_offers')
       .insert({
@@ -107,29 +128,27 @@ export default async function handler(req, res) {
       });
 
     if (offerError) {
-      console.error('⚠️ Error saving offer:', offerError);
-      // No bloqueamos el envío si falla el tracking
+      console.error('⚠️ Tracking error:', offerError);
     }
 
-    // 6. Guardar mensaje en chat table
+    // 6. Guardar en chat
     const { error: chatError } = await supabase
       .from('chat')
       .insert({
         of_message_id: ofResult.id?.toString(),
         fan_id,
         model_id,
-        message: messageText.replace(/<[^>]*>/g, ''), // Quitar HTML
+        message: messageText.replace(/<[^>]*>/g, ''),
         ts: new Date().toISOString(),
         from: 'model',
         read: false,
         is_ppv: true,
         ppv_price: price,
-        ppv_catalog_id: catalog_id,
-        media_url: of_media_ids[0] || null
+        ppv_catalog_id: catalog_id
       });
 
     if (chatError) {
-      console.error('⚠️ Error saving chat:', chatError);
+      console.error('⚠️ Chat save error:', chatError);
     }
 
     return res.status(200).json({
@@ -141,10 +160,9 @@ export default async function handler(req, res) {
     });
 
   } catch (error) {
-    console.error('❌ Error in send-ppv:', error);
+    console.error('❌ Error:', error);
     return res.status(500).json({ 
-      error: 'Internal server error',
-      details: error.message 
+      error: error.message
     });
   }
 }
