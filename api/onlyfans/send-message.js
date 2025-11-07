@@ -100,7 +100,8 @@ export default async function handler(req, res) {
         );
 
         if (!uploadResp.ok) {
-          console.error(`❌ Upload failed for ${item.of_media_id}`);
+          const uploadError = await uploadResp.text();
+          console.error(`❌ Upload failed for ${item.of_media_id}:`, uploadError);
           continue;
         }
 
