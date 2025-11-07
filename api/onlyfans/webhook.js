@@ -1,9 +1,12 @@
+// 🔥 WEBHOOK UPDATED - Con handlePurchase separado para desbloquear PPVs
+// Ubicación: api/onlyfans/webhook.js (REEMPLAZAR ARCHIVO COMPLETO)
+
 import { createClient } from '@supabase/supabase-js'
 import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3'
 
 const supabase = createClient(
-  process.env.SUPABASE_URL,
-  process.env.SUPABASE_ANON_KEY
+  process.env.VITE_SUPABASE_URL,
+  process.env.VITE_SUPABASE_ANON_KEY
 )
 
 // R2 Client for permanent storage
@@ -16,11 +19,12 @@ const r2Client = new S3Client({
   },
 })
 
-// Helper function to upload to R2
-async function uploadToR2(buffer, mediaId, mediaType) {
+// Helper function to upload to R2 (ORGANIZAD O POR MODELO)
+async function uploadToR2(buffer, mediaId, mediaType, modelId) {
   try {
     const ext = mediaType === 'video' ? 'mp4' : 'jpg'
-    const key = `media/${mediaId}_${Date.now()}.${ext}`
+    // 🔥 NUEVO: Organizar por modelo
+    const key = `model_${modelId}/media/${mediaId}_${Date.now()}.${ext}`
     const contentType = mediaType === 'video' ? 'video/mp4' : 'image/jpeg'
     
     const command = new PutObjectCommand({
@@ -108,6 +112,7 @@ export default async function handler(req, res) {
         await handleNewSubscriber(data, modelId)
         break
 
+      // 🔥 SEPARADO: purchases.created ahora tiene su propio handler
       case 'purchases.created':
         await handlePurchase(data, modelId)
         break
@@ -157,205 +162,118 @@ async function handleMessage(data, modelId) {
       
       let savedCount = 0
       
-      // 1. Guardar CADA media como registro INDIVIDUAL en catalog
+      // 1. GUARDAR EN CATALOG
       if (data.media && data.media.length > 0) {
-        console.log(`📦 Found ${data.media.length} media(s) in message`)
-        
-        for (const media of data.media) {
-          const mediaType = media.type
-          let mediaUrl = null
-          let mediaThumb = null
+        for (const mediaItem of data.media) {
+          const mediaId = mediaItem.id?.toString()
+          const mediaType = mediaItem.type
+          const thumbUrl = mediaItem.files?.thumb?.url || mediaItem.thumb?.url
+          let fullUrl = mediaItem.files?.full?.url || mediaItem.full?.url || mediaItem.url
           
-          if (mediaType === 'video') {
-            mediaUrl = media.files?.full?.url || media.url
-            mediaThumb = media.files?.thumb?.url
-          } else {
-            mediaUrl = media.files?.full?.url || media.files?.thumb?.url || media.url
-            mediaThumb = media.files?.thumb?.url
-          }
+          if (!mediaId || !fullUrl) continue
           
-          // 🔥 DOWNLOAD AND UPLOAD TO R2 FOR PERMANENT STORAGE
+          // Download and upload to R2
           let r2Url = null
-          if (mediaUrl) {
-            try {
-              console.log(`⬇️ Downloading media ${media.id} to R2...`)
-              const downloadResponse = await fetch(mediaUrl)
-              if (downloadResponse.ok) {
-                const arrayBuffer = await downloadResponse.arrayBuffer()
-                const buffer = Buffer.from(arrayBuffer)
-                r2Url = await uploadToR2(buffer, media.id, mediaType)
-                if (r2Url) {
-                  console.log(`✅ Uploaded to R2: ${r2Url}`)
-                }
-              }
-            } catch (r2Error) {
-              console.error(`❌ R2 upload failed for media ${media.id}:`, r2Error)
+          try {
+            console.log(`📥 Downloading ${mediaType} ${mediaId}...`)
+            const downloadResp = await fetch(fullUrl)
+            if (downloadResp.ok) {
+              const buffer = Buffer.from(await downloadResp.arrayBuffer())
+              // 🔥 PASAR modelId para organizar en R2
+              r2Url = await uploadToR2(buffer, mediaId, mediaType, modelId)
+              console.log(`✅ Uploaded to R2: ${r2Url}`)
             }
+          } catch (err) {
+            console.error(`❌ R2 upload failed for ${mediaId}:`, err)
           }
           
-          // Crear un registro por cada media (UPSERT para evitar duplicados)
-        const { error: catalogError } = await supabase
-  .from('catalog')
-  .upsert({
-    model_id: modelId,
-    offer_id: `vault_${Date.now()}_${media.id}`,
-    title: data.text?.replace(/<[^>]*>/g, '').replace('📸 ', '').trim() || 'Untitled',
-    base_price: 0,
-    nivel: 1,
-    of_media_id: media.id?.toString(),
-    file_type: mediaType,
-    media_url: mediaUrl,
-    media_thumb: mediaThumb,
-    r2_url: r2Url,  // 🔥 PERMANENT R2 URL
-    is_single: false,
-    created_at: new Date().toISOString()
-  }, { 
-    onConflict: 'of_media_id',
-    ignoreDuplicates: false
-  })
+          const catalogEntry = {
+            of_media_id: mediaId,
+            title: `Vault ${mediaType} ${mediaId}`,
+            description: `Uploaded via vault fan ${fanId}`,
+            base_price: 10,
+            nivel: 5,
+            model_id: modelId,
+            file_type: mediaType,
+            media_url: fullUrl,
+            media_thumb: thumbUrl,
+            r2_url: r2Url,
+            status: 'inbox'
+          }
           
-          if (catalogError) {
-            console.error(`❌ Error saving media ${media.id} to catalog:`, catalogError)
-          } else {
+          const { error: catalogError } = await supabase
+            .from('catalog')
+            .upsert(catalogEntry, { onConflict: 'of_media_id' })
+          
+          if (!catalogError) {
             savedCount++
+            console.log(`✅ Saved to catalog: ${mediaId}`)
+          } else {
+            console.error(`❌ Catalog error for ${mediaId}:`, catalogError)
           }
         }
-        
-        console.log(`✅ Saved ${savedCount}/${data.media.length} media(s) to catalog!`)
       }
       
-      // 2. Guardar en CHAT (primer media como principal para mostrar)
-      if (data.media && data.media.length > 0) {
-        const firstMedia = data.media[0]
-        const mediaType = firstMedia.type
-        let mediaUrl = null
-        let mediaThumb = null
-        
-        if (mediaType === 'video') {
-          mediaUrl = firstMedia.files?.full?.url || firstMedia.url
-          mediaThumb = firstMedia.files?.thumb?.url
-        } else {
-          mediaUrl = firstMedia.files?.full?.url || firstMedia.files?.thumb?.url || firstMedia.url
-          mediaThumb = firstMedia.files?.thumb?.url
-        }
-        
-        const chatData = {
-          fan_id: fanId,
-          message: cleanHTML(data.text),
-          model_id: modelId,
-          ts: new Date(data.createdAt || Date.now()).toISOString(),
-          from: data.isSentByMe ? 'model' : 'fan',
-          of_message_id: data.id?.toString(),
-          media_url: mediaUrl,
-          media_thumb: mediaThumb,
-          media_type: mediaType,
-          amount: parseFloat(data.price || 0),
-          read: data.isOpened || false
-        }
-
-        const { error: chatError } = await supabase
-          .from('chat')
-          .upsert(chatData, { onConflict: 'of_message_id' })
-        
-        if (chatError) {
-          console.error('❌ Error saving to chat:', chatError)
-        } else {
-          console.log('✅ Saved to chat!')
-        }
-      }
+      // 2. GUARDAR EN CHAT (para timeline)
+      const messageId = data.id?.toString() || `vault_${Date.now()}`
+      const from = data.fromUser?.id?.toString() === fanId ? 'fan' : 'model'
+      const mediaUrl = data.media?.[0]?.files?.full?.url || data.media?.[0]?.files?.thumb?.url
+      const mediaType = data.media?.[0]?.type || 'photo'
+      const tipAmount = parseFloat(data.price || 0)
       
-      // 3. Crear notificación del vault fan
-      if (!data.isSentByMe && data.media && data.media.length > 0) {
-        const fanName = data.fromUser?.name || data.user?.name || 'Vault Fan'
-        const count = savedCount
-        const messagePreview = count > 1 
-          ? `📦 ${count} items guardados en vault`
-          : data.media[0].type === 'video' ? '📹 Video guardado en vault' 
-          : '📸 Foto guardada en vault'
-        
-        await createNotification(
-          modelId,
-          fanId,
-          'vault_upload',
-          `${fanName} - Vault`,
-          messagePreview
-        )
-      }
-      
-      // 4. Actualizar info del fan
-      await supabase.from('fans').upsert({
+      await supabase.from('chat').upsert({
         fan_id: fanId,
-        name: data.fromUser?.name || data.user?.name || 'Vault Fan',
         model_id: modelId,
-        of_username: data.fromUser?.username || data.user?.username,
-        of_avatar_url: data.fromUser?.avatar || data.user?.avatar,
-        last_message_date: data.createdAt || new Date().toISOString()
-      }, { onConflict: 'fan_id,model_id' })
+        message: cleanHTML(data.text) || `[${savedCount} ${savedCount === 1 ? 'file' : 'files'} uploaded to vault]`,
+        from: from,
+        timestamp: new Date(data.createdAt || Date.now()).toISOString(),
+        of_message_id: messageId,
+        media_url: mediaUrl,
+        media_type: mediaType,
+        amount: tipAmount,
+        read: data.isOpened || false,
+        source: 'webhook'
+      }, { onConflict: 'of_message_id' })
       
-      // ✅ YA procesamos todo para vault fan, salir aquí
+      console.log(`✅ Vault: ${savedCount} items saved to catalog`)
       return
     }
 
-    // Upsert fan (código existente)
+    // MENSAJE NORMAL (no es vault fan)
     await supabase.from('fans').upsert({
       fan_id: fanId,
-      name: data.fromUser?.name || data.user?.name || 'Unknown',
       model_id: modelId,
+      name: data.fromUser?.name || data.user?.name || 'Unknown',
       of_username: data.fromUser?.username || data.user?.username,
-      of_avatar_url: data.fromUser?.avatar || data.user?.avatar,
-      last_message_date: data.createdAt || new Date().toISOString()
+      of_avatar_url: data.fromUser?.avatar || data.user?.avatar
     }, { onConflict: 'fan_id,model_id' })
 
-    // Detectar tipo de media
-    let mediaUrl = null
-    let mediaThumb = null
-    let mediaType = null
-    
-    if (data.media && data.media.length > 0) {
-      const media = data.media[0]
-      mediaType = media.type
-      
-      if (mediaType === 'video') {
-        mediaUrl = media.files?.full?.url || media.url
-        mediaThumb = media.files?.thumb?.url
-        console.log('🎬 Video detected:', { url: mediaUrl, thumb: mediaThumb })
-      } else {
-        mediaUrl = media.files?.full?.url || media.files?.thumb?.url || media.url
-        console.log('🖼️ Media detected:', { type: mediaType, url: mediaUrl })
-      }
-    }
+    const messageId = data.id?.toString()
+    if (!messageId) return
 
-    // Guardar mensaje (código existente...)
-    const chatData = {
+    const from = data.fromUser?.id?.toString() === fanId ? 'fan' : 'model'
+    const mediaUrl = data.media?.[0]?.files?.full?.url || data.media?.[0]?.files?.thumb?.url
+    const mediaType = data.media?.[0]?.type || 'photo'
+    const tipAmount = parseFloat(data.price || 0)
+    const isTip = tipAmount > 0
+
+    await supabase.from('chat').upsert({
       fan_id: fanId,
-      message: cleanHTML(data.text),
       model_id: modelId,
-      ts: new Date(data.createdAt || Date.now()).toISOString(),
-      from: data.isSentByMe ? 'model' : 'fan',
-      of_message_id: data.id?.toString(),
+      message: cleanHTML(data.text) || (mediaUrl ? `[${mediaType}]` : ''),
+      from: from,
+      timestamp: new Date(data.createdAt || Date.now()).toISOString(),
+      of_message_id: messageId,
       media_url: mediaUrl,
-      media_thumb: mediaThumb,
       media_type: mediaType,
-      amount: parseFloat(data.price || 0),
-      read: data.isOpened || false
-    }
+      amount: tipAmount,
+      read: data.isOpened || false,
+      source: 'webhook'
+    }, { onConflict: 'of_message_id' })
 
-    const { error: chatError } = await supabase
-      .from('chat')
-      .upsert(chatData, { onConflict: 'of_message_id' })
-    
-    if (chatError) {
-      console.error('❌ Error saving message:', chatError)
-    } else {
-      console.log('✅ Message saved')
-    }
-
-    // Crear notificación si es del fan (código existente...)
-    if (!data.isSentByMe) {
-      const fanName = data.fromUser?.name || data.user?.name || 'Un fan'
-      const tipAmount = parseFloat(data.price || 0)
-      
-      const isTip = tipAmount > 0
+    // Notification
+    if (from === 'fan') {
+      const fanName = data.fromUser?.name || 'A fan'
       const notifType = isTip ? 'new_tip' : 'new_message'
       
       let messagePreview = cleanHTML(data.text).slice(0, 50)
@@ -422,6 +340,83 @@ async function handleNewSubscriber(data, modelId) {
   }
 }
 
+// 🔥 NUEVA FUNCIÓN: handlePurchase (separada de tips)
+async function handlePurchase(data, modelId) {
+  try {
+    console.log('💰 Purchase detected:', data)
+    
+    const fanId = data.user?.id?.toString() || data.from_user?.id?.toString()
+    const fanName = data.user?.name || data.from_user?.name || 'Un fan'
+    const amount = parseFloat(data.amount || data.price || 0)
+    const messageId = data.message?.id?.toString() || data.message_id?.toString()
+    
+    if (!fanId || amount === 0) {
+      console.log('⚠️ Invalid purchase data:', { fanId, amount })
+      return
+    }
+
+    console.log('🔍 Looking for PPV message:', messageId)
+
+    // 1. BUSCAR MENSAJE PPV POR of_message_id
+    if (messageId) {
+      const { data: ppvMessage, error: findError } = await supabase
+        .from('chat')
+        .select('*')
+        .eq('of_message_id', messageId)
+        .eq('model_id', modelId)
+        .single()
+
+      if (findError) {
+        console.log('⚠️ PPV message not found:', messageId, findError)
+      } else if (ppvMessage) {
+        console.log('✅ PPV message found! Unlocking...')
+        
+        // 2. ACTUALIZAR MENSAJE: Desbloquear PPV
+        const { error: updateError } = await supabase
+          .from('chat')
+          .update({
+            is_purchased: true,
+            is_locked: false,
+            ppv_unlocked: true,
+            is_opened: true
+          })
+          .eq('of_message_id', messageId)
+          .eq('model_id', modelId)
+
+        if (updateError) {
+          console.error('❌ Error unlocking PPV:', updateError)
+        } else {
+          console.log('🔓 PPV unlocked successfully!')
+        }
+      }
+    }
+
+    // 3. SUMAR A SPENT_TOTAL
+    await supabase.rpc('increment_fan_spent', {
+      p_fan_id: fanId,
+      p_model_id: modelId,
+      p_amount: amount
+    })
+
+    // 4. CREAR NOTIFICACIÓN
+    await createNotification(
+      modelId,
+      fanId,
+      'new_purchase',
+      `${fanName} desbloqueó contenido por $${amount}`,
+      'PPV desbloqueado',
+      amount,
+      { message_id: messageId }
+    )
+
+    console.log('✅ Purchase handled successfully')
+
+  } catch (error) {
+    console.error('💥 Error handling purchase:', error)
+  }
+}
+
+// 🔥 FUNCIÓN ORIGINAL: handleTransaction (solo para tips ahora)
 async function handleTransaction(data, modelId) {
   try {
     const fanId = data.user?.id?.toString() || data.from_user?.id?.toString()
@@ -430,18 +425,13 @@ async function handleTransaction(data, modelId) {
     
     if (!fanId || amount === 0) return
 
-    const isPPV = data.type === 'purchase' || data.action === 'unlock'
-    const type = isPPV ? 'new_purchase' : 'new_tip'
-    const title = isPPV 
-      ? `${fanName} desbloqueó contenido por $${amount}`
-      : `${fanName} te envió un tip de $${amount}`
-
+    // Solo tips (purchases.created ahora usa handlePurchase)
     await createNotification(
       modelId,
       fanId,
-      type,
-      title,
-      isPPV ? 'Contenido desbloqueado' : 'Nuevo tip',
+      'new_tip',
+      `${fanName} te envió un tip de $${amount}`,
+      'Nuevo tip',
       amount
     )
 
@@ -456,84 +446,6 @@ async function handleTransaction(data, modelId) {
   }
 }
 
-async function handlePurchase(data, modelId) {
-  try {
-    console.log('💰 Processing PPV purchase...')
-    
-    const messageId = data.responseType === 'message' ? data.id : null
-    const fanId = data.fromUser?.id?.toString() || data.user?.id?.toString()
-    
-    if (!messageId || !fanId) {
-      console.log('⚠️ Purchase without message ID or fan ID')
-      return
-    }
-
-    // 1. Actualizar el mensaje PPV en la BD
-    const { data: message, error: fetchError } = await supabase
-      .from('chat')
-      .select('*')
-      .eq('of_message_id', messageId)
-      .single()
-
-    if (fetchError || !message) {
-      console.warn('⚠️ Message not found for purchase:', messageId)
-      return
-    }
-
-    // Actualizar a desbloqueado
-    const { error: updateError } = await supabase
-      .from('chat')
-      .update({
-        is_purchased: true,
-        is_locked: false,
-        ppv_unlocked: true
-      })
-      .eq('of_message_id', messageId)
-
-    if (updateError) {
-      console.error('❌ Error updating message:', updateError)
-      return
-    }
-
-    console.log('✅ PPV unlocked:', messageId)
-
-    // 2. Actualizar spent_total del fan
-    const purchaseAmount = parseFloat(data.price || 0)
-    
-    if (purchaseAmount > 0) {
-      const { error: fanError } = await supabase.rpc('increment_fan_spent', {
-        p_fan_id: fanId,
-        p_model_id: modelId,
-        p_amount: purchaseAmount
-      })
-
-      if (fanError) {
-        console.error('❌ Error updating fan spent:', fanError)
-      } else {
-        console.log(`✅ Fan spent updated: +$${purchaseAmount}`)
-      }
-    }
-
-    // 3. Crear notificación de compra
-    const fanName = data.fromUser?.name || data.user?.name || 'A fan'
-    await createNotification(
-      modelId,
-      fanId,
-      'ppv_purchased',
-      `${fanName} - PPV Purchase`,
-      `💰 ${fanName} purchased PPV for $${purchaseAmount}`,
-      purchaseAmount,
-      {
-        message_id: messageId,
-        purchase_type: data.responseType
-      }
-    )
-
-  } catch (error) {
-    console.error('💥 Error handling purchase:', error)
-  }
-}
-
 async function handleLike(data, modelId) {
   try {
     const fanId = data.user?.id?.toString() || data.from_user?.id?.toString()
@@ -541,20 +453,14 @@ async function handleLike(data, modelId) {
     
     if (!fanId) return
 
-    const contentType = data.post ? 'post' : 'mensaje'
-    const contentPreview = data.post?.text || data.message?.text || 'tu contenido'
-
+    const contentType = data.post ? 'post' : 'message'
+    
     await createNotification(
       modelId,
       fanId,
       'new_like',
-      `${fanName} le dio ❤️ a tu ${contentType}`,
-      contentPreview.slice(0, 50),
-      null,
-      { 
-        like_id: data.id,
-        post_id: data.post?.id || data.message?.id
-      }
+      `${fanName} le dio like a tu ${contentType}`,
+      `Like en ${contentType}`
     )
 
   } catch (error) {

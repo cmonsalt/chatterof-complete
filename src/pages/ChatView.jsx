@@ -5,6 +5,7 @@ import { useAuth } from '../contexts/AuthContext';
 import Navbar from '../components/Navbar';
 import PPVSelectorModal from '../components/PPVSelectorModal';
 import PPVSendModal from '../components/PPVSendModal';
+import PPVMessage from '../components/PPVMessage'
 
 export default function ChatView({ embedded = false }) {
   const { fanId } = useParams();
@@ -583,27 +584,31 @@ Conversación:\n${JSON.stringify(conversacion, null, 2)}`
                       <p className="text-sm">{msg.message}</p>
 
                       {msg.media_url && (
-                        <div className="mt-2 max-w-xs">
-                          {msg.media_type === 'video' ? (
-                            <video
-                              src={msg.media_url}
-                              controls
-                              className="rounded-lg w-full max-h-60 object-cover"
-                            />
-                          ) : (
-                            <img
-                              src={msg.media_url}
-                              alt="Media"
-                              className="rounded-lg w-full max-h-60 object-cover"
-                            />
-                          )}
-                          {msg.amount > 0 && (
-                            <div className="mt-1 text-xs">
-                              💰 PPV: ${msg.amount}
-                            </div>
-                          )}
-                        </div>
-                      )}
+  // 🔥 RENDERIZADO CONDICIONAL: PPV vs Normal
+  msg.is_ppv ? (
+    <PPVMessage message={msg} />
+  ) : msg.media_type === 'video' ? (
+    <video
+      src={msg.media_url}
+      controls
+      className="rounded-lg shadow-md max-w-xs max-h-60"
+      onError={(e) => {
+        console.error('Video failed to load')
+        e.target.outerHTML = '<div class="flex flex-col items-center justify-center h-48 bg-gray-100 rounded-lg"><div class="text-5xl mb-2">❌</div><p class="text-sm text-gray-600 font-semibold">Video URL expired</p></div>'
+      }}
+    />
+  ) : (
+    <img
+      src={msg.media_url}
+      alt="Media"
+      className="rounded-lg shadow-md max-w-xs max-h-60"
+      onError={(e) => {
+        console.error('Image failed to load')
+        e.target.outerHTML = '<div class="flex flex-col items-center justify-center h-48 bg-gray-100 rounded-lg"><div class="text-5xl mb-2">❌</div><p class="text-sm text-gray-600 font-semibold">Image URL expired</p></div>'
+      }}
+    />
+  )
+)}
 
                       <div className="text-xs opacity-75 mt-1">
                         {new Date(msg.ts).toLocaleTimeString()}
