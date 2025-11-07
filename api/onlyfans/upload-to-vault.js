@@ -23,37 +23,54 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const { 
-    accountId,
-    modelId,
-    fileBuffer,  // base64
-    fileName,
-    contentType,
-    title,
-    basePrice = 10,
-    nivel = 5,
-    tags = ''
-  } = req.body;
-
-  const API_KEY = process.env.ONLYFANS_API_KEY;
-
-  if (!accountId || !modelId || !fileBuffer || !contentType) {
-    return res.status(400).json({ 
-      error: 'accountId, modelId, fileBuffer, and contentType required' 
-    });
-  }
-
-  console.log('📤 Starting upload to vault...');
-
   try {
-    // 1️⃣ Subir a Cloudflare R2 (GRATIS)
-    console.log('☁️ Step 1: Uploading to Cloudflare R2...');
+    // ✅ Vercel no soporta multipart nativo, necesitamos usar formidable
+    const formidable = require('formidable');
     
-    const buffer = Buffer.from(fileBuffer, 'base64');
+    const form = formidable({
+      maxFileSize: 500 * 1024 * 1024, // 500MB
+    });
+
+    const [fields, files] = await new Promise((resolve, reject) => {
+      form.parse(req, (err, fields, files) => {
+        if (err) reject(err);
+        else resolve([fields, files]);
+      });
+    });
+
+    // Extraer datos
+    const accountId = fields.accountId?.[0] || fields.accountId;
+    const modelId = fields.modelId?.[0] || fields.modelId;
+    const title = fields.title?.[0] || fields.title;
+    const basePrice = parseInt(fields.basePrice?.[0] || fields.basePrice || '10');
+    const nivel = parseInt(fields.nivel?.[0] || fields.nivel || '5');
+    const tags = fields.tags?.[0] || fields.tags || '';
+    
+    const file = files.file?.[0] || files.file;
+    
+    if (!file) {
+      return res.status(400).json({ error: 'No file uploaded' });
+    }
+
+    const API_KEY = process.env.ONLYFANS_API_KEY;
+
+    if (!accountId || !modelId) {
+      return res.status(400).json({ 
+        error: 'accountId and modelId required' 
+      });
+    }
+
+    console.log('📤 Starting upload:', file.originalFilename);
+
+    // Leer archivo
+    const fs = require('fs');
+    const buffer = fs.readFileSync(file.filepath);
+    const contentType = file.mimetype;
     const fileType = contentType.includes('video') ? 'video' : 'photo';
     const ext = fileType === 'video' ? 'mp4' : 'jpg';
     const timestamp = Date.now();
-    const key = `model_${modelId}/vault/${timestamp}_${fileName.replace(/[^a-zA-Z0-9]/g, '_')}.${ext}`;
+    const sanitizedName = file.originalFilename.replace(/[^a-zA-Z0-9]/g, '_');
+    const key = `model_${modelId}/vault/${timestamp}_${sanitizedName}.${ext}`;
 
     await r2Client.send(new PutObjectCommand({
       Bucket: process.env.R2_BUCKET_NAME,

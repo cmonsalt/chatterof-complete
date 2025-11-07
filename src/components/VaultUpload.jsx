@@ -67,39 +67,27 @@ export default function VaultUpload() {
     }
 
     setUploading(true);
-    setProgress('📤 Step 1/3: Converting file...');
+    setProgress('📤 Step 1/2: Preparing upload...');
 
     try {
       const currentModelId = modelId || user?.user_metadata?.model_id;
 
-      // Convertir a base64
-      const fileBuffer = await new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => {
-          const base64 = reader.result.split(',')[1];
-          resolve(base64);
-        };
-        reader.onerror = reject;
-        reader.readAsDataURL(selectedFile);
-      });
+      // ✅ Usar FormData para evitar límite de Vercel
+      const formData = new FormData();
+      formData.append('file', selectedFile);
+      formData.append('accountId', accountId);
+      formData.append('modelId', currentModelId);
+      formData.append('title', title);
+      formData.append('basePrice', basePrice.toString());
+      formData.append('nivel', nivel.toString());
+      formData.append('tags', tags);
 
-      setProgress('☁️ Step 2/3: Uploading to cloud...');
+      setProgress('☁️ Step 2/2: Uploading to vault...');
 
-      // Subir usando el nuevo endpoint
+      // Subir usando FormData (sin Content-Type para que el browser lo ponga)
       const response = await fetch('/api/onlyfans/upload-to-vault', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          accountId: accountId,
-          modelId: currentModelId,
-          fileBuffer: fileBuffer,
-          fileName: selectedFile.name,
-          contentType: selectedFile.type,
-          title: title,
-          basePrice: basePrice,
-          nivel: nivel,
-          tags: tags
-        })
+        body: formData  // ✅ FormData en lugar de JSON
       });
 
       if (!response.ok) {

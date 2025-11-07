@@ -1,8 +1,12 @@
 {
-  "rewrites": [
-    {
-      "source": "/(.*)",
-      "destination": "/index.html"
+  "functions": {
+    "api/onlyfans/upload-to-vault.js": {
+      "maxDuration": 60,
+      "memory": 1024
     }
-  ]
+  },
+  "crons": [{
+    "path": "/api/onlyfans/cron-check-notifications",
+    "schedule": "*/5 * * * *"
+  }]
 }
