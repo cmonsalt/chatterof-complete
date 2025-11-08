@@ -389,15 +389,6 @@ export default function CatalogView({ modelId }) {
                                 </div>
                               )}
                             </div>
-                                  alt={part.title}
-                                  className="w-full h-full object-cover"
-                                />
-                              ) : (
-                                <div className="w-full h-full flex items-center justify-center text-gray-400">
-                                  {part.file_type === 'video' ? 'ðŸŽ¥' : 'ðŸ“·'}
-                                </div>
-                              )}
-                            </div>
 
                             <div className="flex-1 min-w-0">
                               <div className="flex items-start justify-between gap-2">
