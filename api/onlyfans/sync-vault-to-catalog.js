@@ -1,9 +1,41 @@
 import { createClient } from '@supabase/supabase-js';
+import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
 
 const supabase = createClient(
   process.env.SUPABASE_URL,
   process.env.SUPABASE_ANON_KEY
 );
+
+// R2 Client
+const r2Client = new S3Client({
+  region: 'auto',
+  endpoint: `https://${process.env.R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
+  credentials: {
+    accessKeyId: process.env.R2_ACCESS_KEY_ID,
+    secretAccessKey: process.env.R2_SECRET_ACCESS_KEY,
+  },
+});
+
+// Helper para subir a R2
+async function uploadToR2(buffer, mediaId, mediaType, modelId) {
+  try {
+    const ext = mediaType === 'video' ? 'mp4' : 'jpg';
+    const key = `model_${modelId}/vault/${mediaId}_${Date.now()}.${ext}`;
+    const contentType = mediaType === 'video' ? 'video/mp4' : 'image/jpeg';
+    
+    await r2Client.send(new PutObjectCommand({
+      Bucket: process.env.R2_BUCKET_NAME,
+      Key: key,
+      Body: buffer,
+      ContentType: contentType,
+    }));
+    
+    return `https://${process.env.R2_PUBLIC_DOMAIN}/${key}`;
+  } catch (error) {
+    console.error('❌ R2 upload error:', error);
+    return null;
+  }
+}
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -20,7 +52,7 @@ export default async function handler(req, res) {
   }
 
   try {
-    console.log('🔄 Starting vault → catalog sync...');
+    console.log('🔄 Starting vault → catalog sync with R2 backup...');
 
     // 1. Obtener todos los medias del vault de OnlyFans
     let allMedias = [];
@@ -65,6 +97,7 @@ export default async function handler(req, res) {
     let syncedCount = 0;
     let skippedCount = 0;
     let errorCount = 0;
+    let r2UploadedCount = 0;
 
     for (const media of allMedias) {
       try {
@@ -75,42 +108,73 @@ export default async function handler(req, res) {
           continue;
         }
 
-        // Extraer URLs
-        const mediaUrl = media.files?.full?.url || media.files?.preview?.url;
-        const thumbUrl = media.files?.thumb?.url || media.files?.preview?.url;
+        // Verificar si ya existe en catalog con R2 URL
+        const { data: existingMedia } = await supabase
+          .from('catalog')
+          .select('of_media_id, r2_url')
+          .eq('of_media_id', media.id.toString())
+          .single();
 
-        if (!mediaUrl) {
-          console.log(`⏭️ Skipping media ${media.id} - no URL available`);
-          skippedCount++;
-          continue;
+        let r2Url = existingMedia?.r2_url || null;
+
+        // Si no tiene R2 URL, descargar y subir
+        if (!r2Url) {
+          const mediaUrl = media.files?.full?.url || media.files?.preview?.url;
+          
+          if (mediaUrl) {
+            try {
+              console.log(`📥 Downloading media ${media.id} from OnlyFans...`);
+              
+              const downloadResp = await fetch(mediaUrl);
+              if (downloadResp.ok) {
+                const buffer = Buffer.from(await downloadResp.arrayBuffer());
+                
+                console.log(`☁️ Uploading media ${media.id} to R2...`);
+                r2Url = await uploadToR2(buffer, media.id, media.type, modelId);
+                
+                if (r2Url) {
+                  console.log(`✅ Uploaded to R2: ${r2Url}`);
+                  r2UploadedCount++;
+                } else {
+                  console.warn(`⚠️ R2 upload failed for ${media.id}`);
+                }
+              }
+            } catch (downloadError) {
+              console.error(`❌ Download failed for ${media.id}:`, downloadError.message);
+            }
+          }
+        } else {
+          console.log(`✅ Media ${media.id} already has R2 URL`);
         }
+
+        // Extraer thumbnail URL
+        const thumbUrl = media.files?.thumb?.url || media.files?.preview?.url;
 
         // Preparar datos para catalog
         const catalogData = {
           of_media_id: media.id.toString(),
-          of_media_ids: [media.id.toString()], // Array de un solo ID
-          media_url: mediaUrl,
+          of_media_ids: [media.id.toString()],
+          media_url: r2Url || (media.files?.full?.url || media.files?.preview?.url),
+          r2_url: r2Url, // URL permanente de R2
           media_thumb: thumbUrl,
           media_thumbnails: {
             [media.id]: thumbUrl
           },
-          file_type: media.type, // 'video' o 'photo'
+          file_type: media.type,
           duration_seconds: media.duration || null,
           model_id: modelId,
-          parent_type: 'single', // Por defecto como single
+          parent_type: 'single',
           
-          // Campos por defecto que el usuario puede editar después
           title: `${media.type === 'video' ? '🎥' : '📸'} ${media.type} ${media.id}`,
-          base_price: 10, // Precio base por defecto
-          nivel: 5, // Nivel medio por defecto
+          base_price: 10,
+          nivel: 5,
           tags: media.type,
           description: `Synced from vault on ${new Date().toISOString().split('T')[0]}`,
           
-          // Metadata
           created_at: media.createdAt || new Date().toISOString(),
         };
 
-        // UPSERT en catalog (actualizar si existe, insertar si no)
+        // UPSERT en catalog
         const { error } = await supabase
           .from('catalog')
           .upsert(catalogData, { 
@@ -119,13 +183,10 @@ export default async function handler(req, res) {
           });
 
         if (error) {
-          console.error(`❌ Error syncing media ${media.id}:`, error.message);
+          console.error(`❌ Error saving media ${media.id}:`, error.message);
           errorCount++;
         } else {
           syncedCount++;
-          if (syncedCount % 50 === 0) {
-            console.log(`✅ Synced ${syncedCount}/${allMedias.length} medias...`);
-          }
         }
 
       } catch (mediaError) {
@@ -134,32 +195,26 @@ export default async function handler(req, res) {
       }
     }
 
-    // 3. Actualizar modelo con fecha de sincronización
-    await supabase
-      .from('models')
-      .update({ 
-        vault_synced_at: new Date().toISOString(),
-        vault_media_count: syncedCount
-      })
-      .eq('model_id', modelId);
-
-    console.log('✅ Vault sync completed!');
-    console.log(`📊 Synced: ${syncedCount} | Skipped: ${skippedCount} | Errors: ${errorCount}`);
-
-    res.status(200).json({
-      success: true,
+    const summary = {
+      total: allMedias.length,
       synced: syncedCount,
       skipped: skippedCount,
       errors: errorCount,
-      total: allMedias.length,
-      message: `Successfully synced ${syncedCount} medias to catalog`
+      r2_uploaded: r2UploadedCount
+    };
+
+    console.log('✅ Sync complete:', summary);
+
+    return res.status(200).json({
+      success: true,
+      message: 'Vault synced successfully',
+      summary
     });
 
   } catch (error) {
-    console.error('❌ Sync vault error:', error);
-    res.status(500).json({ 
-      success: false,
-      error: error.message 
+    console.error('❌ Sync error:', error);
+    return res.status(500).json({ 
+      error: error.message || 'Sync failed' 
     });
   }
 }
