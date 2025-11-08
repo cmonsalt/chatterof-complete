@@ -1,10 +1,4 @@
 {
-  "functions": {
-    "api/onlyfans/upload-direct.js": {
-      "maxDuration": 60,
-      "memory": 1024
-    }
-  },
   "rewrites": [
     {
       "source": "/(.*)",
