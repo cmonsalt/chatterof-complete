@@ -12,6 +12,8 @@ export default function PPVSendModal({
 }) {
   const [tiers, setTiers] = useState([]);
   const [message, setMessage] = useState('');
+  const [lockedText, setLockedText] = useState('');
+  const [previewMediaIds, setPreviewMediaIds] = useState([]);
   const [sending, setSending] = useState(false);
   const [customPrice, setCustomPrice] = useState(null);
 
@@ -63,11 +65,22 @@ export default function PPVSendModal({
       const price = calculatePrice();
       const mediaFiles = selectedContent.map(item => item.of_media_id);
 
-      await onSendPPV({
+      const ppvData = {
         text: message,
         mediaFiles,
         price
-      });
+      };
+
+      // Agregar tease/preview si están configurados
+      if (lockedText.trim()) {
+        ppvData.lockedText = lockedText;
+      }
+
+      if (previewMediaIds.length > 0) {
+        ppvData.previewMediaIds = previewMediaIds;
+      }
+
+      await onSendPPV(ppvData);
 
       onClose();
     } catch (error) {
@@ -76,6 +89,16 @@ export default function PPVSendModal({
     } finally {
       setSending(false);
     }
+  }
+
+  function togglePreview(mediaId) {
+    setPreviewMediaIds(prev => {
+      if (prev.includes(mediaId)) {
+        return prev.filter(id => id !== mediaId);
+      } else {
+        return [...prev, mediaId];
+      }
+    });
   }
 
   if (!isOpen || !selectedContent || selectedContent.length === 0) return null;
@@ -115,36 +138,59 @@ export default function PPVSendModal({
               📦 Selected Content ({selectedContent.length})
             </h3>
             <div className="grid grid-cols-3 gap-3">
-              {selectedContent.map((item) => (
-                <div
-                  key={item.id}
-                  className="relative rounded-lg overflow-hidden border-2 border-gray-200"
-                >
-                  <div className="aspect-square bg-gray-200">
-                    {item.media_thumb ? (
-                      <img
-                        src={item.media_thumb}
-                        alt={item.title}
-                        className="w-full h-full object-cover"
-                      />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-green-400 to-emerald-400">
-                        <span className="text-4xl">
-                          {item.file_type === 'video' ? '🎥' : '📸'}
-                        </span>
-                      </div>
-                    )}
+              {selectedContent.map((item) => {
+                const isPreview = previewMediaIds.includes(item.of_media_id);
+                return (
+                  <div
+                    key={item.id}
+                    className={`relative rounded-lg overflow-hidden border-2 ${
+                      isPreview ? 'border-blue-500 ring-2 ring-blue-300' : 'border-gray-200'
+                    }`}
+                  >
+                    <div className="aspect-square bg-gray-200">
+                      {item.media_thumb ? (
+                        <img
+                          src={item.media_thumb}
+                          alt={item.title}
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-green-400 to-emerald-400">
+                          <span className="text-4xl">
+                            {item.file_type === 'video' ? '🎥' : '📸'}
+                          </span>
+                        </div>
+                      )}
+                      
+                      {/* Preview Badge */}
+                      {isPreview && (
+                        <div className="absolute top-2 right-2 bg-blue-500 text-white px-2 py-1 rounded-full text-xs font-bold">
+                          FREE
+                        </div>
+                      )}
+                    </div>
+                    <div className="p-2 bg-white">
+                      <p className="text-xs font-semibold text-gray-700 truncate">
+                        {item.title}
+                      </p>
+                      <p className="text-xs text-gray-500">
+                        Base: ${item.base_price}
+                      </p>
+                      
+                      {/* Checkbox para marcar como preview */}
+                      <label className="flex items-center gap-2 mt-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={isPreview}
+                          onChange={() => togglePreview(item.of_media_id)}
+                          className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                        />
+                        <span className="text-xs text-gray-600">Free preview</span>
+                      </label>
+                    </div>
                   </div>
-                  <div className="p-2 bg-white">
-                    <p className="text-xs font-semibold text-gray-700 truncate">
-                      {item.title}
-                    </p>
-                    <p className="text-xs text-gray-500">
-                      Base: ${item.base_price}
-                    </p>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
 
@@ -155,155 +201,89 @@ export default function PPVSendModal({
             <div className="space-y-2 mb-4">
               <div className="flex items-center justify-between text-sm">
                 <span className="text-gray-600">Base Price Total:</span>
-                <span className="font-semibold text-gray-800">${baseTotal}</span>
+                <span className="font-bold text-gray-800">${baseTotal}</span>
               </div>
               
               <div className="flex items-center justify-between text-sm">
                 <span className="text-gray-600">Fan Tier:</span>
-                <span className="font-semibold text-gray-800">
-                  {currentTier?.emoji} {currentTier?.tier_name} ({currentTier?.multiplier}x)
+                <span className="font-semibold">
+                  {currentTier?.emoji} {currentTier?.tier_name} (x{currentTier?.multiplier})
                 </span>
               </div>
               
-              <div className="border-t border-green-300 pt-2 mt-2">
-                <div className="flex items-center justify-between">
-                  <span className="font-bold text-gray-800">Final Price:</span>
-                  <span className="font-bold text-2xl text-green-600">
-                    ${finalPrice}
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            {/* All Tier Prices */}
-            <div className="bg-white rounded-lg p-3 border border-green-200">
-              <p className="text-xs font-semibold text-gray-600 mb-2">Prices by tier:</p>
-              <div className="flex items-center gap-3">
-                {tiers.map((tier) => {
-                  const tierPrice = Math.round(baseTotal * tier.multiplier);
-                  const isCurrent = tier.tier_number === fanTier;
-                  return (
-                    <div
-                      key={tier.tier_number}
-                      className={`flex-1 text-center p-2 rounded-lg ${
-                        isCurrent
-                          ? 'bg-green-100 border-2 border-green-500'
-                          : 'bg-gray-50 border border-gray-200'
-                      }`}
-                    >
-                      <div className="text-lg">{tier.emoji}</div>
-                      <div className={`text-xs font-semibold ${
-                        isCurrent ? 'text-green-700' : 'text-gray-600'
-                      }`}>
-                        {tier.tier_name}
-                      </div>
-                      <div className={`text-sm font-bold ${
-                        isCurrent ? 'text-green-600' : 'text-gray-700'
-                      }`}>
-                        ${tierPrice}
-                      </div>
-                    </div>
-                  );
-                })}
+              <div className="pt-2 border-t border-green-300 flex items-center justify-between">
+                <span className="font-bold text-gray-800">Final Price:</span>
+                <span className="text-2xl font-bold text-green-600">${finalPrice}</span>
               </div>
             </div>
 
             {/* Custom Price Override */}
-            <div className="mt-3">
-              <label className="flex items-center gap-2 text-sm text-gray-700 mb-2">
-                <input
-                  type="checkbox"
-                  checked={customPrice !== null}
-                  onChange={(e) => {
-                    if (e.target.checked) {
-                      setCustomPrice(finalPrice);
-                    } else {
-                      setCustomPrice(null);
-                    }
-                  }}
-                  className="rounded"
-                />
-                <span className="font-semibold">Override with custom price</span>
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">
+                💰 Custom Price (Optional)
               </label>
-              {customPrice !== null && (
-                <div className="flex items-center gap-2">
-                  <span className="text-gray-600">$</span>
-                  <input
-                    type="number"
-                    min="1"
-                    step="1"
-                    value={customPrice}
-                    onChange={(e) => setCustomPrice(parseInt(e.target.value) || 0)}
-                    className="flex-1 px-3 py-2 border-2 border-green-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
-                  />
-                </div>
-              )}
+              <input
+                type="number"
+                min="0"
+                value={customPrice !== null ? customPrice : ''}
+                onChange={(e) => setCustomPrice(e.target.value ? parseFloat(e.target.value) : null)}
+                placeholder={`Default: $${finalPrice}`}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+              />
             </div>
           </div>
 
-          {/* Message */}
+          {/* Message Input */}
           <div>
-            <label className="block text-lg font-bold text-gray-800 mb-2">
+            <label className="block text-sm font-semibold text-gray-700 mb-2">
               💬 Message to Fan
             </label>
             <textarea
               value={message}
               onChange={(e) => setMessage(e.target.value)}
-              placeholder="Write a teasing message to send with the PPV content..."
-              rows={4}
-              className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 resize-none"
+              placeholder="Baby I have something special for you..."
+              rows={3}
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent resize-none"
+            />
+          </div>
+
+          {/* Locked Text (Tease) */}
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-2">
+              🔓 Locked Text (Optional Tease)
+            </label>
+            <input
+              type="text"
+              value={lockedText}
+              onChange={(e) => setLockedText(e.target.value)}
+              placeholder="e.g., Unlock to see me play 💦"
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
             />
             <p className="text-xs text-gray-500 mt-1">
-              💡 Tip: Be flirty and create anticipation to increase purchase rate
+              This text appears before fan unlocks the content
             </p>
           </div>
 
-          {/* Warning */}
-          <div className="bg-yellow-50 border-2 border-yellow-300 rounded-lg p-4">
-            <div className="flex items-start gap-3">
-              <span className="text-2xl">⚠️</span>
-              <div className="flex-1">
-                <p className="text-sm font-semibold text-yellow-800 mb-1">
-                  Content will be locked until fan pays
-                </p>
-                <p className="text-xs text-yellow-700">
-                  The fan will need to pay ${finalPrice} to unlock and view this content.
-                  Make sure your message creates enough desire to drive the purchase!
-                </p>
-              </div>
-            </div>
-          </div>
         </div>
 
         {/* Footer */}
-        <div className="px-6 py-4 border-t border-gray-200 bg-gray-50">
-          <div className="flex items-center justify-between">
-            <button
-              onClick={onClose}
-              disabled={sending}
-              className="px-6 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 font-semibold transition-all disabled:opacity-50"
-            >
-              Cancel
-            </button>
-            <button
-              onClick={handleSend}
-              disabled={!message.trim() || sending}
-              className="px-8 py-3 bg-gradient-to-r from-green-500 to-emerald-500 text-white rounded-lg hover:from-green-600 hover:to-emerald-600 font-bold disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center gap-2"
-            >
-              {sending ? (
-                <>
-                  <span className="animate-spin">⏳</span>
-                  <span>Sending...</span>
-                </>
-              ) : (
-                <>
-                  <span>💰</span>
-                  <span>Send PPV for ${finalPrice}</span>
-                </>
-              )}
-            </button>
-          </div>
+        <div className="px-6 py-4 border-t border-gray-200 bg-gray-50 flex gap-3">
+          <button
+            onClick={onClose}
+            disabled={sending}
+            className="flex-1 px-6 py-3 bg-gray-200 text-gray-700 rounded-lg font-semibold hover:bg-gray-300 disabled:opacity-50 transition-all"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleSend}
+            disabled={sending}
+            className="flex-1 px-6 py-3 bg-gradient-to-r from-green-500 to-emerald-500 text-white rounded-lg font-semibold hover:from-green-600 hover:to-emerald-600 disabled:opacity-50 transition-all"
+          >
+            {sending ? '⏳ Sending...' : `📤 Send PPV for $${finalPrice}`}
+          </button>
         </div>
+
       </div>
     </div>
   );
