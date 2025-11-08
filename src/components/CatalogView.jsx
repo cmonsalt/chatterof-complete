@@ -316,10 +316,51 @@ export default function CatalogView({ modelId }) {
                           className="border border-gray-200 rounded-lg p-3 hover:border-purple-300 transition-all"
                         >
                           <div className="flex gap-3">
-                            <div
-                              className="w-24 h-24 flex-shrink-0 rounded-lg overflow-hidden bg-gray-100 cursor-pointer hover:ring-2 ring-purple-500"
-                              onClick={() => setPreviewMedia(part)}
-                            >
+                           <div className="flex gap-3">
+  {/* Thumbnails - Mostrar todos si hay múltiples */}
+  <div className="flex gap-2 flex-shrink-0">
+    {part.of_media_ids && part.of_media_ids.length > 1 ? (
+      // Múltiples medias - mostrar grid
+      <div className="grid grid-cols-2 gap-1 w-32">
+        {part.of_media_ids.slice(0, 4).map((mediaId, idx) => (
+          <div
+            key={idx}
+            className="w-full aspect-square rounded overflow-hidden bg-gray-100 cursor-pointer hover:ring-2 ring-purple-500"
+            onClick={() => setPreviewMedia(part)}
+          >
+            <img
+              src={part.media_thumb}
+              alt={`Media ${idx + 1}`}
+              className="w-full h-full object-cover"
+            />
+          </div>
+        ))}
+        {part.of_media_ids.length > 4 && (
+          <div className="w-full aspect-square rounded bg-purple-100 flex items-center justify-center text-xs font-bold text-purple-600">
+            +{part.of_media_ids.length - 4}
+          </div>
+        )}
+      </div>
+    ) : (
+      // Solo 1 media - mostrar normal
+      <div
+        className="w-24 h-24 flex-shrink-0 rounded-lg overflow-hidden bg-gray-100 cursor-pointer hover:ring-2 ring-purple-500"
+        onClick={() => setPreviewMedia(part)}
+      >
+        {part.media_thumb ? (
+          <img
+            src={part.media_thumb}
+            alt={part.title}
+            className="w-full h-full object-cover"
+          />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center text-gray-400">
+            {part.file_type === 'video' ? '🎥' : '📷'}
+          </div>
+        )}
+      </div>
+    )}
+  </div>
                               {part.media_thumb ? (
                                 <img
                                   src={part.media_thumb}
