@@ -124,24 +124,37 @@ export default async function handler(req, res) {
           if (mediaUrl) {
             try {
               console.log(`📥 Downloading media ${media.id} from OnlyFans...`);
+              console.log(`   URL: ${mediaUrl.substring(0, 50)}...`);
               
               const downloadResp = await fetch(mediaUrl);
+              console.log(`   Download status: ${downloadResp.status}`);
+              
               if (downloadResp.ok) {
                 const buffer = Buffer.from(await downloadResp.arrayBuffer());
+                console.log(`   Downloaded ${buffer.length} bytes`);
                 
                 console.log(`☁️ Uploading media ${media.id} to R2...`);
+                console.log(`   Bucket: ${process.env.R2_BUCKET_NAME}`);
+                console.log(`   Domain: ${process.env.R2_PUBLIC_DOMAIN}`);
+                console.log(`   Account: ${process.env.R2_ACCOUNT_ID}`);
+                
                 r2Url = await uploadToR2(buffer, media.id, media.type, modelId);
                 
                 if (r2Url) {
                   console.log(`✅ Uploaded to R2: ${r2Url}`);
                   r2UploadedCount++;
                 } else {
-                  console.warn(`⚠️ R2 upload failed for ${media.id}`);
+                  console.warn(`⚠️ R2 upload failed for ${media.id} - uploadToR2 returned null`);
                 }
+              } else {
+                console.error(`❌ Download failed: HTTP ${downloadResp.status}`);
               }
             } catch (downloadError) {
-              console.error(`❌ Download failed for ${media.id}:`, downloadError.message);
+              console.error(`❌ Download/Upload error for ${media.id}:`, downloadError);
+              console.error(`   Error stack:`, downloadError.stack);
             }
+          } else {
+            console.log(`⏭️ No mediaUrl for ${media.id}`);
           }
         } else {
           console.log(`✅ Media ${media.id} already has R2 URL`);
