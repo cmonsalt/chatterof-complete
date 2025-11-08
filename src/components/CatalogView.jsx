@@ -23,18 +23,19 @@ export default function CatalogView({ modelId }) {
   const [refreshingVideo, setRefreshingVideo] = useState(null)
 
   // Función para refrescar URL y abrir video
-const handleWatchVideo = async (single) => {
+// Función para refrescar URL y abrir video
+  const handleWatchVideo = async (single) => {
     setRefreshingVideo(single.id)
     
     try {
       // Obtener of_account_id del modelo
       const { data: modelData } = await supabase
         .from('models')
-        .select('of_account_id')  // ← CAMBIADO
+        .select('of_account_id')
         .eq('model_id', modelId)
         .single()
       
-      if (!modelData?.of_account_id) {  // ← CAMBIADO
+      if (!modelData?.of_account_id) {
         alert('Error: No se encontró of_account_id del modelo')
         return
       }
@@ -44,7 +45,7 @@ const handleWatchVideo = async (single) => {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          accountId: modelData.of_account_id,  // ← CAMBIADO
+          accountId: modelData.of_account_id,
           ofMediaId: single.of_media_id
         })
       })
@@ -52,8 +53,9 @@ const handleWatchVideo = async (single) => {
       const result = await response.json()
 
       if (result.success && result.freshUrl) {
-        // Abrir URL fresca en nueva pestaña
-        window.open(result.freshUrl, '_blank')
+        // Usar el proxy para ver el video
+        const watchUrl = `/api/onlyfans/watch-video?accountId=${modelData.of_account_id}&cdnUrl=${encodeURIComponent(result.freshUrl)}`
+        window.open(watchUrl, '_blank')
       } else {
         alert('Error al obtener URL del video: ' + (result.error || 'Unknown error'))
       }
