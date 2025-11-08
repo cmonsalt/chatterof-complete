@@ -125,16 +125,15 @@ export default async function handler(req, res) {
             try {
               console.log(`📥 Downloading media ${media.id} from OnlyFans API...`);
               
-              // Según la doc: GET con body JSON
-              const downloadUrl = `https://app.onlyfansapi.com/api/${accountId}/media/download/string`;
+              // cdnUrl va en el path, URL encoded
+              const encodedUrl = encodeURIComponent(mediaUrl);
+              const downloadUrl = `https://app.onlyfansapi.com/api/${accountId}/media/download/${encodedUrl}`;
               
               const downloadResp = await fetch(downloadUrl, {
                 method: 'GET',
                 headers: {
-                  'Authorization': `Bearer ${API_KEY}`,
-                  'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({ cdnUrl: mediaUrl })
+                  'Authorization': `Bearer ${API_KEY}`
+                }
               });
               
               console.log(`   Download status: ${downloadResp.status}`);
