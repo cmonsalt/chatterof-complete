@@ -643,7 +643,7 @@ function MediaPreviewModal({ media, onClose }) {
         <div className="p-4 max-h-[70vh] overflow-auto">
           {media.file_type === 'video' ? (
             <video
-              src={media.media_url}
+              src={media.r2_url || media.media_url}
               controls
               className="w-full rounded-lg"
             >
