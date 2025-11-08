@@ -26,29 +26,38 @@ export default async function handler(req, res) {
     });
 
     if (!response.ok) {
+      const errorText = await response.text();
+      console.error('OnlyFans API Error:', response.status, errorText);
       throw new Error(`API error: ${response.status}`);
     }
 
     const data = await response.json();
     const medias = data.data?.list || [];
     
+    console.log(`📦 Found ${medias.length} medias in vault`);
+    
     // Buscar el media específico
     const media = medias.find(m => m.id.toString() === ofMediaId.toString());
     
     if (!media) {
+      console.log(`❌ Media ${ofMediaId} not found in vault`);
       return res.status(404).json({ 
         success: false,
-        error: 'Media not found in vault' 
+        error: 'Media not found in vault. It may not be in the first 100 items.'
       });
     }
 
-    // Extraer URL fresca
-    const freshUrl = media.files?.full?.url || media.files?.preview?.url;
+    // Extraer URL fresca - Probar múltiples fuentes
+    const freshUrl = media.files?.full?.url || 
+                     media.files?.source?.url || 
+                     media.files?.preview?.url;
     
     if (!freshUrl) {
+      console.log(`❌ No URL available for media ${ofMediaId}`);
+      console.log('Media structure:', JSON.stringify(media.files, null, 2));
       return res.status(404).json({ 
         success: false,
-        error: 'No URL available for this media' 
+        error: 'No URL available for this media'
       });
     }
 
