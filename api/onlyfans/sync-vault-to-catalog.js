@@ -119,39 +119,44 @@ export default async function handler(req, res) {
 
         // Si no tiene R2 URL, descargar y subir
         if (!r2Url) {
-          try {
-            console.log(`📥 Downloading media ${media.id} from OnlyFans API...`);
-            
-            // Usar la API de OnlyFans para descargar con autenticación
-            const downloadUrl = `https://app.onlyfansapi.com/api/${accountId}/media/${media.id}/download`;
-            
-            const downloadResp = await fetch(downloadUrl, {
-              headers: {
-                'Authorization': `Bearer ${API_KEY}`,
-                'Content-Type': 'application/json'
-              }
-            });
-            
-            console.log(`   Download status: ${downloadResp.status}`);
-            
-            if (downloadResp.ok) {
-              const buffer = Buffer.from(await downloadResp.arrayBuffer());
-              console.log(`   Downloaded ${buffer.length} bytes`);
+          const mediaUrl = media.files?.full?.url || media.files?.preview?.url;
+          
+          if (mediaUrl) {
+            try {
+              console.log(`📥 Downloading media ${media.id} from OnlyFans API...`);
               
-              console.log(`☁️ Uploading media ${media.id} to R2...`);
-              r2Url = await uploadToR2(buffer, media.id, media.type, modelId);
+              // Usar el endpoint correcto con cdnUrl
+              const encodedUrl = encodeURIComponent(mediaUrl);
+              const downloadUrl = `https://app.onlyfansapi.com/api/${accountId}/media/download/${encodedUrl}`;
               
-              if (r2Url) {
-                console.log(`✅ Uploaded to R2: ${r2Url}`);
-                r2UploadedCount++;
+              const downloadResp = await fetch(downloadUrl, {
+                headers: {
+                  'Authorization': `Bearer ${API_KEY}`,
+                  'Content-Type': 'application/json'
+                }
+              });
+              
+              console.log(`   Download status: ${downloadResp.status}`);
+              
+              if (downloadResp.ok) {
+                const buffer = Buffer.from(await downloadResp.arrayBuffer());
+                console.log(`   Downloaded ${buffer.length} bytes`);
+                
+                console.log(`☁️ Uploading media ${media.id} to R2...`);
+                r2Url = await uploadToR2(buffer, media.id, media.type, modelId);
+                
+                if (r2Url) {
+                  console.log(`✅ Uploaded to R2: ${r2Url}`);
+                  r2UploadedCount++;
+                } else {
+                  console.warn(`⚠️ R2 upload failed for ${media.id}`);
+                }
               } else {
-                console.warn(`⚠️ R2 upload failed for ${media.id}`);
+                console.error(`❌ Download failed: HTTP ${downloadResp.status}`);
               }
-            } else {
-              console.error(`❌ Download failed: HTTP ${downloadResp.status}`);
+            } catch (downloadError) {
+              console.error(`❌ Error for ${media.id}:`, downloadError.message);
             }
-          } catch (downloadError) {
-            console.error(`❌ Download/Upload error for ${media.id}:`, downloadError);
           }
         } else {
           console.log(`✅ Media ${media.id} already has R2 URL`);
