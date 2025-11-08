@@ -47,15 +47,28 @@ export default function SessionManager({ isOpen, onClose, modelId, editingSessio
   }, [isOpen, editingSession])
 
   const initializeParts = (count) => {
-    const newParts = []
-    for (let i = 0; i < count; i++) {
+    const newParts = [
+      // Part 0 (FREE TEASER - SIEMPRE)
+      {
+        step_number: 0,
+        title: 'Free Teaser',
+        base_price: 0,
+        nivel: 1,
+        keywords: [],
+        selectedMedias: [],
+        keywordInput: ''
+      }
+    ]
+    
+    // Agregar las partes de pago (1, 2, 3...)
+    for (let i = 1; i <= count; i++) {
       newParts.push({
-        step_number: i + 1,
+        step_number: i,
         title: '',
         base_price: 10,
         nivel: 2,
         keywords: [],
-        selectedMedias: [], // Array de media objects
+        selectedMedias: [],
         keywordInput: ''
       })
     }
@@ -351,7 +364,7 @@ export default function SessionManager({ isOpen, onClose, modelId, editingSessio
                 {/* Part Header */}
                 <div className="flex items-center justify-between pb-2 border-b border-gray-200">
                   <h4 className="text-lg font-bold text-purple-600">
-                    Part {part.step_number}
+                    Part {part.step_number} {part.step_number === 0 && '(FREE TEASER)'}
                   </h4>
                   <span className="text-sm text-gray-500">
                     {part.selectedMedias.length} media(s) selected
@@ -382,10 +395,14 @@ export default function SessionManager({ isOpen, onClose, modelId, editingSessio
                       type="number"
                       value={part.base_price}
                       onChange={(e) => updatePart(index, 'base_price', parseFloat(e.target.value))}
+                      disabled={part.step_number === 0}
                       min="0"
                       step="5"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
                     />
+                    {part.step_number === 0 && (
+                      <p className="text-xs text-gray-500 mt-1">🔒 Free teaser - price locked at $0</p>
+                    )}
                   </div>
 
                   <div>
