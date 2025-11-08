@@ -14,20 +14,19 @@ export default function SessionManager({ isOpen, onClose, modelId, editingSessio
   const [availableMedias, setAvailableMedias] = useState([])
   const [loading, setLoading] = useState(false)
   const [showMediaSelector, setShowMediaSelector] = useState(null) // {partIndex}
-  const [previewMedia, setPreviewMedia] = useState(null) // Para preview de video/foto
 
   // Niveles predefinidos
   const NIVELES = [
-    { value: 1, label: 'ðŸŸ¢ Tease', color: 'bg-green-100 text-green-800' },
-    { value: 2, label: 'ðŸŸ¢ Soft', color: 'bg-green-100 text-green-800' },
-    { value: 3, label: 'ðŸŸ¢ Innocent', color: 'bg-green-100 text-green-800' },
-    { value: 4, label: 'ðŸŸ¡ Bikini', color: 'bg-yellow-100 text-yellow-800' },
-    { value: 5, label: 'ðŸŸ¡ Lingerie', color: 'bg-yellow-100 text-yellow-800' },
-    { value: 6, label: 'ðŸŸ¡ Topless', color: 'bg-yellow-100 text-yellow-800' },
-    { value: 7, label: 'ðŸŸ  Nude', color: 'bg-orange-100 text-orange-800' },
-    { value: 8, label: 'ðŸŸ  Solo Play', color: 'bg-orange-100 text-orange-800' },
-    { value: 9, label: 'ðŸ”´ Explicit', color: 'bg-red-100 text-red-800' },
-    { value: 10, label: 'âš« Hardcore', color: 'bg-gray-900 text-white' }
+    { value: 1, label: '🟢 Tease', color: 'bg-green-100 text-green-800' },
+    { value: 2, label: '🟢 Soft', color: 'bg-green-100 text-green-800' },
+    { value: 3, label: '🟢 Innocent', color: 'bg-green-100 text-green-800' },
+    { value: 4, label: '🟡 Bikini', color: 'bg-yellow-100 text-yellow-800' },
+    { value: 5, label: '🟡 Lingerie', color: 'bg-yellow-100 text-yellow-800' },
+    { value: 6, label: '🟡 Topless', color: 'bg-yellow-100 text-yellow-800' },
+    { value: 7, label: '🟠 Nude', color: 'bg-orange-100 text-orange-800' },
+    { value: 8, label: '🟠 Solo Play', color: 'bg-orange-100 text-orange-800' },
+    { value: 9, label: '🔴 Explicit', color: 'bg-red-100 text-red-800' },
+    { value: 10, label: '⚫ Hardcore', color: 'bg-gray-900 text-white' }
   ]
 
   useEffect(() => {
@@ -40,7 +39,7 @@ export default function SessionManager({ isOpen, onClose, modelId, editingSessio
         setSessionDescription(editingSession.session_description || '')
         loadSessionParts(editingSession.session_id)
       } else {
-        // Nueva session - inicializar parts vacÃ­os
+        // Nueva session - inicializar parts vacíos
         initializeParts(numParts)
       }
     }
@@ -73,8 +72,8 @@ export default function SessionManager({ isOpen, onClose, modelId, editingSessio
 
       if (error) throw error
       
-      // Filtrar: mostrar solo los que NO estÃ¡n en otra session
-      // (pero si estoy editando, mostrar los de MI session tambiÃ©n)
+      // Filtrar: mostrar solo los que NO están en otra session
+      // (pero si estoy editando, mostrar los de MI session también)
       const available = (data || []).filter(m => {
         if (editingSession) {
           // Si edito, mostrar: sin session O de mi session
@@ -102,7 +101,7 @@ export default function SessionManager({ isOpen, onClose, modelId, editingSessio
 
       if (error) throw error
       
-      // TambiÃ©n necesitamos cargar info de los medias seleccionados
+      // También necesitamos cargar info de los medias seleccionados
       const { data: allSessionMedias } = await supabase
         .from('catalog')
         .select('*')
@@ -247,7 +246,7 @@ export default function SessionManager({ isOpen, onClose, modelId, editingSessio
           throw error
         }
 
-        // Actualizar los otros medias del bundle (si hay mÃ¡s de uno)
+        // Actualizar los otros medias del bundle (si hay más de uno)
         // Solo actualizar su session_id para marcarlos como "usados"
         if (mediaIds.length > 1) {
           for (let j = 1; j < part.selectedMedias.length; j++) {
@@ -264,7 +263,7 @@ export default function SessionManager({ isOpen, onClose, modelId, editingSessio
         }
       }
 
-      alert(`âœ… Session "${sessionName}" guardada exitosamente!`)
+      alert(`✅ Session "${sessionName}" guardada exitosamente!`)
       onClose()
       
     } catch (error) {
@@ -284,10 +283,10 @@ export default function SessionManager({ isOpen, onClose, modelId, editingSessio
         {/* Header */}
         <div className="sticky top-0 bg-gradient-to-r from-purple-600 to-pink-600 text-white p-6 rounded-t-xl">
           <h2 className="text-2xl font-bold">
-            {editingSession ? 'âœï¸ Edit Session' : 'âœ¨ Create New Session'}
+            {editingSession ? '✏️ Edit Session' : '✨ Create New Session'}
           </h2>
           <p className="text-purple-100 mt-1">
-            Organiza tu contenido en mÃºltiples parts secuenciales
+            Organiza tu contenido en múltiples parts secuenciales
           </p>
         </div>
 
@@ -298,7 +297,7 @@ export default function SessionManager({ isOpen, onClose, modelId, editingSessio
           <div className="bg-gray-50 rounded-lg p-4 space-y-4">
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-2">
-                ðŸ“ Session Name
+                📝 Session Name
               </label>
               <input
                 type="text"
@@ -311,7 +310,7 @@ export default function SessionManager({ isOpen, onClose, modelId, editingSessio
 
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-2">
-                ðŸ“„ Description (para la IA)
+                📄 Description (para la IA)
               </label>
               <textarea
                 value={sessionDescription}
@@ -325,7 +324,7 @@ export default function SessionManager({ isOpen, onClose, modelId, editingSessio
             {!editingSession && (
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  ðŸ”¢ Number of Parts (1-10)
+                  🔢 Number of Parts (1-10)
                 </label>
                 <input
                   type="number"
@@ -342,7 +341,7 @@ export default function SessionManager({ isOpen, onClose, modelId, editingSessio
           {/* Parts */}
           <div className="space-y-4">
             <h3 className="text-lg font-bold text-gray-900">
-              ðŸ“¦ Configure Parts
+              📦 Configure Parts
             </h3>
 
             {parts.map((part, index) => (
@@ -376,7 +375,7 @@ export default function SessionManager({ isOpen, onClose, modelId, editingSessio
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-semibold text-gray-700 mb-1">
-                      ðŸ’° Base Price
+                      💰 Base Price
                     </label>
                     <input
                       type="number"
@@ -390,7 +389,7 @@ export default function SessionManager({ isOpen, onClose, modelId, editingSessio
 
                   <div>
                     <label className="block text-sm font-semibold text-gray-700 mb-1">
-                      ðŸ”¥ Explicitness Level
+                      🔥 Explicitness Level
                     </label>
                     <select
                       value={part.nivel}
@@ -409,7 +408,7 @@ export default function SessionManager({ isOpen, onClose, modelId, editingSessio
                 {/* Keywords */}
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-1">
-                    ðŸ·ï¸ Keywords (para storyline de IA)
+                    🏷️ Keywords (para storyline de IA)
                   </label>
                   <div className="flex gap-2 mb-2">
                     <input
@@ -438,7 +437,7 @@ export default function SessionManager({ isOpen, onClose, modelId, editingSessio
                           onClick={() => removeKeyword(index, ki)}
                           className="hover:text-purple-900"
                         >
-                          Ã—
+                          ×
                         </button>
                       </span>
                     ))}
@@ -448,13 +447,13 @@ export default function SessionManager({ isOpen, onClose, modelId, editingSessio
                 {/* Selected Medias */}
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    ðŸŽ¬ Selected Media(s)
+                    🎬 Selected Media(s)
                   </label>
                   
                   {part.selectedMedias.length > 0 ? (
                     <div className="grid grid-cols-4 gap-2 mb-2">
                       {part.selectedMedias.map((media, mi) => (
-                        <div key={mi} className="relative group cursor-pointer" onClick={() => setPreviewMedia(media)}>
+                        <div key={mi} className="relative group">
                           <img
                             src={media.media_thumb || '/placeholder.png'}
                             alt={media.title}
@@ -462,7 +461,7 @@ export default function SessionManager({ isOpen, onClose, modelId, editingSessio
                           />
                           <div className="absolute inset-0 bg-black bg-opacity-50 opacity-0 group-hover:opacity-100 transition-opacity rounded-lg flex items-center justify-center">
                             <span className="text-white text-xs">
-                              {media.file_type === 'video' ? 'ðŸŽ¥' : 'ðŸ“·'}
+                              {media.file_type === 'video' ? '🎥' : '📷'}
                             </span>
                           </div>
                         </div>
@@ -478,7 +477,7 @@ export default function SessionManager({ isOpen, onClose, modelId, editingSessio
                     onClick={() => openMediaSelector(index)}
                     className="w-full px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 font-semibold"
                   >
-                    {part.selectedMedias.length > 0 ? 'âœï¸ Change Medias' : 'âž• Select Medias'}
+                    {part.selectedMedias.length > 0 ? '✏️ Change Medias' : '➕ Select Medias'}
                   </button>
                 </div>
 
@@ -502,7 +501,7 @@ export default function SessionManager({ isOpen, onClose, modelId, editingSessio
             disabled={loading}
             className="flex-1 px-6 py-3 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-lg font-semibold hover:shadow-lg disabled:opacity-50"
           >
-            {loading ? 'â³ Saving...' : 'ðŸ’¾ Save Session'}
+            {loading ? '⏳ Saving...' : '💾 Save Session'}
           </button>
         </div>
 
@@ -554,7 +553,7 @@ function MediaSelectorModal({ availableMedias, usedMediaIds, selectedMediaIds, o
         <div className="bg-gradient-to-r from-blue-600 to-purple-600 text-white p-4">
           <h3 className="text-xl font-bold">Select Media(s)</h3>
           <p className="text-blue-100 text-sm">
-            {selected.size} selected â€¢ {availableToSelect.length} available
+            {selected.size} selected • {availableToSelect.length} available
           </p>
         </div>
 
@@ -562,7 +561,7 @@ function MediaSelectorModal({ availableMedias, usedMediaIds, selectedMediaIds, o
         <div className="flex-1 overflow-y-auto p-4">
           {availableToSelect.length === 0 ? (
             <div className="text-center py-12">
-              <p className="text-gray-500 text-lg">ðŸ˜” No available medias</p>
+              <p className="text-gray-500 text-lg">😔 No available medias</p>
               <p className="text-gray-400 text-sm mt-2">
                 All medias are already assigned to other parts
               </p>
@@ -588,14 +587,14 @@ function MediaSelectorModal({ availableMedias, usedMediaIds, selectedMediaIds, o
                   {/* Overlay */}
                   <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent flex flex-col justify-end p-2">
                     <span className="text-white text-xs font-semibold truncate">
-                      {media.file_type === 'video' ? 'ðŸŽ¥' : 'ðŸ“·'} {media.title || 'Untitled'}
+                      {media.file_type === 'video' ? '🎥' : '📷'} {media.title || 'Untitled'}
                     </span>
                   </div>
 
                   {/* Checkmark */}
                   {selected.has(media.of_media_id) && (
                     <div className="absolute top-2 right-2 w-6 h-6 bg-purple-600 rounded-full flex items-center justify-center">
-                      <span className="text-white text-sm">âœ“</span>
+                      <span className="text-white text-sm">✓</span>
                     </div>
                   )}
                 </div>
@@ -623,42 +622,5 @@ function MediaSelectorModal({ availableMedias, usedMediaIds, selectedMediaIds, o
 
       </div>
     </div>
-
-    {/* Preview Modal */}
-    {previewMedia && (
-      <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-[100]" onClick={() => setPreviewMedia(null)}>
-        <div className="max-w-4xl w-full p-4" onClick={(e) => e.stopPropagation()}>
-          <div className="bg-white rounded-lg overflow-hidden">
-            {previewMedia.file_type === 'video' ? (
-              <video
-                src={previewMedia.r2_url || previewMedia.media_url}
-                controls
-                autoPlay
-                className="w-full"
-              >
-                Your browser doesn't support video
-              </video>
-            ) : (
-              <img
-                src={previewMedia.r2_url || previewMedia.media_url || previewMedia.media_thumb}
-                alt={previewMedia.title}
-                className="w-full"
-              />
-            )}
-            <div className="p-4 bg-gray-50">
-              <p className="text-sm font-semibold text-gray-800">{previewMedia.title}</p>
-              <p className="text-xs text-gray-600">{previewMedia.file_type}</p>
-            </div>
-          </div>
-          <button
-            onClick={() => setPreviewMedia(null)}
-            className="mt-4 w-full px-4 py-2 bg-white text-gray-800 rounded-lg font-semibold hover:bg-gray-100"
-          >
-            Close
-          </button>
-        </div>
-      </div>
-    )}
-
   )
 }
