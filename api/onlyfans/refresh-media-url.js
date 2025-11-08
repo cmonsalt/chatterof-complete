@@ -16,7 +16,7 @@ export default async function handler(req, res) {
     console.log(`🔄 Refreshing URL for media ${ofMediaId}...`);
 
     // Obtener info del media desde OnlyFans (incluye URL fresca)
-    const url = `https://app.onlyfansapi.com/api/${accountId}/media/vault?limit=1000`;
+    const url = `https://app.onlyfansapi.com/api/${accountId}/media/vault?limit=100&sort=desc`;
     
     const response = await fetch(url, {
       headers: { 
