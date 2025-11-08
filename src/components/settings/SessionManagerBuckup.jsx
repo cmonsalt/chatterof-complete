@@ -1,10 +1,6 @@
-import { useState, useEffect } from 'react'
-import { createClient } from '@supabase/supabase-js'
+import { useState, useEffect } from 'react';
+import { supabase } from '../../lib/supabase'
 
-const supabase = createClient(
-  import.meta.env.VITE_SUPABASE_URL,
-  import.meta.env.VITE_SUPABASE_ANON_KEY
-)
 
 export default function SessionManager({ isOpen, onClose, modelId, editingSession = null, preselectedMediaIds = [] }) {
   const [sessionName, setSessionName] = useState('')
@@ -13,7 +9,6 @@ export default function SessionManager({ isOpen, onClose, modelId, editingSessio
   const [parts, setParts] = useState([])
   const [availableMedias, setAvailableMedias] = useState([])
   const [loading, setLoading] = useState(false)
-  const [showMediaSelector, setShowMediaSelector] = useState(null)
   const [previewMedia, setPreviewMedia] = useState(null)
 
   // Niveles predefinidos
@@ -454,7 +449,7 @@ export default function SessionManager({ isOpen, onClose, modelId, editingSessio
                   {part.selectedMedias.length > 0 ? (
                     <div className="grid grid-cols-4 gap-2 mb-2">
                       {part.selectedMedias.map((media, mi) => (
-                        <div key={mi} className="relative group cursor-pointer" onClick={() => setPreviewMedia(media)}>
+                       <div key={mi} className="relative group cursor-pointer" onClick={() => setPreviewMedia(media)}>
                           <img
                             src={media.media_thumb || '/placeholder.png'}
                             alt={media.title}
@@ -517,42 +512,6 @@ export default function SessionManager({ isOpen, onClose, modelId, editingSessio
           onSelect={(ids) => handleMediaSelect(showMediaSelector, ids)}
           onClose={() => setShowMediaSelector(null)}
         />
-      )}
-
-      {/* Preview Modal */}
-      {previewMedia && (
-        <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-[100]" onClick={() => setPreviewMedia(null)}>
-          <div className="max-w-4xl w-full p-4" onClick={(e) => e.stopPropagation()}>
-            <div className="bg-white rounded-lg overflow-hidden">
-              {previewMedia.file_type === 'video' ? (
-                <video
-                  src={previewMedia.r2_url || previewMedia.media_url}
-                  controls
-                  autoPlay
-                  className="w-full"
-                >
-                  Your browser doesn't support video
-                </video>
-              ) : (
-                <img
-                  src={previewMedia.r2_url || previewMedia.media_url || previewMedia.media_thumb}
-                  alt={previewMedia.title}
-                  className="w-full"
-                />
-              )}
-              <div className="p-4 bg-gray-50">
-                <p className="text-sm font-semibold text-gray-800">{previewMedia.title}</p>
-                <p className="text-xs text-gray-600">{previewMedia.file_type}</p>
-              </div>
-            </div>
-            <button
-              onClick={() => setPreviewMedia(null)}
-              className="mt-4 w-full px-4 py-2 bg-white text-gray-800 rounded-lg font-semibold hover:bg-gray-100"
-            >
-              Close
-            </button>
-          </div>
-        </div>
       )}
 
     </div>
@@ -660,4 +619,8 @@ function MediaSelectorModal({ availableMedias, usedMediaIds, selectedMediaIds, o
       </div>
     </div>
   )
+  
 }
+
+
+
