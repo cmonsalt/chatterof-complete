@@ -125,15 +125,16 @@ export default async function handler(req, res) {
             try {
               console.log(`📥 Downloading media ${media.id} from OnlyFans API...`);
               
-              // Usar el endpoint correcto con cdnUrl
-              const encodedUrl = encodeURIComponent(mediaUrl);
-              const downloadUrl = `https://app.onlyfansapi.com/api/${accountId}/media/download/${encodedUrl}`;
+              // Según la doc: GET con body JSON
+              const downloadUrl = `https://app.onlyfansapi.com/api/${accountId}/media/download/string`;
               
               const downloadResp = await fetch(downloadUrl, {
+                method: 'GET',
                 headers: {
                   'Authorization': `Bearer ${API_KEY}`,
                   'Content-Type': 'application/json'
-                }
+                },
+                body: JSON.stringify({ cdnUrl: mediaUrl })
               });
               
               console.log(`   Download status: ${downloadResp.status}`);
@@ -152,7 +153,8 @@ export default async function handler(req, res) {
                   console.warn(`⚠️ R2 upload failed for ${media.id}`);
                 }
               } else {
-                console.error(`❌ Download failed: HTTP ${downloadResp.status}`);
+                const errorText = await downloadResp.text();
+                console.error(`❌ Download failed: HTTP ${downloadResp.status} - ${errorText.substring(0, 200)}`);
               }
             } catch (downloadError) {
               console.error(`❌ Error for ${media.id}:`, downloadError.message);
