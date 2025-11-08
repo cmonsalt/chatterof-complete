@@ -23,19 +23,19 @@ export default function CatalogView({ modelId }) {
   const [refreshingVideo, setRefreshingVideo] = useState(null)
 
   // Función para refrescar URL y abrir video
-  const handleWatchVideo = async (single) => {
+const handleWatchVideo = async (single) => {
     setRefreshingVideo(single.id)
     
     try {
-      // Obtener account_id del modelo
+      // Obtener of_account_id del modelo
       const { data: modelData } = await supabase
         .from('models')
-        .select('of_account_id')
+        .select('of_account_id')  // ← CAMBIADO
         .eq('model_id', modelId)
         .single()
       
-      if (!modelData?.account_id) {
-        alert('Error: No se encontró account_id del modelo')
+      if (!modelData?.of_account_id) {  // ← CAMBIADO
+        alert('Error: No se encontró of_account_id del modelo')
         return
       }
 
@@ -44,7 +44,7 @@ export default function CatalogView({ modelId }) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          accountId: modelData.account_id,
+          accountId: modelData.of_account_id,  // ← CAMBIADO
           ofMediaId: single.of_media_id
         })
       })
