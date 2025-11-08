@@ -225,6 +225,9 @@ async function handleVaultContent(payload, modelId) {
       const catalogData = {
         model_id: modelId,
         of_media_id: mediaId,
+        title: `Vault ${mediaType} - ${mediaId}`, // Título temporal
+        base_price: 0, // Se asignará después al organizar
+        nivel: 1, // Nivel por defecto
         file_type: mediaType,
         r2_url: r2Url,
         media_thumb: r2ThumbUrl || thumbUrl,
