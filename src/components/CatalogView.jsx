@@ -30,7 +30,7 @@ export default function CatalogView({ modelId }) {
       // Obtener account_id del modelo
       const { data: modelData } = await supabase
         .from('models')
-        .select('account_id')
+        .select('of_account_id')
         .eq('model_id', modelId)
         .single()
       
