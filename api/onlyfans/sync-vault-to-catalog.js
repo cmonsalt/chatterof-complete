@@ -138,8 +138,10 @@ export default async function handler(req, res) {
               
               console.log(`   Download status: ${downloadResp.status}`);
               
-              if (downloadResp.ok) {
-                const buffer = Buffer.from(await downloadResp.arrayBuffer());
+              const buffer = Buffer.from(await downloadResp.arrayBuffer());
+              
+              // Si tiene contenido binario válido, procesarlo
+              if (buffer.length > 1000) {  // Archivos reales son > 1KB
                 console.log(`   Downloaded ${buffer.length} bytes`);
                 
                 console.log(`☁️ Uploading media ${media.id} to R2...`);
