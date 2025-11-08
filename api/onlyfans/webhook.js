@@ -175,7 +175,7 @@ export default async function handler(req, res) {
     const modelId = model.model_id
 
     // Procesar mensaje
-    if (event === 'message:new') {
+    if (event === 'messages.received') {
       await handleMessage(data, modelId)
     }
 
