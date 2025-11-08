@@ -125,10 +125,160 @@ async function handleMessageReceived(payload, modelId) {
   }
 }
 
+// 📦 HANDLE VAULT CONTENT - Descargar y subir a R2
+async function handleVaultContent(payload, modelId) {
+  try {
+    // Solo procesar si tiene media
+    if (!payload.media || payload.media.length === 0) {
+      console.log('⚠️ No media in vault message')
+      return
+    }
+
+    console.log(`🎯 Vault content detected, processing ${payload.media.length} files...`)
+
+    // Procesar cada media
+    for (const media of payload.media) {
+      const mediaId = media.id?.toString()
+      const mediaType = media.type // 'photo' o 'video'
+      const cdnUrl = media.files?.full?.url || media.files?.source?.url
+      const thumbUrl = media.files?.thumb?.url
+
+      if (!mediaId || !cdnUrl) {
+        console.log('⚠️ Missing mediaId or cdnUrl')
+        continue
+      }
+
+      console.log(`📥 Downloading media ${mediaId} from CDN...`)
+
+      // Descargar desde OnlyFans CDN
+      const response = await fetch(cdnUrl)
+      
+      if (!response.ok) {
+        console.error(`❌ Failed to download: ${response.status}`)
+        continue
+      }
+
+      const arrayBuffer = await response.arrayBuffer()
+      const buffer = Buffer.from(arrayBuffer)
+      
+      console.log(`✅ Downloaded ${buffer.length} bytes`)
+
+      // Determinar extensión y content type
+      const ext = mediaType === 'video' ? 'mp4' : 'jpg'
+      const contentType = mediaType === 'video' ? 'video/mp4' : 'image/jpeg'
+      
+      // Generar key único para R2
+      const timestamp = Date.now()
+      const r2Key = `vault/${mediaId}_${timestamp}.${ext}`
+      
+      // Subir a R2
+      const { S3Client, PutObjectCommand } = await import('@aws-sdk/client-s3')
+      
+      const r2Client = new S3Client({
+        region: 'auto',
+        endpoint: `https://${process.env.R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
+        credentials: {
+          accessKeyId: process.env.R2_ACCESS_KEY_ID,
+          secretAccessKey: process.env.R2_SECRET_ACCESS_KEY,
+        },
+      })
+
+      const command = new PutObjectCommand({
+        Bucket: process.env.R2_BUCKET_NAME,
+        Key: r2Key,
+        Body: buffer,
+        ContentType: contentType,
+      })
+
+      await r2Client.send(command)
+
+      // URL pública de R2
+      const r2Url = `https://${process.env.R2_BUCKET_NAME}.r2.dev/${r2Key}`
+      
+      console.log(`✅ Uploaded to R2: ${r2Url}`)
+
+      // También subir thumbnail si existe
+      let r2ThumbUrl = null
+      if (thumbUrl) {
+        try {
+          const thumbResponse = await fetch(thumbUrl)
+          if (thumbResponse.ok) {
+            const thumbBuffer = Buffer.from(await thumbResponse.arrayBuffer())
+            const thumbKey = `vault/${mediaId}_${timestamp}_thumb.jpg`
+            
+            await r2Client.send(new PutObjectCommand({
+              Bucket: process.env.R2_BUCKET_NAME,
+              Key: thumbKey,
+              Body: thumbBuffer,
+              ContentType: 'image/jpeg',
+            }))
+            
+            r2ThumbUrl = `https://${process.env.R2_BUCKET_NAME}.r2.dev/${thumbKey}`
+            console.log(`✅ Thumbnail uploaded to R2`)
+          }
+        } catch (thumbError) {
+          console.error('⚠️ Thumbnail upload failed:', thumbError)
+        }
+      }
+
+      // Guardar en catalog
+      const catalogData = {
+        model_id: modelId,
+        of_media_id: mediaId,
+        file_type: mediaType,
+        r2_url: r2Url,
+        media_thumb: r2ThumbUrl || thumbUrl,
+        status: 'inbox', // Pendiente de organizar
+        created_at: new Date().toISOString()
+      }
+
+      const { error } = await supabase
+        .from('catalog')
+        .upsert(catalogData, { onConflict: 'of_media_id' })
+
+      if (error) {
+        console.error('❌ Error saving to catalog:', error)
+      } else {
+        console.log(`✅ Media ${mediaId} saved to catalog (inbox)`)
+      }
+    }
+
+  } catch (error) {
+    console.error('❌ Error in handleVaultContent:', error)
+  }
+}
+
 // 📤 MESSAGES.SENT - Mensaje enviado por la modelo
 async function handleMessageSent(payload, modelId) {
   console.log('📤 Message sent by model')
-  // No hacer nada, ya se guardó cuando se envió desde la app
+  
+  // Verificar si es al vault fan
+  const recipientId = payload.toUser?.id?.toString()
+  
+  if (!recipientId) {
+    console.log('⚠️ No recipient in sent message')
+    return
+  }
+
+  // Buscar vault_fan_id del modelo
+  const { data: model } = await supabase
+    .from('models')
+    .select('vault_fan_id')
+    .eq('model_id', modelId)
+    .single()
+
+  if (!model?.vault_fan_id) {
+    console.log('⚠️ No vault_fan_id configured')
+    return
+  }
+
+  // Si el destinatario es el vault fan, procesar contenido
+  if (recipientId === model.vault_fan_id) {
+    console.log('🎯 Message to vault fan detected!')
+    await handleVaultContent(payload, modelId)
+  } else {
+    console.log('📤 Regular message sent (not to vault fan)')
+  }
 }
 
 // 💰 MESSAGES.PPV.UNLOCKED - PPV desbloqueado
