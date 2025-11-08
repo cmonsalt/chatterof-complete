@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { createClient } from '@supabase/supabase-js'
-import SessionManager from './SessionManager'
-import SingleEditor from './SingleEditor'
+import SessionManager from './settings/SessionManager'
+import SingleEditor from './settings/SingleEditor'
 
 const supabase = createClient(
   import.meta.env.VITE_SUPABASE_URL,
