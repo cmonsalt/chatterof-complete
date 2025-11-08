@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import InboxView from './InboxView'
-import CatalogView from './CatalogView'
+import CatalogView from '../CatalogView'
 import VaultSetup from './VaultSetup'
 import VaultInstructions from './VaultInstructions'
 
