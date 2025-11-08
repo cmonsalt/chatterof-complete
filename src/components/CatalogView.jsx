@@ -629,14 +629,14 @@ function MediaPreviewModal({ media, onClose }) {
           <div>
             <h3 className="text-lg font-bold">{media.title || 'Preview'}</h3>
             <p className="text-sm text-purple-100">
-              {media.file_type === 'video' ? 'ðŸŽ¥ Video' : 'ðŸ“· Photo'}
+              {media.file_type === 'video' ? '🎥 Video' : '📸 Photo'}
             </p>
           </div>
           <button
             onClick={onClose}
             className="text-white hover:bg-white/20 rounded-lg p-2"
           >
-            âœ•
+            ✕
           </button>
         </div>
 
