@@ -105,13 +105,6 @@ export default function Settings() {
                   icon="🗂️"
                   label="Vault"
                 />
-                {/* ✅ NUEVO TAB */}
-                <TabButton
-                  active={activeTab === 'upload'}
-                  onClick={() => setActiveTab('upload')}
-                  icon="📤"
-                  label="Upload"
-                />
               </nav>
             </div>
 

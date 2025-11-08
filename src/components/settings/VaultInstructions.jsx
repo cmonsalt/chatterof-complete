@@ -120,64 +120,7 @@ export default function VaultInstructions({ modelId: propModelId, onGoToSetup })
 
   return (
     <div className="space-y-6">
-      {/* Header con Sync Button */}
-      <div className="bg-white rounded-xl shadow-lg p-6">
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-3">
-            <span className="text-3xl">📦</span>
-            <div>
-              <h2 className="text-2xl font-bold text-gray-800">Vault Management</h2>
-              <p className="text-gray-600 text-sm">Gestiona tu contenido para PPV</p>
-            </div>
-          </div>
-          <div className="text-right">
-            <div className="text-3xl font-bold text-purple-600">{catalogCount}</div>
-            <div className="text-xs text-gray-500">Items en catalog</div>
-          </div>
-        </div>
-
-        {/* Botón de Sync */}
-        <button
-          onClick={handleSyncVault}
-          disabled={syncing}
-          className="w-full px-6 py-3 bg-gradient-to-r from-blue-500 to-indigo-500 text-white rounded-lg hover:from-blue-600 hover:to-indigo-600 font-bold disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 transition-all"
-        >
-          {syncing ? (
-            <>
-              <span className="animate-spin">⏳</span>
-              <span>Syncing vault...</span>
-            </>
-          ) : (
-            <>
-              <span>🔄</span>
-              <span>Sync Vault from OnlyFans</span>
-            </>
-          )}
-        </button>
-
-        {/* Resultado del sync */}
-        {syncResult && (
-          <div className="mt-4 p-4 bg-green-50 border border-green-200 rounded-lg animate-fadeIn">
-            <div className="flex items-center gap-2 mb-2">
-              <span className="text-green-600 font-bold">✅ Sync Complete!</span>
-            </div>
-            <div className="text-sm text-gray-700 space-y-1">
-              <p>• Total: {syncResult.total} items</p>
-              <p>• Synced: {syncResult.synced} items</p>
-              {syncResult.r2_uploaded > 0 && (
-                <p className="text-blue-600">• Downloaded to R2: {syncResult.r2_uploaded} items</p>
-              )}
-              {syncResult.skipped > 0 && (
-                <p>• Skipped: {syncResult.skipped} items</p>
-              )}
-              {syncResult.errors > 0 && (
-                <p className="text-red-600">• Errors: {syncResult.errors} items</p>
-              )}
-            </div>
-          </div>
-        )}
-      </div>
-
+    
       {/* Fan de prueba configurado */}
       <div className="bg-green-50 border-l-4 border-green-500 rounded-lg p-6">
         <div className="flex items-center gap-2 mb-2">
