@@ -193,7 +193,7 @@ async function handleVaultContent(payload, modelId) {
       await r2Client.send(command)
 
       // URL pública de R2 (permanente)
-      const r2Url = `${process.env.R2_PUBLIC_URL}/${r2Key}`
+      const r2Url = `https://pub-${process.env.R2_ACCOUNT_ID}.r2.dev/${r2Key}`
       
       console.log(`✅ Uploaded to R2: ${r2Url}`)
 
