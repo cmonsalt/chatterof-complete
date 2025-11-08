@@ -20,6 +20,50 @@ export default function CatalogView({ modelId }) {
   const [editingSingle, setEditingSingle] = useState(null)
   const [showAddSingleSelector, setShowAddSingleSelector] = useState(false)
   const [availableMedias, setAvailableMedias] = useState([])
+  const [refreshingVideo, setRefreshingVideo] = useState(null)
+
+  // Función para refrescar URL y abrir video
+  const handleWatchVideo = async (single) => {
+    setRefreshingVideo(single.id)
+    
+    try {
+      // Obtener account_id del modelo
+      const { data: modelData } = await supabase
+        .from('models')
+        .select('account_id')
+        .eq('model_id', modelId)
+        .single()
+      
+      if (!modelData?.account_id) {
+        alert('Error: No se encontró account_id del modelo')
+        return
+      }
+
+      // Llamar al endpoint para refrescar URL
+      const response = await fetch('/api/onlyfans/refresh-media-url', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          accountId: modelData.account_id,
+          ofMediaId: single.of_media_id
+        })
+      })
+
+      const result = await response.json()
+
+      if (result.success && result.freshUrl) {
+        // Abrir URL fresca en nueva pestaña
+        window.open(result.freshUrl, '_blank')
+      } else {
+        alert('Error al obtener URL del video: ' + (result.error || 'Unknown error'))
+      }
+    } catch (error) {
+      console.error('Error refreshing video:', error)
+      alert('Error al cargar el video')
+    } finally {
+      setRefreshingVideo(null)
+    }
+  }
 
   useEffect(() => {
     loadCatalog()
@@ -86,7 +130,7 @@ export default function CatalogView({ modelId }) {
   }
 
   const handleDeleteSession = async (session) => {
-    if (!confirm(`¿Eliminar session "${session.session_name}"? Los medias volverán a estar sin organizar pero seguirán en Inbox.`)) {
+    if (!confirm(`Â¿Eliminar session "${session.session_name}"? Los medias volverÃ¡n a estar sin organizar pero seguirÃ¡n en Inbox.`)) {
       return
     }
 
@@ -104,7 +148,7 @@ export default function CatalogView({ modelId }) {
 
       if (error) throw error
 
-      alert('✅ Session eliminada. Los medias siguen en Inbox.')
+      alert('âœ… Session eliminada. Los medias siguen en Inbox.')
       loadCatalog()
 
     } catch (error) {
@@ -119,7 +163,7 @@ export default function CatalogView({ modelId }) {
   }
 
   const handleDeleteSingle = async (single) => {
-    if (!confirm(`¿Desmarcar "${single.title}" como Single? El media seguirá en Inbox.`)) {
+    if (!confirm(`Â¿Desmarcar "${single.title}" como Single? El media seguirÃ¡ en Inbox.`)) {
       return
     }
 
@@ -131,7 +175,7 @@ export default function CatalogView({ modelId }) {
 
       if (error) throw error
 
-      alert('✅ Single desmarcado. El media sigue en Inbox.')
+      alert('âœ… Single desmarcado. El media sigue en Inbox.')
       loadCatalog()
 
     } catch (error) {
@@ -174,16 +218,16 @@ export default function CatalogView({ modelId }) {
 
   const getNivelBadge = (nivel) => {
     const badges = {
-      1: { label: '🟢 Tease', color: 'bg-green-100 text-green-800' },
-      2: { label: '🟢 Soft', color: 'bg-green-100 text-green-800' },
-      3: { label: '🟢 Innocent', color: 'bg-green-100 text-green-800' },
-      4: { label: '🟡 Bikini', color: 'bg-yellow-100 text-yellow-800' },
-      5: { label: '🟡 Lingerie', color: 'bg-yellow-100 text-yellow-800' },
-      6: { label: '🟡 Topless', color: 'bg-yellow-100 text-yellow-800' },
-      7: { label: '🟠 Nude', color: 'bg-orange-100 text-orange-800' },
-      8: { label: '🟠 Solo Play', color: 'bg-orange-100 text-orange-800' },
-      9: { label: '🔴 Explicit', color: 'bg-red-100 text-red-800' },
-      10: { label: '⚫ Hardcore', color: 'bg-gray-900 text-white' }
+      1: { label: 'ðŸŸ¢ Tease', color: 'bg-green-100 text-green-800' },
+      2: { label: 'ðŸŸ¢ Soft', color: 'bg-green-100 text-green-800' },
+      3: { label: 'ðŸŸ¢ Innocent', color: 'bg-green-100 text-green-800' },
+      4: { label: 'ðŸŸ¡ Bikini', color: 'bg-yellow-100 text-yellow-800' },
+      5: { label: 'ðŸŸ¡ Lingerie', color: 'bg-yellow-100 text-yellow-800' },
+      6: { label: 'ðŸŸ¡ Topless', color: 'bg-yellow-100 text-yellow-800' },
+      7: { label: 'ðŸŸ  Nude', color: 'bg-orange-100 text-orange-800' },
+      8: { label: 'ðŸŸ  Solo Play', color: 'bg-orange-100 text-orange-800' },
+      9: { label: 'ðŸ”´ Explicit', color: 'bg-red-100 text-red-800' },
+      10: { label: 'âš« Hardcore', color: 'bg-gray-900 text-white' }
     }
     return badges[nivel] || badges[1]
   }
@@ -212,7 +256,7 @@ export default function CatalogView({ modelId }) {
                 : 'border-transparent text-gray-500 hover:text-gray-700'
             }`}
           >
-            📁 Sessions ({sessions.length})
+            ðŸ“ Sessions ({sessions.length})
           </button>
           <button
             onClick={() => setActiveTab('singles')}
@@ -222,14 +266,14 @@ export default function CatalogView({ modelId }) {
                 : 'border-transparent text-gray-500 hover:text-gray-700'
             }`}
           >
-            💎 Singles ({singles.length})
+            ðŸ’Ž Singles ({singles.length})
           </button>
         </div>
       </div>
 
       {activeTab === 'sessions' ? (
         <div className="space-y-4">
-          {/* Botón Create Session */}
+          {/* BotÃ³n Create Session */}
           <div className="flex justify-end">
             <button
               onClick={() => {
@@ -238,13 +282,13 @@ export default function CatalogView({ modelId }) {
               }}
               className="px-6 py-2 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-lg font-semibold hover:shadow-lg transition-all"
             >
-              ✨ Create Session
+              âœ¨ Create Session
             </button>
           </div>
 
           {sessions.length === 0 ? (
             <div className="text-center py-12 bg-gray-50 rounded-lg border-2 border-dashed border-gray-300">
-              <p className="text-gray-500 text-lg">📁 No sessions yet</p>
+              <p className="text-gray-500 text-lg">ðŸ“ No sessions yet</p>
               <p className="text-gray-400 text-sm mt-2">
                 Create sessions from Inbox content
               </p>
@@ -272,14 +316,14 @@ export default function CatalogView({ modelId }) {
                     <div className="flex-1">
                       <div className="flex items-center gap-3">
                         <span className="text-2xl">
-                          {expandedSessions.has(session.session_id) ? '📂' : '📁'}
+                          {expandedSessions.has(session.session_id) ? 'ðŸ“‚' : 'ðŸ“'}
                         </span>
                         <div>
                           <h3 className="text-lg font-bold text-gray-900">
                             {session.session_name}
                           </h3>
                           <p className="text-sm text-gray-600">
-                            {session.parts.length} parts • {session.session_description}
+                            {session.parts.length} parts â€¢ {session.session_description}
                           </p>
                         </div>
                       </div>
@@ -293,7 +337,7 @@ export default function CatalogView({ modelId }) {
                         }}
                         className="px-3 py-1 bg-white border border-purple-300 text-purple-600 rounded-lg hover:bg-purple-50 text-sm font-semibold"
                       >
-                        ✏️ Edit
+                        âœï¸ Edit
                       </button>
                       <button
                         onClick={(e) => {
@@ -302,7 +346,7 @@ export default function CatalogView({ modelId }) {
                         }}
                         className="px-3 py-1 bg-white border border-red-300 text-red-600 rounded-lg hover:bg-red-50 text-sm font-semibold"
                       >
-                        🗑️
+                        ðŸ—‘ï¸
                       </button>
                     </div>
                   </div>
@@ -330,7 +374,7 @@ export default function CatalogView({ modelId }) {
                                 />
                               ) : (
                                 <div className="w-full h-full flex items-center justify-center text-gray-400">
-                                  {part.file_type === 'video' ? '🎥' : '📷'}
+                                  {part.file_type === 'video' ? 'ðŸŽ¥' : 'ðŸ“·'}
                                 </div>
                               )}
                             </div>
@@ -343,7 +387,7 @@ export default function CatalogView({ modelId }) {
                                   </h4>
                                   <div className="flex flex-wrap items-center gap-2 mb-2">
                                     <span className="px-2 py-1 bg-green-100 text-green-800 rounded-full text-xs font-semibold">
-                                      💰 ${part.base_price}
+                                      ðŸ’° ${part.base_price}
                                     </span>
                                     <span className={`px-2 py-1 rounded-full text-xs font-semibold ${nivelBadge.color}`}>
                                       {nivelBadge.label}
@@ -390,13 +434,13 @@ export default function CatalogView({ modelId }) {
               onClick={handleAddSingle}
               className="px-4 py-2 bg-green-600 text-white rounded-lg font-semibold hover:bg-green-700"
             >
-              ➕ Add Single
+              âž• Add Single
             </button>
           </div>
 
           {singles.length === 0 ? (
             <div className="text-center py-12 bg-gray-50 rounded-lg border-2 border-dashed border-gray-300">
-              <p className="text-gray-500 text-lg">💎 No singles yet</p>
+              <p className="text-gray-500 text-lg">ðŸ’Ž No singles yet</p>
               <p className="text-gray-400 text-sm mt-2">
                 Mark content as Singles from Inbox for quick direct sales
               </p>
@@ -426,19 +470,19 @@ export default function CatalogView({ modelId }) {
                         />
                       ) : (
                         <div className="w-full h-full bg-gray-100 flex items-center justify-center text-gray-400 text-4xl">
-                          {single.file_type === 'video' ? '🎥' : '📷'}
+                          {single.file_type === 'video' ? 'ðŸŽ¥' : 'ðŸ“·'}
                         </div>
                       )}
 
                       <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-40 transition-all flex items-center justify-center">
                         <span className="text-white text-sm font-semibold opacity-0 group-hover:opacity-100 transition-all">
-                          👁️ Preview
+                          ðŸ‘ï¸ Preview
                         </span>
                       </div>
 
                       {!isConfigured && (
                         <div className="absolute top-2 left-2 px-2 py-1 bg-yellow-500 text-white text-xs font-bold rounded">
-                          ⚠️ Configure
+                          âš ï¸ Configure
                         </div>
                       )}
                     </div>
@@ -463,18 +507,38 @@ export default function CatalogView({ modelId }) {
                         </span>
                       </div>
 
+                      {/* Botón Ver Video (solo para videos) */}
+                      {single.file_type === 'video' && (
+                        <button
+                          onClick={() => handleWatchVideo(single)}
+                          disabled={refreshingVideo === single.id}
+                          className="w-full mb-2 px-3 py-2 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-lg hover:shadow-lg transition-all text-xs font-semibold disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                        >
+                          {refreshingVideo === single.id ? (
+                            <>
+                              <span className="animate-spin">⏳</span>
+                              Cargando...
+                            </>
+                          ) : (
+                            <>
+                              👁️ Ver Video Completo
+                            </>
+                          )}
+                        </button>
+                      )}
+
                       <div className="flex gap-1">
                         <button
                           onClick={() => handleEditSingle(single)}
                           className="flex-1 px-3 py-1 bg-purple-50 text-purple-600 rounded hover:bg-purple-100 text-xs font-semibold"
                         >
-                          ✏️ {isConfigured ? 'Edit' : 'Configure'}
+                          âœï¸ {isConfigured ? 'Edit' : 'Configure'}
                         </button>
                         <button
                           onClick={() => handleDeleteSingle(single)}
                           className="px-3 py-1 bg-red-50 text-red-600 rounded hover:bg-red-100 text-xs font-semibold"
                         >
-                          🗑️
+                          ðŸ—‘ï¸
                         </button>
                       </div>
                     </div>
@@ -539,7 +603,7 @@ function MediaSelectorModal({ medias, onSelect, onClose }) {
         
         <div className="bg-gradient-to-r from-green-600 to-emerald-600 text-white p-4 flex items-center justify-between">
           <div>
-            <h3 className="text-lg font-bold">💎 Select Media for Single</h3>
+            <h3 className="text-lg font-bold">ðŸ’Ž Select Media for Single</h3>
             <p className="text-sm text-green-100">
               Choose content to mark as Single
             </p>
@@ -548,14 +612,14 @@ function MediaSelectorModal({ medias, onSelect, onClose }) {
             onClick={onClose}
             className="text-white hover:bg-white/20 rounded-lg p-2"
           >
-            ✕
+            âœ•
           </button>
         </div>
 
         <div className="flex-1 overflow-auto p-6">
           {medias.length === 0 ? (
             <div className="text-center py-12">
-              <p className="text-gray-500 text-lg">📭 No available content</p>
+              <p className="text-gray-500 text-lg">ðŸ“­ No available content</p>
               <p className="text-gray-400 text-sm mt-2">
                 All content is already organized in Sessions or Singles
               </p>
@@ -577,14 +641,14 @@ function MediaSelectorModal({ medias, onSelect, onClose }) {
                       />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center text-gray-400 text-3xl">
-                        {media.file_type === 'video' ? '🎥' : '📷'}
+                        {media.file_type === 'video' ? 'ðŸŽ¥' : 'ðŸ“·'}
                       </div>
                     )}
                   </div>
                   
                   <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-40 transition-all flex items-center justify-center">
                     <span className="text-white text-sm font-semibold opacity-0 group-hover:opacity-100 transition-all">
-                      ✓ Select
+                      âœ“ Select
                     </span>
                   </div>
 
@@ -593,7 +657,7 @@ function MediaSelectorModal({ medias, onSelect, onClose }) {
                       {media.title || 'Untitled'}
                     </p>
                     <p className="text-xs text-gray-500">
-                      {media.file_type === 'video' ? '🎥' : '📷'}
+                      {media.file_type === 'video' ? 'ðŸŽ¥' : 'ðŸ“·'}
                     </p>
                   </div>
                 </div>
@@ -625,14 +689,14 @@ function MediaPreviewModal({ media, onClose }) {
           <div>
             <h3 className="text-lg font-bold">{media.title || 'Preview'}</h3>
             <p className="text-sm text-purple-100">
-              {media.file_type === 'video' ? '🎥 Video' : '📷 Photo'}
+              {media.file_type === 'video' ? 'ðŸŽ¥ Video' : 'ðŸ“· Photo'}
             </p>
           </div>
           <button
             onClick={onClose}
             className="text-white hover:bg-white/20 rounded-lg p-2"
           >
-            ✕
+            âœ•
           </button>
         </div>
 
