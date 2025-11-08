@@ -7,7 +7,7 @@ import ReconnectAccount from '../components/ReconnectAccount'
 import ConfigTab from '../components/settings/ConfigTab'
 import TiersTab from '../components/settings/TiersTab'
 import VaultTab from '../components/settings/VaultTab'
-import VaultUpload from '../components/VaultUpload'  // ✅ NUEVO
+
 
 export default function Settings() {
   const { modelId, currentModel } = useAuth()
@@ -167,8 +167,6 @@ export default function Settings() {
               {activeTab === 'config' && <ConfigTab modelId={modelId} />}
               {activeTab === 'tiers' && <TiersTab modelId={modelId} />}
               {activeTab === 'vault' && <VaultTab modelId={modelId} />}
-              {/* ✅ NUEVO CONTENIDO */}
-              {activeTab === 'upload' && <VaultUpload />}
             </div>
           </div>
         </div>
