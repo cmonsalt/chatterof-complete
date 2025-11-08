@@ -1,10 +1,6 @@
 import { useState, useEffect } from 'react'
-import { createClient } from '@supabase/supabase-js'
+import { supabase } from '../lib/supabase'
 
-const supabase = createClient(
-  import.meta.env.VITE_SUPABASE_URL,
-  import.meta.env.VITE_SUPABASE_ANON_KEY
-)
 
 export default function SessionManager({ isOpen, onClose, modelId, editingSession = null, preselectedMediaIds = [] }) {
   const [sessionName, setSessionName] = useState('')
@@ -13,7 +9,6 @@ export default function SessionManager({ isOpen, onClose, modelId, editingSessio
   const [parts, setParts] = useState([])
   const [availableMedias, setAvailableMedias] = useState([])
   const [loading, setLoading] = useState(false)
-  const [showMediaSelector, setShowMediaSelector] = useState(null)
   const [previewMedia, setPreviewMedia] = useState(null)
 
   // Niveles predefinidos
@@ -47,28 +42,15 @@ export default function SessionManager({ isOpen, onClose, modelId, editingSessio
   }, [isOpen, editingSession])
 
   const initializeParts = (count) => {
-    const newParts = [
-      // Part 0 (FREE TEASER - SIEMPRE)
-      {
-        step_number: 0,
-        title: 'Free Teaser',
-        base_price: 0,
-        nivel: 1,
-        keywords: [],
-        selectedMedias: [],
-        keywordInput: ''
-      }
-    ]
-    
-    // Agregar las partes de pago (1, 2, 3...)
-    for (let i = 1; i <= count; i++) {
+    const newParts = []
+    for (let i = 0; i < count; i++) {
       newParts.push({
-        step_number: i,
+        step_number: i + 1,
         title: '',
         base_price: 10,
         nivel: 2,
         keywords: [],
-        selectedMedias: [],
+        selectedMedias: [], // Array de media objects
         keywordInput: ''
       })
     }
@@ -364,7 +346,7 @@ export default function SessionManager({ isOpen, onClose, modelId, editingSessio
                 {/* Part Header */}
                 <div className="flex items-center justify-between pb-2 border-b border-gray-200">
                   <h4 className="text-lg font-bold text-purple-600">
-                    Part {part.step_number} {part.step_number === 0 && '(FREE TEASER)'}
+                    Part {part.step_number}
                   </h4>
                   <span className="text-sm text-gray-500">
                     {part.selectedMedias.length} media(s) selected
@@ -395,14 +377,10 @@ export default function SessionManager({ isOpen, onClose, modelId, editingSessio
                       type="number"
                       value={part.base_price}
                       onChange={(e) => updatePart(index, 'base_price', parseFloat(e.target.value))}
-                      disabled={part.step_number === 0}
                       min="0"
                       step="5"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
                     />
-                    {part.step_number === 0 && (
-                      <p className="text-xs text-gray-500 mt-1">🔒 Free teaser - price locked at $0</p>
-                    )}
                   </div>
 
                   <div>
@@ -471,7 +449,7 @@ export default function SessionManager({ isOpen, onClose, modelId, editingSessio
                   {part.selectedMedias.length > 0 ? (
                     <div className="grid grid-cols-4 gap-2 mb-2">
                       {part.selectedMedias.map((media, mi) => (
-                        <div key={mi} className="relative group cursor-pointer" onClick={() => setPreviewMedia(media)}>
+                       <div key={mi} className="relative group cursor-pointer" onClick={() => setPreviewMedia(media)}>
                           <img
                             src={media.media_thumb || '/placeholder.png'}
                             alt={media.title}
@@ -534,42 +512,6 @@ export default function SessionManager({ isOpen, onClose, modelId, editingSessio
           onSelect={(ids) => handleMediaSelect(showMediaSelector, ids)}
           onClose={() => setShowMediaSelector(null)}
         />
-      )}
-
-      {/* Preview Modal */}
-      {previewMedia && (
-        <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-[100]" onClick={() => setPreviewMedia(null)}>
-          <div className="max-w-4xl w-full p-4" onClick={(e) => e.stopPropagation()}>
-            <div className="bg-white rounded-lg overflow-hidden">
-              {previewMedia.file_type === 'video' ? (
-                <video
-                  src={previewMedia.r2_url || previewMedia.media_url}
-                  controls
-                  autoPlay
-                  className="w-full"
-                >
-                  Your browser doesn't support video
-                </video>
-              ) : (
-                <img
-                  src={previewMedia.r2_url || previewMedia.media_url || previewMedia.media_thumb}
-                  alt={previewMedia.title}
-                  className="w-full"
-                />
-              )}
-              <div className="p-4 bg-gray-50">
-                <p className="text-sm font-semibold text-gray-800">{previewMedia.title}</p>
-                <p className="text-xs text-gray-600">{previewMedia.file_type}</p>
-              </div>
-            </div>
-            <button
-              onClick={() => setPreviewMedia(null)}
-              className="mt-4 w-full px-4 py-2 bg-white text-gray-800 rounded-lg font-semibold hover:bg-gray-100"
-            >
-              Close
-            </button>
-          </div>
-        </div>
       )}
 
     </div>
@@ -677,4 +619,8 @@ function MediaSelectorModal({ availableMedias, usedMediaIds, selectedMediaIds, o
       </div>
     </div>
   )
+  
 }
+
+
+

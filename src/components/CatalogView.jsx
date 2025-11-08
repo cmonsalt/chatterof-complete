@@ -1,12 +1,8 @@
 import { useState, useEffect } from 'react'
-import { createClient } from '@supabase/supabase-js'
+import { supabase } from '../lib/supabase'
 import SessionManager from './settings/SessionManager'
 import SingleEditor from './settings/SingleEditor'
 
-const supabase = createClient(
-  import.meta.env.VITE_SUPABASE_URL,
-  import.meta.env.VITE_SUPABASE_ANON_KEY
-)
 
 export default function CatalogView({ modelId }) {
   const [activeTab, setActiveTab] = useState('sessions')
