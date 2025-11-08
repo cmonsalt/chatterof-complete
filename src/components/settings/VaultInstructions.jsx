@@ -7,6 +7,8 @@ export default function VaultInstructions({ modelId: propModelId, onGoToSetup })
   const modelId = propModelId || contextModelId;
   const [vaultFan, setVaultFan] = useState(null);
   const [catalogCount, setCatalogCount] = useState(0);
+  const [syncing, setSyncing] = useState(false);
+  const [syncResult, setSyncResult] = useState(null);
 
   useEffect(() => {
     loadVaultConfig();
@@ -20,7 +22,7 @@ export default function VaultInstructions({ modelId: propModelId, onGoToSetup })
 
       const { data } = await supabase
         .from('models')
-        .select('vault_fan_id')
+        .select('vault_fan_id, of_account_id')
         .eq('model_id', currentModelId)
         .single();
 
@@ -32,7 +34,7 @@ export default function VaultInstructions({ modelId: propModelId, onGoToSetup })
           .eq('model_id', currentModelId)
           .single();
 
-        setVaultFan(fanData);
+        setVaultFan({ ...fanData, accountId: data.of_account_id });
       }
     } catch (error) {
       console.error('Error loading vault config:', error);
@@ -52,6 +54,45 @@ export default function VaultInstructions({ modelId: propModelId, onGoToSetup })
       setCatalogCount(count || 0);
     } catch (error) {
       console.error('Error loading catalog:', error);
+    }
+  }
+
+  async function handleSyncVault() {
+    if (!vaultFan?.accountId) {
+      alert('❌ Account ID not found. Please reconnect your OnlyFans account.');
+      return;
+    }
+
+    setSyncing(true);
+    setSyncResult(null);
+
+    try {
+      const currentModelId = modelId || user?.user_metadata?.model_id;
+
+      const response = await fetch('/api/onlyfans/sync-vault-to-catalog', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          accountId: vaultFan.accountId,
+          modelId: currentModelId
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error('Sync failed');
+      }
+
+      const data = await response.json();
+      setSyncResult(data.summary);
+      
+      // Recargar contador
+      await loadCatalogCount();
+
+    } catch (error) {
+      console.error('❌ Sync error:', error);
+      alert('❌ Error syncing vault. Please try again.');
+    } finally {
+      setSyncing(false);
     }
   }
 
@@ -79,9 +120,9 @@ export default function VaultInstructions({ modelId: propModelId, onGoToSetup })
 
   return (
     <div className="space-y-6">
-      {/* Header */}
+      {/* Header con Sync Button */}
       <div className="bg-white rounded-xl shadow-lg p-6">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-3">
             <span className="text-3xl">📦</span>
             <div>
@@ -94,6 +135,47 @@ export default function VaultInstructions({ modelId: propModelId, onGoToSetup })
             <div className="text-xs text-gray-500">Items en catalog</div>
           </div>
         </div>
+
+        {/* Botón de Sync */}
+        <button
+          onClick={handleSyncVault}
+          disabled={syncing}
+          className="w-full px-6 py-3 bg-gradient-to-r from-blue-500 to-indigo-500 text-white rounded-lg hover:from-blue-600 hover:to-indigo-600 font-bold disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 transition-all"
+        >
+          {syncing ? (
+            <>
+              <span className="animate-spin">⏳</span>
+              <span>Syncing vault...</span>
+            </>
+          ) : (
+            <>
+              <span>🔄</span>
+              <span>Sync Vault from OnlyFans</span>
+            </>
+          )}
+        </button>
+
+        {/* Resultado del sync */}
+        {syncResult && (
+          <div className="mt-4 p-4 bg-green-50 border border-green-200 rounded-lg animate-fadeIn">
+            <div className="flex items-center gap-2 mb-2">
+              <span className="text-green-600 font-bold">✅ Sync Complete!</span>
+            </div>
+            <div className="text-sm text-gray-700 space-y-1">
+              <p>• Total: {syncResult.total} items</p>
+              <p>• Synced: {syncResult.synced} items</p>
+              {syncResult.r2_uploaded > 0 && (
+                <p className="text-blue-600">• Downloaded to R2: {syncResult.r2_uploaded} items</p>
+              )}
+              {syncResult.skipped > 0 && (
+                <p>• Skipped: {syncResult.skipped} items</p>
+              )}
+              {syncResult.errors > 0 && (
+                <p className="text-red-600">• Errors: {syncResult.errors} items</p>
+              )}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Fan de prueba configurado */}
@@ -113,7 +195,7 @@ export default function VaultInstructions({ modelId: propModelId, onGoToSetup })
       {/* Instrucciones */}
       <div className="bg-white rounded-xl shadow-lg p-6">
         <div className="flex items-center gap-2 mb-6">
-          <span className="text-2xl">📝</span>
+          <span className="text-2xl">📋</span>
           <h3 className="text-xl font-bold text-gray-800">Cómo Agregar Contenido al Vault</h3>
         </div>
 
