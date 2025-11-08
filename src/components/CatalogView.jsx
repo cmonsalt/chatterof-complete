@@ -20,13 +20,9 @@ export default function CatalogView({ modelId }) {
   const [editingSingle, setEditingSingle] = useState(null)
   const [showAddSingleSelector, setShowAddSingleSelector] = useState(false)
   const [availableMedias, setAvailableMedias] = useState([])
-  const [refreshingVideo, setRefreshingVideo] = useState(null)
 
-  // Función para refrescar URL y abrir video
-// Función para refrescar URL y abrir video
-  const handleWatchVideo = (single) => {
-  setPreviewMedia(single)
-}
+
+
   useEffect(() => {
     loadCatalog()
   }, [modelId])
@@ -469,25 +465,7 @@ export default function CatalogView({ modelId }) {
                         </span>
                       </div>
 
-                      {/* Botón Ver Video (solo para videos) */}
-                      {single.file_type === 'video' && (
-                        <button
-                          onClick={() => handleWatchVideo(single)}
-                          disabled={refreshingVideo === single.id}
-                          className="w-full mb-2 px-3 py-2 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-lg hover:shadow-lg transition-all text-xs font-semibold disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                        >
-                          {refreshingVideo === single.id ? (
-                            <>
-                              <span className="animate-spin">⏳</span>
-                              Cargando...
-                            </>
-                          ) : (
-                            <>
-                              👁️ Ver Video Completo
-                            </>
-                          )}
-                        </button>
-                      )}
+                
 
                       <div className="flex gap-1">
                         <button
