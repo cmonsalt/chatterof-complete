@@ -37,6 +37,181 @@ async function createNotification(modelId, fanId, type, title, message, amount, 
   }
 }
 
+// 📨 MESSAGES.RECEIVED - Mensaje recibido de un fan
+async function handleMessageReceived(payload, modelId) {
+  const fanId = payload.fromUser?.id?.toString()
+  
+  if (!fanId) {
+    console.log('⚠️ No fanId in message')
+    return
+  }
+
+  const cleanText = cleanHTML(payload.text || '')
+  
+  let mediaUrl = null
+  let mediaThumb = null
+  let mediaType = null
+  
+  if (payload.media && payload.media.length > 0) {
+    const firstMedia = payload.media[0]
+    mediaUrl = firstMedia.files?.full?.url || firstMedia.url
+    mediaThumb = firstMedia.files?.thumb?.url || firstMedia.thumb
+    mediaType = firstMedia.type
+  }
+  
+  const isTip = payload.price > 0 && !payload.isOpened
+  
+  // Guardar mensaje
+  const messageData = {
+    of_message_id: payload.id?.toString(),
+    fan_id: fanId,
+    model_id: modelId,
+    message: cleanText,
+    timestamp: payload.createdAt || new Date().toISOString(),
+    from: 'fan',
+    read: false,
+    source: 'webhook',
+    media_url: mediaUrl,
+    media_thumb: mediaThumb,
+    media_type: mediaType,
+    amount: isTip ? payload.price : 0,
+    is_ppv: false,
+    ppv_price: 0
+  }
+  
+  const { error: chatError } = await supabase
+    .from('chat')
+    .upsert(messageData, { onConflict: 'of_message_id' })
+  
+  if (chatError) {
+    console.error('❌ Chat save error:', chatError)
+    return
+  }
+  
+  console.log('✅ Message saved to chat')
+  
+  // Si es tip
+  if (isTip) {
+    await createNotification(
+      modelId,
+      fanId,
+      'new_tip',
+      'New Tip Received! 💰',
+      `You received a $${payload.price} tip!`,
+      payload.price,
+      { message_id: payload.id }
+    )
+    
+    await supabase.rpc('increment_fan_spent', {
+      p_fan_id: fanId,
+      p_model_id: modelId,
+      p_amount: payload.price
+    })
+  } else {
+    // Notificación de mensaje nuevo
+    await createNotification(
+      modelId,
+      fanId,
+      'new_message',
+      'New Message 💬',
+      cleanText.substring(0, 100) || 'New media message',
+      null,
+      { message_id: payload.id }
+    )
+  }
+}
+
+// 📤 MESSAGES.SENT - Mensaje enviado por la modelo
+async function handleMessageSent(payload, modelId) {
+  console.log('📤 Message sent by model')
+  // No hacer nada, ya se guardó cuando se envió desde la app
+}
+
+// 💰 MESSAGES.PPV.UNLOCKED - PPV desbloqueado
+async function handlePPVUnlocked(payload, modelId) {
+  const fanId = payload.fromUser?.id?.toString()
+  
+  if (!fanId) return
+
+  console.log(`💰 PPV unlocked by fan ${fanId}`)
+  
+  await createNotification(
+    modelId,
+    fanId,
+    'ppv_unlocked',
+    'PPV Unlocked! 💸',
+    `Fan unlocked your PPV for $${payload.price}`,
+    payload.price,
+    { message_id: payload.id }
+  )
+  
+  // Actualizar spent_total
+  await supabase.rpc('increment_fan_spent', {
+    p_fan_id: fanId,
+    p_model_id: modelId,
+    p_amount: payload.price
+  })
+}
+
+// 🆕 SUBSCRIPTIONS.NEW - Nueva suscripción
+async function handleNewSubscription(payload, modelId) {
+  const fanId = payload.user?.id?.toString()
+  
+  if (!fanId) return
+
+  console.log(`🆕 New subscription from fan ${fanId}`)
+  
+  await createNotification(
+    modelId,
+    fanId,
+    'new_subscription',
+    'New Subscriber! 🎉',
+    `${payload.user?.name || 'Someone'} just subscribed!`,
+    payload.price || 0,
+    { subscription_id: payload.id }
+  )
+}
+
+// ❤️ POSTS.LIKED - Post liked
+async function handlePostLiked(payload, modelId) {
+  console.log('❤️ Post liked')
+  // Opcional: crear notificación si quieres
+}
+
+// ⌨️ USERS.TYPING - Usuario escribiendo
+async function handleUserTyping(payload, modelId) {
+  console.log('⌨️ User typing')
+  // No crear notificación, solo log
+}
+
+// 🔌 ACCOUNTS.* - Eventos de cuenta
+async function handleAccountEvent(event, payload, modelId) {
+  console.log(`🔌 Account event: ${event}`)
+  
+  // Actualizar connection_status en models
+  let status = 'connected'
+  
+  if (event === 'accounts.session_expired') {
+    status = 'session_expired'
+  } else if (event === 'accounts.authentication_failed') {
+    status = 'auth_failed'
+  } else if (event === 'accounts.otp_code_required') {
+    status = 'otp_required'
+  } else if (event === 'accounts.face_otp_required') {
+    status = 'face_otp_required'
+  }
+  
+  await supabase
+    .from('models')
+    .update({ 
+      connection_status: status,
+      last_connection_check: new Date().toISOString()
+    })
+    .eq('model_id', modelId)
+  
+  console.log(`✅ Connection status updated: ${status}`)
+}
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' })
@@ -77,87 +252,43 @@ export default async function handler(req, res) {
 
     const modelId = model.model_id
 
-    // Procesar mensaje recibido
-    if (event === 'messages.received') {
-      const fanId = payload.fromUser?.id?.toString()
-      
-      if (!fanId) {
-        console.log('⚠️ No fanId in message')
-        return res.status(200).json({ success: true })
-      }
-
-      const cleanText = cleanHTML(payload.text || '')
-      
-      let mediaUrl = null
-      let mediaThumb = null
-      let mediaType = null
-      
-      if (payload.media && payload.media.length > 0) {
-        const firstMedia = payload.media[0]
-        mediaUrl = firstMedia.files?.full?.url || firstMedia.url
-        mediaThumb = firstMedia.files?.thumb?.url || firstMedia.thumb
-        mediaType = firstMedia.type
-      }
-      
-      const isTip = payload.price > 0 && !payload.isOpened
-      
-      // Guardar mensaje
-      const messageData = {
-        of_message_id: payload.id?.toString(),
-        fan_id: fanId,
-        model_id: modelId,
-        message: cleanText,
-        timestamp: payload.createdAt || new Date().toISOString(),
-        from: 'fan',
-        read: false,
-        source: 'webhook',
-        media_url: mediaUrl,
-        media_thumb: mediaThumb,
-        media_type: mediaType,
-        amount: isTip ? payload.price : 0,
-        is_ppv: false,
-        ppv_price: 0
-      }
-      
-      const { error: chatError } = await supabase
-        .from('chat')
-        .upsert(messageData, { onConflict: 'of_message_id' })
-      
-      if (chatError) {
-        console.error('❌ Chat save error:', chatError)
-      } else {
-        console.log('✅ Message saved to chat')
-      }
-      
-      // Si es tip
-      if (isTip) {
-        await createNotification(
-          modelId,
-          fanId,
-          'new_tip',
-          'New Tip Received! 💰',
-          `You received a $${payload.price} tip!`,
-          payload.price,
-          { message_id: payload.id }
-        )
+    // Rutear eventos
+    switch(event) {
+      case 'messages.received':
+        await handleMessageReceived(payload, modelId)
+        break
         
-        await supabase.rpc('increment_fan_spent', {
-          p_fan_id: fanId,
-          p_model_id: modelId,
-          p_amount: payload.price
-        })
-      }
-      
-      // Notificación de mensaje nuevo
-      await createNotification(
-        modelId,
-        fanId,
-        'new_message',
-        'New Message 💬',
-        cleanText.substring(0, 100) || 'New media message',
-        null,
-        { message_id: payload.id }
-      )
+      case 'messages.sent':
+        await handleMessageSent(payload, modelId)
+        break
+        
+      case 'messages.ppv.unlocked':
+        await handlePPVUnlocked(payload, modelId)
+        break
+        
+      case 'subscriptions.new':
+        await handleNewSubscription(payload, modelId)
+        break
+        
+      case 'posts.liked':
+        await handlePostLiked(payload, modelId)
+        break
+        
+      case 'users.typing':
+        await handleUserTyping(payload, modelId)
+        break
+        
+      case 'accounts.connected':
+      case 'accounts.reconnected':
+      case 'accounts.session_expired':
+      case 'accounts.authentication_failed':
+      case 'accounts.otp_code_required':
+      case 'accounts.face_otp_required':
+        await handleAccountEvent(event, payload, modelId)
+        break
+        
+      default:
+        console.log(`⚠️ Unhandled event: ${event}`)
     }
 
     return res.status(200).json({ success: true })
