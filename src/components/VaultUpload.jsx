@@ -1,236 +1,90 @@
-// ✅ UPLOAD CLIENT-SIDE DIRECTO A BLOB (sin pasar por API)
+// ✅ VAULT UPLOAD - Instrucciones para upload manual
 // Ubicación: src/components/VaultUpload.jsx
 
-import { useState, useEffect } from 'react';
-import { upload } from '@vercel/blob/client';
-import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 
 export default function VaultUpload() {
-  const { user, modelId } = useAuth();
-  
-  const [selectedFile, setSelectedFile] = useState(null);
-  const [filePreview, setFilePreview] = useState(null);
-  const [title, setTitle] = useState('');
-  const [basePrice, setBasePrice] = useState(10);
-  const [nivel, setNivel] = useState(5);
-  const [tags, setTags] = useState('');
-  const [uploading, setUploading] = useState(false);
-  const [progress, setProgress] = useState('');
-  const [accountId, setAccountId] = useState(null);
+  const { currentModel } = useAuth();
 
-  useEffect(() => {
-    loadAccountId();
-  }, [modelId]);
-
-  async function loadAccountId() {
-    const currentModelId = modelId || user?.user_metadata?.model_id;
-    if (!currentModelId) return;
-
-    const { data } = await supabase
-      .from('models')
-      .select('of_account_id')
-      .eq('model_id', currentModelId)
-      .single();
-
-    if (data?.of_account_id) {
-      setAccountId(data.of_account_id);
-    }
-  }
-
-  function handleFileSelect(e) {
-    const file = e.target.files[0];
-    if (!file) return;
-
-    setSelectedFile(file);
-
-    const reader = new FileReader();
-    reader.onload = (e) => setFilePreview(e.target.result);
-    reader.readAsDataURL(file);
-
-    if (!title) {
-      setTitle(file.name.split('.')[0]);
-    }
-  }
-
-  async function handleUpload() {
-    if (!selectedFile || !accountId) {
-      alert('Missing file or account configuration');
-      return;
-    }
-
-    if (!title.trim()) {
-      alert('Please enter a title');
-      return;
-    }
-
-    setUploading(true);
-    const currentModelId = modelId || user?.user_metadata?.model_id;
-
-    try {
-      // 1️⃣ Upload DIRECTO a Vercel Blob desde el cliente (sin límite)
-      setProgress('☁️ Uploading to cloud storage...');
-
-      const newBlob = await upload(selectedFile.name, selectedFile, {
-        access: 'public',
-        handleUploadUrl: '/api/blob/client-upload',
-      });
-
-      console.log('✅ Uploaded to Blob:', newBlob.url);
-
-      // 2️⃣ Registrar en OnlyFans y guardar en catalog
-      setProgress('📥 Registering with OnlyFans...');
-
-      const registerResponse = await fetch('/api/onlyfans/register-blob-media', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          accountId,
-          modelId: currentModelId,
-          blobUrl: newBlob.url,
-          filename: selectedFile.name,
-          contentType: selectedFile.type,
-          title,
-          basePrice,
-          nivel,
-          tags
-        })
-      });
-
-      if (!registerResponse.ok) {
-        const error = await registerResponse.json();
-        throw new Error(error.error || 'Registration failed');
-      }
-
-      const data = await registerResponse.json();
-      
-      setProgress(`✅ Success! Vault ID: ${data.vaultMediaId} | Credits: ${data.creditsUsed}`);
-      
-      setTimeout(() => {
-        setSelectedFile(null);
-        setFilePreview(null);
-        setTitle('');
-        setProgress('');
-      }, 3000);
-
-    } catch (error) {
-      console.error('❌ Error:', error);
-      setProgress(`❌ Error: ${error.message}`);
-    } finally {
-      setUploading(false);
-    }
+  async function handleSyncVault() {
+    window.location.href = '/settings?tab=vault';
   }
 
   return (
     <div className="max-w-2xl mx-auto p-6">
-      <div className="bg-white rounded-xl shadow-lg p-6 border-2 border-green-200">
+      <div className="bg-white rounded-xl shadow-lg p-6 border-2 border-blue-200">
         <h2 className="text-2xl font-bold text-gray-800 mb-6">
-          📤 Upload to Vault
+          📤 Upload Content to Vault
         </h2>
 
-        <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-6">
-          <div className="flex items-start gap-3">
-            <span className="text-2xl">✅</span>
+        {/* Instrucciones */}
+        <div className="bg-blue-50 border-2 border-blue-200 rounded-lg p-6 mb-6">
+          <div className="flex items-start gap-4">
+            <span className="text-4xl">💡</span>
             <div>
-              <h3 className="font-bold text-green-800 mb-1">Unlimited Size</h3>
-              <p className="text-sm text-green-700">
-                Upload videos of any size directly to cloud storage.
-              </p>
+              <h3 className="text-xl font-bold text-blue-900 mb-3">How to Upload Content</h3>
+              <ol className="space-y-3 text-blue-800">
+                <li className="flex items-start gap-2">
+                  <span className="font-bold min-w-[24px]">1.</span>
+                  <div>
+                    <span className="font-semibold">Go to OnlyFans Vault:</span>
+                    <br />
+                    <a 
+                      href="https://onlyfans.com/my/vault" 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="text-blue-600 hover:text-blue-700 underline font-medium"
+                    >
+                      https://onlyfans.com/my/vault
+                    </a>
+                  </div>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="font-bold min-w-[24px]">2.</span>
+                  <span>Upload your photos and videos there (unlimited size)</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="font-bold min-w-[24px]">3.</span>
+                  <span>Come back here and click "Sync Vault" below</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="font-bold min-w-[24px]">4.</span>
+                  <span>Your content will appear in the catalog, ready to send as PPV!</span>
+                </li>
+              </ol>
             </div>
           </div>
         </div>
 
-        <div className="space-y-4">
-          <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-2">
-              Select Media
-            </label>
-            <input
-              type="file"
-              accept="image/*,video/*"
-              onChange={handleFileSelect}
-              disabled={uploading}
-              className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-green-50 file:text-green-700 hover:file:bg-green-100 disabled:opacity-50"
-            />
-          </div>
+        {/* Botón de Sync */}
+        <button
+          onClick={handleSyncVault}
+          className="w-full px-6 py-4 bg-gradient-to-r from-blue-500 to-indigo-500 text-white rounded-lg hover:from-blue-600 hover:to-indigo-600 font-bold text-lg shadow-lg flex items-center justify-center gap-3"
+        >
+          <span>🔄</span>
+          <span>Go to Sync Vault</span>
+        </button>
 
-          {filePreview && (
-            <div className="rounded-lg overflow-hidden border-2 border-gray-200">
-              {selectedFile?.type.includes('video') ? (
-                <video src={filePreview} controls className="w-full max-h-64 object-contain bg-black" />
-              ) : (
-                <img src={filePreview} alt="Preview" className="w-full max-h-64 object-contain bg-gray-100" />
-              )}
-            </div>
-          )}
+        {/* Ventajas */}
+        <div className="mt-6 bg-green-50 border border-green-200 rounded-xl p-4">
+          <h3 className="font-bold text-green-800 mb-2">✅ Advantages:</h3>
+          <ul className="text-sm text-green-700 space-y-1">
+            <li>• Upload videos of any size (no limits)</li>
+            <li>• Content stored permanently in OnlyFans vault</li>
+            <li>• Automatic backup to Cloudflare R2</li>
+            <li>• Videos playable in your catalog</li>
+            <li>• Ready to send as PPV instantly</li>
+          </ul>
+        </div>
 
-          <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-2">Title *</label>
-            <input
-              type="text"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder="e.g., Beach Video"
-              disabled={uploading}
-              className="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
-            />
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">Price ($)</label>
-              <input
-                type="number"
-                min="1"
-                value={basePrice}
-                onChange={(e) => setBasePrice(parseInt(e.target.value) || 10)}
-                disabled={uploading}
-                className="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">Level (1-10)</label>
-              <input
-                type="number"
-                min="1"
-                max="10"
-                value={nivel}
-                onChange={(e) => setNivel(parseInt(e.target.value) || 5)}
-                disabled={uploading}
-                className="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
-              />
-            </div>
-          </div>
-
-          <button
-            onClick={handleUpload}
-            disabled={!selectedFile || !title.trim() || uploading}
-            className="w-full px-6 py-3 bg-gradient-to-r from-green-500 to-emerald-500 text-white rounded-lg hover:from-green-600 hover:to-emerald-600 font-bold disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-          >
-            {uploading ? (
-              <>
-                <span className="animate-spin">⏳</span>
-                <span>Uploading...</span>
-              </>
-            ) : (
-              <>
-                <span>📤</span>
-                <span>Upload to Vault</span>
-              </>
-            )}
-          </button>
-
-          {progress && (
-            <div className={`p-4 rounded-lg ${
-              progress.includes('✅') 
-                ? 'bg-green-50 border border-green-200 text-green-700'
-                : progress.includes('❌')
-                ? 'bg-red-50 border border-red-200 text-red-700'
-                : 'bg-blue-50 border border-blue-200 text-blue-700'
-            }`}>
-              <p className="text-sm font-semibold">{progress}</p>
-            </div>
-          )}
+        {/* Info técnica */}
+        <div className="mt-6 bg-gray-50 border border-gray-200 rounded-xl p-4">
+          <h3 className="font-bold text-gray-800 mb-2">ℹ️ Technical Details:</h3>
+          <p className="text-sm text-gray-600">
+            When you sync, the system downloads your vault content and creates permanent copies 
+            in Cloudflare R2 storage. This ensures your videos are always accessible in the catalog, 
+            even if OnlyFans URLs expire.
+          </p>
         </div>
       </div>
     </div>
