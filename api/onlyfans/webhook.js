@@ -169,7 +169,7 @@ async function handleVaultContent(payload, modelId) {
       
       // Generar key único para R2
       const timestamp = Date.now()
-      const r2Key = `vault/${mediaId}_${timestamp}.${ext}`
+      const r2Key = `vault/${modelId}/${mediaId}_${timestamp}.${ext}`
       
       // Subir a R2
       const { S3Client, PutObjectCommand } = await import('@aws-sdk/client-s3')
