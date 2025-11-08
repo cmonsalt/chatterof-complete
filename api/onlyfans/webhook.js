@@ -192,8 +192,8 @@ async function handleVaultContent(payload, modelId) {
 
       await r2Client.send(command)
 
-      // URL pública de R2
-      const r2Url = `https://${process.env.R2_BUCKET_NAME}.r2.dev/${r2Key}`
+      // URL pública de R2 (permanente)
+      const r2Url = `https://pub-${process.env.R2_ACCOUNT_ID}.r2.dev/${r2Key}`
       
       console.log(`✅ Uploaded to R2: ${r2Url}`)
 
@@ -213,7 +213,7 @@ async function handleVaultContent(payload, modelId) {
               ContentType: 'image/jpeg',
             }))
             
-            r2ThumbUrl = `https://${process.env.R2_BUCKET_NAME}.r2.dev/${thumbKey}`
+            r2ThumbUrl = `https://pub-${process.env.R2_ACCOUNT_ID}.r2.dev/${thumbKey}`
             console.log(`✅ Thumbnail uploaded to R2`)
           }
         } catch (thumbError) {
