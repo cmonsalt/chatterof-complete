@@ -34,6 +34,14 @@ export default function PPVSelectorModal({
       
       const allContent = data || [];
       
+      // Crear mapa de medias para acceso rápido
+      const allMediasMap = new Map();
+      allContent.forEach(item => {
+        if (item.of_media_id) {
+          allMediasMap.set(item.of_media_id, item);
+        }
+      });
+      
       // INBOX: Todo sin session_id y sin is_single
       const inboxItems = allContent.filter(item => !item.session_id && !item.is_single);
       
@@ -50,7 +58,28 @@ export default function PPVSelectorModal({
               parts: []
             });
           }
-          sessionsMap.get(item.session_id).parts.push(item);
+          
+          // Cargar info de todos los medias del bundle
+          const mediasInfo = [];
+          if (item.of_media_ids && item.of_media_ids.length > 0) {
+            item.of_media_ids.forEach(mediaId => {
+              const mediaInfo = allMediasMap.get(mediaId);
+              if (mediaInfo) {
+                mediasInfo.push({
+                  of_media_id: mediaInfo.of_media_id,
+                  media_thumb: mediaInfo.media_thumb,
+                  media_url: mediaInfo.media_url,
+                  r2_url: mediaInfo.r2_url,
+                  file_type: mediaInfo.file_type
+                });
+              }
+            });
+          }
+          
+          sessionsMap.get(item.session_id).parts.push({
+            ...item,
+            medias_info: mediasInfo
+          });
         });
       
       // Ordenar parts por step_number
@@ -220,12 +249,33 @@ export default function PPVSelectorModal({
                                     : 'bg-gray-50 hover:bg-gray-100'
                                 }`}
                               >
-                                {/* Thumbnail */}
-                                <img 
-                                  src={part.media_thumb || '/placeholder.png'} 
-                                  alt={part.title}
-                                  className="w-16 h-16 object-cover rounded-lg"
-                                />
+                                {/* Thumbnails */}
+                                <div className="flex gap-1 flex-shrink-0">
+                                  {part.medias_info && part.medias_info.length > 1 ? (
+                                    // Múltiples medias - grid pequeño
+                                    <div className="grid grid-cols-2 gap-1 w-16">
+                                      {part.medias_info.slice(0, 4).map((media, idx) => (
+                                        <div
+                                          key={idx}
+                                          className="w-full aspect-square rounded overflow-hidden"
+                                        >
+                                          <img
+                                            src={media.media_thumb}
+                                            alt={`Media ${idx + 1}`}
+                                            className="w-full h-full object-cover"
+                                          />
+                                        </div>
+                                      ))}
+                                    </div>
+                                  ) : (
+                                    // Solo 1 media
+                                    <img 
+                                      src={part.media_thumb || '/placeholder.png'} 
+                                      alt={part.title}
+                                      className="w-16 h-16 object-cover rounded-lg"
+                                    />
+                                  )}
+                                </div>
                                 
                                 {/* Info */}
                                 <div className="flex-1">
