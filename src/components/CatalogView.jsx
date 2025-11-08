@@ -214,7 +214,7 @@ export default function CatalogView({ modelId }) {
                 : 'border-transparent text-gray-500 hover:text-gray-700'
             }`}
           >
-            ðŸ“ Sessions ({sessions.length})
+            📁 Sessions ({sessions.length})
           </button>
           <button
             onClick={() => setActiveTab('singles')}
@@ -224,7 +224,7 @@ export default function CatalogView({ modelId }) {
                 : 'border-transparent text-gray-500 hover:text-gray-700'
             }`}
           >
-            ðŸ’Ž Singles ({singles.length})
+            1️⃣ Singles ({singles.length})
           </button>
         </div>
       </div>
@@ -240,7 +240,7 @@ export default function CatalogView({ modelId }) {
               }}
               className="px-6 py-2 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-lg font-semibold hover:shadow-lg transition-all"
             >
-              âœ¨ Create Session
+              ✨ Create Session
             </button>
           </div>
 
@@ -392,7 +392,7 @@ export default function CatalogView({ modelId }) {
               onClick={handleAddSingle}
               className="px-4 py-2 bg-green-600 text-white rounded-lg font-semibold hover:bg-green-700"
             >
-              âž• Add Single
+              1️⃣ Add Single
             </button>
           </div>
 
