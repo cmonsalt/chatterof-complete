@@ -15,107 +15,6 @@ function cleanHTML(text) {
     .trim()
 }
 
-async function handleMessage(data, modelId) {
-  try {
-    // Determinar si es mensaje del FAN o de la MODELO
-    const isFromFan = !!data.fromUser
-    const fanId = data.fromUser?.id?.toString()
-    
-    if (!fanId && isFromFan) {
-      console.log('⚠️ No fanId found')
-      return
-    }
-
-    // Si es mensaje de la modelo, no procesar (no tiene fanId)
-    if (!isFromFan) {
-      console.log('📤 Message from model, skipping')
-      return
-    }
-
-    const cleanText = cleanHTML(data.text || '')
-    
-    let mediaUrl = null
-    let mediaThumb = null
-    let mediaType = null
-    
-    if (data.media && data.media.length > 0) {
-      const firstMedia = data.media[0]
-      mediaUrl = firstMedia.files?.full?.url || firstMedia.url
-      mediaThumb = firstMedia.files?.thumb?.url || firstMedia.thumb
-      mediaType = firstMedia.type
-    }
-    
-    // Determinar si es tip
-    const isTip = data.price > 0 && !data.isOpened
-    const isMessage = data.text || data.media?.length > 0
-    
-    if (isMessage) {
-      const messageData = {
-        of_message_id: data.id?.toString(),
-        fan_id: fanId,
-        model_id: modelId,
-        message: cleanText,
-        timestamp: data.createdAt || new Date().toISOString(),
-        from: 'fan',
-        read: false,
-        source: 'webhook',
-        media_url: mediaUrl,
-        media_thumb: mediaThumb,
-        media_type: mediaType,
-        amount: isTip ? data.price : 0,
-        is_ppv: false,
-        ppv_price: 0
-      }
-      
-      const { error: chatError } = await supabase
-        .from('chat')
-        .upsert(messageData, { onConflict: 'of_message_id' })
-      
-      if (chatError) {
-        console.error('❌ Chat save error:', chatError)
-      } else {
-        console.log('✅ Message saved to chat')
-      }
-    }
-    
-    // Si es tip, crear notificación
-    if (isTip) {
-      await createNotification(
-        modelId,
-        fanId,
-        'new_tip',
-        'New Tip Received! 💰',
-        `You received a $${data.price} tip!`,
-        data.price,
-        { message_id: data.id }
-      )
-      
-      // Actualizar spent_total
-      await supabase.rpc('increment_fan_spent', {
-        p_fan_id: fanId,
-        p_model_id: modelId,
-        p_amount: data.price
-      })
-    }
-    
-    // Crear notificación de mensaje nuevo
-    if (isFromFan && isMessage) {
-      await createNotification(
-        modelId,
-        fanId,
-        'new_message',
-        'New Message 💬',
-        cleanText.substring(0, 100) || 'New media message',
-        null,
-        { message_id: data.id }
-      )
-    }
-    
-  } catch (error) {
-    console.error('❌ Error in handleMessage:', error)
-  }
-}
-
 async function createNotification(modelId, fanId, type, title, message, amount, metadata) {
   try {
     const { error } = await supabase
@@ -144,39 +43,121 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { event, data } = req.body
+    const { event, account_id, payload } = req.body
 
-    if (!event || !data) {
+    if (!event || !payload) {
       console.log('❌ Invalid payload:', JSON.stringify(req.body))
       return res.status(400).json({ error: 'Invalid webhook payload' })
     }
 
-    console.log(`🔔 Webhook event: ${event}`)
-
-    // Obtener modelId desde account_id en query o en data
-    const accountId = req.query.account || data.account?.id
-
-    if (!accountId) {
-      console.log('❌ Missing account ID')
-      return res.status(400).json({ error: 'Missing account ID' })
+    // Ignorar eventos de test
+    if (event === 'test-event') {
+      console.log('✅ Test event received')
+      return res.status(200).json({ success: true })
     }
 
+    console.log(`🔔 Webhook event: ${event}`)
+
+    if (!account_id) {
+      console.log('❌ Missing account_id')
+      return res.status(400).json({ error: 'Missing account_id' })
+    }
+
+    // Buscar modelo por account_id
     const { data: model } = await supabase
       .from('models')
       .select('model_id')
-      .eq('of_account_id', accountId)
+      .eq('of_account_id', account_id)
       .single()
 
     if (!model) {
-      console.log(`❌ Model not found for account: ${accountId}`)
+      console.log(`❌ Model not found for account: ${account_id}`)
       return res.status(404).json({ error: 'Model not found' })
     }
 
     const modelId = model.model_id
 
-    // Procesar mensaje
+    // Procesar mensaje recibido
     if (event === 'messages.received') {
-      await handleMessage(data, modelId)
+      const fanId = payload.fromUser?.id?.toString()
+      
+      if (!fanId) {
+        console.log('⚠️ No fanId in message')
+        return res.status(200).json({ success: true })
+      }
+
+      const cleanText = cleanHTML(payload.text || '')
+      
+      let mediaUrl = null
+      let mediaThumb = null
+      let mediaType = null
+      
+      if (payload.media && payload.media.length > 0) {
+        const firstMedia = payload.media[0]
+        mediaUrl = firstMedia.files?.full?.url || firstMedia.url
+        mediaThumb = firstMedia.files?.thumb?.url || firstMedia.thumb
+        mediaType = firstMedia.type
+      }
+      
+      const isTip = payload.price > 0 && !payload.isOpened
+      
+      // Guardar mensaje
+      const messageData = {
+        of_message_id: payload.id?.toString(),
+        fan_id: fanId,
+        model_id: modelId,
+        message: cleanText,
+        timestamp: payload.createdAt || new Date().toISOString(),
+        from: 'fan',
+        read: false,
+        source: 'webhook',
+        media_url: mediaUrl,
+        media_thumb: mediaThumb,
+        media_type: mediaType,
+        amount: isTip ? payload.price : 0,
+        is_ppv: false,
+        ppv_price: 0
+      }
+      
+      const { error: chatError } = await supabase
+        .from('chat')
+        .upsert(messageData, { onConflict: 'of_message_id' })
+      
+      if (chatError) {
+        console.error('❌ Chat save error:', chatError)
+      } else {
+        console.log('✅ Message saved to chat')
+      }
+      
+      // Si es tip
+      if (isTip) {
+        await createNotification(
+          modelId,
+          fanId,
+          'new_tip',
+          'New Tip Received! 💰',
+          `You received a $${payload.price} tip!`,
+          payload.price,
+          { message_id: payload.id }
+        )
+        
+        await supabase.rpc('increment_fan_spent', {
+          p_fan_id: fanId,
+          p_model_id: modelId,
+          p_amount: payload.price
+        })
+      }
+      
+      // Notificación de mensaje nuevo
+      await createNotification(
+        modelId,
+        fanId,
+        'new_message',
+        'New Message 💬',
+        cleanText.substring(0, 100) || 'New media message',
+        null,
+        { message_id: payload.id }
+      )
     }
 
     return res.status(200).json({ success: true })
