@@ -27,11 +27,15 @@ async function createNotification(modelId, fanId, type, title, message, amount, 
         message,
         amount,
         metadata,
-        read: false
+        is_read: false
       })
 
-    if (error) throw error
-    console.log(`✅ Notification created: ${type}`)
+    if (error) {
+      console.error('❌ Notification insert error:', error)
+      throw error
+    }
+    
+    console.log(`✅ Notification created: ${type} for fan ${fanId}`)
   } catch (error) {
     console.error('❌ Notification error:', error)
   }
