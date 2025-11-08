@@ -559,7 +559,7 @@ Conversación:\n${JSON.stringify(conversacion, null, 2)}`
 
             {/* Chat */}
            <div className={`flex-1 ${embedded ? 'max-w-full' : 'max-w-4xl mx-auto'} bg-white rounded-xl shadow-lg flex flex-col`}>
-              <div className={`${embedded ? 'h-[calc(100vh-400px)]' : 'h-[600px]'} overflow-y-auto p-6 space-y-4`}>
+              <div className={`${embedded ? 'h-[500px]' : 'h-[600px]'} overflow-y-auto p-6 space-y-4`}>
                 {messages.map((msg) => (
                   <div
                     key={msg.id}
