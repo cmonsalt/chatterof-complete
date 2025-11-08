@@ -24,49 +24,9 @@ export default function CatalogView({ modelId }) {
 
   // Función para refrescar URL y abrir video
 // Función para refrescar URL y abrir video
-  const handleWatchVideo = async (single) => {
-    setRefreshingVideo(single.id)
-    
-    try {
-      // Obtener of_account_id del modelo
-      const { data: modelData } = await supabase
-        .from('models')
-        .select('of_account_id')
-        .eq('model_id', modelId)
-        .single()
-      
-      if (!modelData?.of_account_id) {
-        alert('Error: No se encontró of_account_id del modelo')
-        return
-      }
-
-      // Llamar al endpoint para refrescar URL
-      const response = await fetch('/api/onlyfans/refresh-media-url', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          accountId: modelData.of_account_id,
-          ofMediaId: single.of_media_id
-        })
-      })
-
-      const result = await response.json()
-
-      if (result.success && result.freshUrl) {
-        // Usar el proxy para ver el video
-        const watchUrl = `/api/onlyfans/watch-video?accountId=${modelData.of_account_id}&cdnUrl=${encodeURIComponent(result.freshUrl)}`
-        window.open(watchUrl, '_blank')
-      } else {
-        alert('Error al obtener URL del video: ' + (result.error || 'Unknown error'))
-      }
-    } catch (error) {
-      console.error('Error refreshing video:', error)
-      alert('Error al cargar el video')
-    } finally {
-      setRefreshingVideo(null)
-    }
-  }
-
+  const handleWatchVideo = (single) => {
+  setPreviewMedia(single)
+}
   useEffect(() => {
     loadCatalog()
   }, [modelId])
