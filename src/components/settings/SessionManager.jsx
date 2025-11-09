@@ -263,7 +263,12 @@ export default function SessionManager({ isOpen, onClose, modelId, editingSessio
             const media = part.selectedMedias[j]
             const { error: updateError } = await supabase
               .from('catalog')
-              .update({ session_id: sessionId })
+              .update({ 
+  session_id: sessionId,
+  session_name: sessionName,
+  session_description: sessionDescription,
+  parent_type: 'session'
+})
               .eq('of_media_id', media.of_media_id)
             
             if (updateError) {
