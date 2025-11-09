@@ -13,29 +13,70 @@ export default async function handler(req, res) {
   }
 
   try {
-    // 1. Verificar límite
-    const limitCheck = await fetch(`${process.env.VERCEL_URL || 'http://localhost:3000'}/api/check-ai-limit`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ model_id })
-    })
-
-    if (!limitCheck.ok) {
-      const limitError = await limitCheck.json()
-      return res.status(429).json(limitError)
-    }
-
-    // 2. Inicializar Supabase y Anthropic
+    // 1. Inicializar Supabase y Anthropic
     const supabase = createClient(
       process.env.VITE_SUPABASE_URL,
       process.env.SUPABASE_SERVICE_KEY
     )
 
+    // 2. Verificar límite directamente en DB
+    let { data: limit } = await supabase
+      .from('usage_limits')
+      .select('*')
+      .eq('model_id', model_id)
+      .single()
+
+    // Si no existe límite, crear uno
+    if (!limit) {
+      const { data: newLimit, error: insertError } = await supabase
+        .from('usage_limits')
+        .insert({ model_id, messages_limit: 500, messages_today: 0 })
+        .select()
+        .single()
+      
+      if (insertError) throw insertError
+      limit = newLimit
+    }
+
+    // Verificar si pasaron 24h y resetear
+    const now = new Date()
+    const lastReset = new Date(limit.last_reset)
+    const hoursSinceReset = (now - lastReset) / (1000 * 60 * 60)
+
+    if (hoursSinceReset >= 24) {
+      const { error: resetError } = await supabase
+        .from('usage_limits')
+        .update({ messages_today: 0, last_reset: now.toISOString() })
+        .eq('model_id', model_id)
+      
+      if (resetError) throw resetError
+      limit.messages_today = 0
+    }
+
+    // Verificar si alcanzó el límite
+    if (limit.messages_today >= limit.messages_limit) {
+      return res.status(429).json({ 
+        error: 'Daily AI limit reached',
+        limit: limit.messages_limit,
+        used: limit.messages_today,
+        reset_in_hours: Math.ceil(24 - hoursSinceReset)
+      })
+    }
+
+    // Incrementar contador
+    const { error: updateError } = await supabase
+      .from('usage_limits')
+      .update({ messages_today: limit.messages_today + 1 })
+      .eq('model_id', model_id)
+
+    if (updateError) throw updateError
+
+    // 3. Inicializar Anthropic
     const anthropic = new Anthropic({
       apiKey: process.env.ANTHROPIC_API_KEY
     })
 
-    // 3. Obtener datos del fan
+    // 4. Obtener datos del fan
     const { data: fan, error: fanError } = await supabase
       .from('fans')
       .select('*')
@@ -45,7 +86,7 @@ export default async function handler(req, res) {
 
     if (fanError) throw new Error('Fan not found')
 
-    // 4. Obtener últimos mensajes del chat
+    // 5. Obtener últimos mensajes del chat
     const { data: messages, error: messagesError } = await supabase
       .from('chat')
       .select('message, from, ts, is_ppv, ppv_price')
@@ -56,7 +97,7 @@ export default async function handler(req, res) {
 
     if (messagesError) throw messagesError
 
-    // 5. Obtener sessions disponibles
+    // 6. Obtener sessions disponibles
     const { data: catalog, error: catalogError } = await supabase
       .from('catalog')
       .select('*')
@@ -66,7 +107,7 @@ export default async function handler(req, res) {
 
     if (catalogError) throw catalogError
 
-    // 6. Buscar qué PPVs ya compró el fan
+    // 7. Buscar qué PPVs ya compró el fan
     const { data: purchased } = await supabase
       .from('chat')
       .select('ppv_catalog_id')
@@ -76,7 +117,7 @@ export default async function handler(req, res) {
 
     const purchasedIds = purchased?.map(p => p.ppv_catalog_id) || []
 
-    // 7. Organizar sessions
+    // 8. Organizar sessions
     const sessionsMap = new Map()
     catalog.forEach(item => {
       if (!sessionsMap.has(item.session_id)) {
@@ -90,17 +131,17 @@ export default async function handler(req, res) {
 
     const sessions = Array.from(sessionsMap.values())
 
-    // 8. Determinar tier del fan
+    // 9. Determinar tier del fan
     const tierNames = { 0: 'FREE', 1: 'VIP', 2: 'WHALE' }
     const tierName = tierNames[fan.tier] || 'FREE'
 
-    // 9. Construir historial de chat para el prompt
+    // 10. Construir historial de chat para el prompt
     const chatHistory = messages
       .reverse()
       .map(m => `${m.from === 'fan' ? 'Fan' : 'Model'}: ${m.message}`)
       .join('\n')
 
-    // 10. Crear prompt para Claude
+    // 11. Crear prompt para Claude
     const prompt = `You are an AI assistant helping an OnlyFans chatter respond to a fan. 
 
 FAN INFO:
@@ -146,7 +187,7 @@ Respond with JSON only:
 
 If NOT recommending PPV, set recommended_ppv to null.`
 
-    // 11. Llamar a Claude
+    // 12. Llamar a Claude
     const completion = await anthropic.messages.create({
       model: 'claude-sonnet-4-20250514',
       max_tokens: 1000,
@@ -158,7 +199,7 @@ If NOT recommending PPV, set recommended_ppv to null.`
 
     const responseText = completion.content[0].text
     
-    // 12. Parsear respuesta JSON
+    // 13. Parsear respuesta JSON
     let suggestion
     try {
       // Limpiar markdown si existe
@@ -169,7 +210,7 @@ If NOT recommending PPV, set recommended_ppv to null.`
       throw new Error('Invalid AI response format')
     }
 
-    // 13. Retornar sugerencia
+    // 14. Retornar sugerencia
     return res.json({
       success: true,
       suggestion: {
