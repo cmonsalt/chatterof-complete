@@ -16,7 +16,7 @@ export default async function handler(req, res) {
     // 1. Inicializar Supabase y Anthropic
     const supabase = createClient(
       process.env.VITE_SUPABASE_URL,
-      process.env.SUPABASE_SERVICE_ROLE_KEY
+      process.env.SUPABASE_SERVICE_KEY
     )
 
     // 2. Verificar límite directamente en DB
@@ -175,17 +175,13 @@ Respond with JSON only:
 {
   "message": "The flirty message to send",
   "tease_text": "Short unlock tease (if offering PPV)",
- "recommended_ppv": {
-  "id": 123,
-  "session_name": "Session name",
-  "part_number": 0,
-  "title": "Part title",
-  "base_price": 15,
-  "nivel": 5,
-  "media_thumb": "https://...",
-  "media_url": "https://...",
-  "of_media_id": "123456"
-}
+  "recommended_ppv": {
+    "session_name": "Session name",
+    "part_number": 0,
+    "title": "Part title",
+    "price": 15,
+    "level": 5
+  },
   "reasoning": "Why this approach"
 }
 
@@ -214,7 +210,23 @@ If NOT recommending PPV, set recommended_ppv to null.`
       throw new Error('Invalid AI response format')
     }
 
-    // 14. Retornar sugerencia
+    // 14. Si hay PPV recomendado, buscar info completa del catalog
+    if (suggestion.recommended_ppv && suggestion.recommended_ppv.session_name !== null) {
+      const { data: fullPPV } = await supabase
+        .from('catalog')
+        .select('*')
+        .eq('model_id', model_id)
+        .eq('session_name', suggestion.recommended_ppv.session_name)
+        .eq('step_number', suggestion.recommended_ppv.part_number)
+        .single()
+      
+      if (fullPPV) {
+        // Reemplazar con info completa del catalog
+        suggestion.recommended_ppv = fullPPV
+      }
+    }
+
+    // 15. Retornar sugerencia
     return res.json({
       success: true,
       suggestion: {
