@@ -113,7 +113,7 @@ export default function CatalogView({ modelId }) {
   }
 
   const handleDeleteSession = async (session) => {
-    if (!confirm(`Â¿Eliminar session "${session.session_name}"? Los medias volverÃ¡n a estar sin organizar pero seguirÃ¡n en Inbox.`)) {
+    if (!confirm(`Â¿Eliminar session "${session.session_name}"? Los medias volveran a estar sin organizar pero seguiran en Inbox.`)) {
       return
     }
 
@@ -122,11 +122,15 @@ export default function CatalogView({ modelId }) {
       const { error } = await supabase
         .from('catalog')
         .update({ 
-          session_id: null,
-          session_name: null,
-          session_description: null,
-          step_number: null
-        })
+  session_id: null,
+  session_name: null,
+  session_description: null,
+  step_number: null,
+  parent_type: null,        
+  offer_id: null,           
+  keywords: null,           
+  status: 'inbox'          
+})
         .eq('session_id', session.session_id)
 
       if (error) throw error
@@ -153,7 +157,11 @@ export default function CatalogView({ modelId }) {
     try {
       const { error } = await supabase
         .from('catalog')
-        .update({ is_single: false })
+        .update({ 
+  is_single: false,
+  parent_type: null,   
+  offer_id: null       
+})
         .eq('id', single.id)
 
       if (error) throw error
