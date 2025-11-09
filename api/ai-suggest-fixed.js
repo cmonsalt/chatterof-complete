@@ -211,18 +211,23 @@ If NOT recommending PPV, set recommended_ppv to null.`
     }
 
     // 14. Si hay PPV recomendado, buscar info completa del catalog
-    if (suggestion.recommended_ppv && suggestion.recommended_ppv.session_name !== null) {
-      const { data: fullPPV } = await supabase
-        .from('catalog')
-        .select('*')
-        .eq('model_id', model_id)
-        .eq('session_name', suggestion.recommended_ppv.session_name)
-        .eq('step_number', suggestion.recommended_ppv.part_number)
-        .single()
-      
-      if (fullPPV) {
-        // Reemplazar con info completa del catalog
-        suggestion.recommended_ppv = fullPPV
+    if (suggestion.recommended_ppv && suggestion.recommended_ppv.session_name) {
+      try {
+        const { data: fullPPV, error: ppvError } = await supabase
+          .from('catalog')
+          .select('*')
+          .eq('model_id', model_id)
+          .eq('session_name', suggestion.recommended_ppv.session_name)
+          .eq('step_number', suggestion.recommended_ppv.part_number)
+          .single()
+        
+        if (!ppvError && fullPPV) {
+          // Reemplazar con info completa del catalog
+          suggestion.recommended_ppv = fullPPV
+        }
+      } catch (ppvLookupError) {
+        console.warn('Could not find full PPV details, using basic info:', ppvLookupError)
+        // Continuar con la info básica que ya tiene
       }
     }
 
