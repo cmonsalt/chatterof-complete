@@ -5,9 +5,7 @@ import { useAuth } from '../contexts/AuthContext';
 import Navbar from '../components/Navbar';
 import PPVSelectorModal from '../components/PPVSelectorModal';
 import PPVSendModal from '../components/PPVSendModal';
-import PPVMessage from '../components/PPVMessage';
-import AISuggestionModal from '../components/AISuggestionModal';
-import { generateAISuggestion } from '../services/aiService';
+import PPVMessage from '../components/PPVMessage'
 
 export default function ChatView({ embedded = false }) {
   const { fanId } = useParams();
@@ -39,18 +37,12 @@ export default function ChatView({ embedded = false }) {
     lastInteraction: null
   });
   
-  // ðŸ”¥ PPV MODALS - NEW
+  // 🔥 PPV MODALS - NEW
   const [showPPVSelector, setShowPPVSelector] = useState(false);
   const [showPPVSend, setShowPPVSend] = useState(false);
   const [selectedPPVContent, setSelectedPPVContent] = useState([]);
   
-  // 🤖 AI SUGGESTION MODAL
-  const [showAISuggestion, setShowAISuggestion] = useState(false);
-  const [aiSuggestion, setAiSuggestion] = useState(null);
-  const [aiGenerating, setAiGenerating] = useState(false);
-  const [catalogSessions, setCatalogSessions] = useState([]);
-  
-  // ðŸ”¥ REPLY functionality
+  // 🔥 REPLY functionality
   const [replyingTo, setReplyingTo] = useState(null);
   
   const lastCheckedMessageId = useRef(null);
@@ -67,9 +59,9 @@ export default function ChatView({ embedded = false }) {
 
   const getTierBadge = (tier) => {
     const tiers = {
-      0: { emoji: 'ðŸ†“', label: 'New Fan', color: 'bg-gray-100 text-gray-700' },
-      1: { emoji: 'ðŸ’Ž', label: 'VIP', color: 'bg-blue-100 text-blue-700' },
-      2: { emoji: 'ðŸ‹', label: 'Whale', color: 'bg-purple-100 text-purple-700' }
+      0: { emoji: '🆓', label: 'New Fan', color: 'bg-gray-100 text-gray-700' },
+      1: { emoji: '💎', label: 'VIP', color: 'bg-blue-100 text-blue-700' },
+      2: { emoji: '🐋', label: 'Whale', color: 'bg-purple-100 text-purple-700' }
     }
     return tiers[tier] || tiers[0]
   }
@@ -84,7 +76,7 @@ export default function ChatView({ embedded = false }) {
     if (messages.length === 0) return;
     
     if (justSentMessage.current) {
-      console.log('â­ï¸ Skipping read marking - just sent a message');
+      console.log('⭐ Skipping read marking - just sent a message');
       justSentMessage.current = false;
       return;
     }
@@ -92,7 +84,7 @@ export default function ChatView({ embedded = false }) {
     const lastMessage = messages[messages.length - 1];
     
     if (lastMessage?.from === 'fan' && lastMessage.id !== lastCheckedMessageId.current) {
-      console.log('ðŸ“– Fan responded! Marking previous model messages as read');
+      console.log('📖 Fan responded! Marking previous model messages as read');
       lastCheckedMessageId.current = lastMessage.id;
       markPreviousModelMessagesAsRead(lastMessage.ts);
     }
@@ -113,7 +105,7 @@ export default function ChatView({ embedded = false }) {
         .lt('ts', fanMessageTime);
 
       if (error) throw error;
-      console.log('âœ… Marked model messages as read');
+      console.log('✅ Marked model messages as read');
     } catch (error) {
       console.error('Error marking as read:', error);
     }
@@ -122,13 +114,13 @@ export default function ChatView({ embedded = false }) {
   async function loadFanAndMessages() {
     const currentModelId = modelId || user?.user_metadata?.model_id;
     if (!currentModelId) {
-      console.log('âš ï¸ No model ID');
+      console.log('⚠️ No model ID');
       setLoading(false);
       return;
     }
 
     if (!fanId) {
-      console.log('âš ï¸ No fan ID');
+      console.log('⚠️ No fan ID');
       setLoading(false);
       return;
     }
@@ -142,13 +134,13 @@ export default function ChatView({ embedded = false }) {
         .maybeSingle();
 
       if (fanError) {
-        console.error('âŒ Fan error:', fanError);
+        console.error('❌ Fan error:', fanError);
         setLoading(false);
         return;
       }
       
       if (!fanData) {
-        console.log('âš ï¸ Fan no encontrado');
+        console.log('⚠️ Fan no encontrado');
         setLoading(false);
         return;
       }
@@ -164,7 +156,7 @@ export default function ChatView({ embedded = false }) {
         .limit(50);
 
       if (messagesError) {
-        console.error('âŒ Messages error:', messagesError);
+        console.error('❌ Messages error:', messagesError);
       } else {
         setMessages(messagesData || []);
       }
@@ -172,7 +164,7 @@ export default function ChatView({ embedded = false }) {
       calculateFanStats(messagesData || []);
       setLoading(false);
     } catch (error) {
-      console.error('âŒ Load error:', error);
+      console.error('❌ Load error:', error);
       setLoading(false);
     }
   }
@@ -201,14 +193,14 @@ export default function ChatView({ embedded = false }) {
     });
   }
 
-  // ðŸ”¥ NEW: Handle PPV content selection
+  // 🔥 NEW: Handle PPV content selection
   function handlePPVContentSelected(content) {
     setSelectedPPVContent(content);
     setShowPPVSelector(false);
     setShowPPVSend(true);
   }
 
-  // ðŸ”¥ NEW: Handle PPV send
+  // 🔥 NEW: Handle PPV send
   async function handleSendPPV(ppvData) {
     const currentModelId = modelId || user?.user_metadata?.model_id;
     if (!currentModelId) return;
@@ -258,113 +250,12 @@ export default function ChatView({ embedded = false }) {
       await loadFanAndMessages();
       
     } catch (error) {
-      console.error('âŒ Error sending PPV:', error);
+      console.error('❌ Error sending PPV:', error);
       alert('Error sending PPV: ' + error.message);
       justSentMessage.current = false;
     } finally {
       setSending(false);
     }
-  }
-
-  // 🤖 NEW: Consultar IA
-  async function handleConsultarIA() {
-    setAiGenerating(true);
-    
-    try {
-      // Load catalog if not loaded
-      if (catalogSessions.length === 0) {
-        const { data } = await supabase
-          .from('catalog')
-          .select('*')
-          .eq('model_id', modelId)
-          .order('created_at', { ascending: false });
-        
-        // Group into sessions
-        const sessionsMap = new Map();
-        const allMediasMap = new Map();
-        
-        data?.forEach(item => {
-          if (item.of_media_id) {
-            allMediasMap.set(item.of_media_id, item);
-          }
-        });
-        
-        data?.filter(item => item.session_id && item.step_number !== null)
-          .forEach(item => {
-            if (!sessionsMap.has(item.session_id)) {
-              sessionsMap.set(item.session_id, {
-                session_id: item.session_id,
-                session_name: item.session_name,
-                parts: []
-              });
-            }
-            
-            const mediasInfo = [];
-            if (item.of_media_ids && item.of_media_ids.length > 0) {
-              item.of_media_ids.forEach(mediaId => {
-                const mediaInfo = allMediasMap.get(mediaId);
-                if (mediaInfo) {
-                  mediasInfo.push({
-                    of_media_id: mediaInfo.of_media_id,
-                    media_thumb: mediaInfo.media_thumb,
-                    media_url: mediaInfo.media_url,
-                    r2_url: mediaInfo.r2_url,
-                    file_type: mediaInfo.file_type
-                  });
-                }
-              });
-            }
-            
-            sessionsMap.get(item.session_id).parts.push({
-              ...item,
-              medias_info: mediasInfo
-            });
-          });
-        
-        sessionsMap.forEach(session => {
-          session.parts.sort((a, b) => a.step_number - b.step_number);
-        });
-        
-        setCatalogSessions(Array.from(sessionsMap.values()));
-      }
-      
-      // Generate AI suggestion
-      const suggestion = await generateAISuggestion(
-        fan,
-        { lastMessage: messages[messages.length - 1]?.message || '' },
-        catalogSessions
-      );
-      
-      setAiSuggestion(suggestion);
-      setShowAISuggestion(true);
-      
-    } catch (error) {
-      console.error('Error generating AI suggestion:', error);
-      alert('Error generating AI suggestion');
-    } finally {
-      setAiGenerating(false);
-    }
-  }
-
-  // 🤖 Handle AI suggestion accept
-  function handleAIAccept(data) {
-    if (data.ppv) {
-      // User wants to send PPV
-      setNewMessage(data.message);
-      setSelectedPPVContent([data.ppv]);
-      setShowPPVSend(true);
-    } else {
-      // Just send message
-      setNewMessage(data.message);
-    }
-    setShowAISuggestion(false);
-  }
-
-  // 🤖 Handle AI edit content
-  function handleAIEdit(data) {
-    setNewMessage(data.message);
-    setShowAISuggestion(false);
-    setShowPPVSelector(true);
   }
 
   async function enviarMensaje() {
@@ -416,60 +307,11 @@ export default function ChatView({ embedded = false }) {
       await loadFanAndMessages();
       
     } catch (error) {
-      console.error('âŒ Error enviando mensaje:', error);
+      console.error('❌ Error enviando mensaje:', error);
       alert('Error al enviar mensaje: ' + error.message);
       justSentMessage.current = false;
     } finally {
       setSending(false);
-    }
-  }
-
-  async function analizarConIA() {
-    const currentModelId = modelId || user?.user_metadata?.model_id;
-    if (!currentModelId) return;
-    
-    setIaLoading(true);
-
-    try {
-      const conversacion = messages.map(m => ({
-        role: m.from === 'fan' ? 'user' : 'assistant',
-        content: m.message
-      }));
-
-      const response = await fetch('https://api.anthropic.com/v1/messages', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-api-key': import.meta.env.VITE_ANTHROPIC_API_KEY,
-          'anthropic-version': '2023-06-01'
-        },
-        body: JSON.stringify({
-          model: 'claude-3-5-sonnet-20241022',
-          max_tokens: 1024,
-          messages: [
-            {
-              role: 'user',
-              content: `Eres un experto asesor de OnlyFans. Analiza esta conversaciÃ³n y dame:
-1. Resumen del fan
-2. Estado emocional
-3. Siguiente mejor acciÃ³n para maximizar revenue
-4. Sugerencia de mensaje
-
-ConversaciÃ³n:\n${JSON.stringify(conversacion, null, 2)}`
-            }
-          ]
-        })
-      });
-
-      if (!response.ok) throw new Error('API error');
-
-      const data = await response.json();
-      setIaAnalisis(data.content[0].text);
-    } catch (error) {
-      console.error('Error IA:', error);
-      alert('Error al analizar con IA');
-    } finally {
-      setIaLoading(false);
     }
   }
 
@@ -537,7 +379,7 @@ ConversaciÃ³n:\n${JSON.stringify(conversacion, null, 2)}`
         {!embedded && <Navbar />}
         <div className="flex items-center justify-center min-h-screen">
           <div className="text-center">
-            <div className="text-5xl mb-4">ðŸ’¬</div>
+            <div className="text-5xl mb-4">💬</div>
             <p className="text-gray-500 font-semibold">Loading chat...</p>
           </div>
         </div>
@@ -551,7 +393,7 @@ ConversaciÃ³n:\n${JSON.stringify(conversacion, null, 2)}`
         {!embedded && <Navbar />}
         <div className="flex items-center justify-center min-h-screen">
           <div className="text-center">
-            <div className="text-5xl mb-4">ðŸ˜•</div>
+            <div className="text-5xl mb-4">😕</div>
             <p className="text-gray-500 font-semibold">Fan not found</p>
             <button
               onClick={() => navigate('/dashboard')}
@@ -581,7 +423,7 @@ ConversaciÃ³n:\n${JSON.stringify(conversacion, null, 2)}`
                     onClick={() => navigate('/dashboard')}
                     className="text-gray-400 hover:text-gray-600"
                   >
-                    â† Back
+                    ← Back
                   </button>
                 )}
                 <div>
@@ -602,13 +444,13 @@ ConversaciÃ³n:\n${JSON.stringify(conversacion, null, 2)}`
                   onClick={() => setShowIaPanel(!showIaPanel)}
                   className="px-4 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600 font-semibold"
                 >
-                  ðŸ¤– AI Analysis
+                  🤖 AI Analysis
                 </button>
                 <button
                   onClick={() => setShowNotesSidebar(!showNotesSidebar)}
                   className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 font-semibold"
                 >
-                  ðŸ“ Notes
+                  📝 Notes
                 </button>
               </div>
             </div>
@@ -648,18 +490,14 @@ ConversaciÃ³n:\n${JSON.stringify(conversacion, null, 2)}`
             {/* AI Panel */}
             {showIaPanel && (
               <div className="w-80 bg-gradient-to-br from-purple-50 to-pink-50 rounded-xl shadow-lg p-6 border border-purple-200">
-                <h2 className="text-xl font-bold text-gray-800 mb-4">ðŸ¤– AI Assistant</h2>
+                <h2 className="text-xl font-bold text-gray-800 mb-4">🤖 AI Assistant</h2>
                 
-                <button
-                  onClick={analizarConIA}
-                  disabled={iaLoading}
-                  className="w-full px-4 py-3 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-lg hover:from-purple-600 hover:to-pink-600 font-semibold disabled:opacity-50 mb-4"
-                >
-                  {iaLoading ? 'â³ Analyzing...' : 'ðŸ” Analyze Conversation'}
-                </button>
+                <p className="text-sm text-gray-600 mb-4">
+                  Click the button below to get AI-powered suggestions for this conversation.
+                </p>
 
                 {iaAnalisis && (
-                  <div className="bg-white rounded-lg p-4 border border-purple-200 max-h-96 overflow-y-auto">
+                  <div className="bg-white rounded-lg p-4 border border-purple-200 max-h-96 overflow-y-auto mb-4">
                     <pre className="text-sm text-gray-700 whitespace-pre-wrap">{iaAnalisis}</pre>
                   </div>
                 )}
@@ -683,7 +521,7 @@ ConversaciÃ³n:\n${JSON.stringify(conversacion, null, 2)}`
                     >
                       {msg.reply_to_text && (
                         <div className="mb-2 pb-2 border-b border-opacity-30 border-white">
-                          <div className="text-xs opacity-75">â†©ï¸ Reply to:</div>
+                          <div className="text-xs opacity-75">↩️ Reply to:</div>
                           <div className="text-xs italic opacity-90">
                             {msg.reply_to_text.slice(0, 50)}...
                           </div>
@@ -693,7 +531,6 @@ ConversaciÃ³n:\n${JSON.stringify(conversacion, null, 2)}`
                       <p className="text-sm">{msg.message}</p>
 
                       {msg.media_url && (
-  // ðŸ”¥ RENDERIZADO CONDICIONAL: PPV vs Normal
   msg.is_ppv ? (
     <PPVMessage message={msg} />
   ) : msg.media_type === 'video' ? (
@@ -703,7 +540,7 @@ ConversaciÃ³n:\n${JSON.stringify(conversacion, null, 2)}`
       className="rounded-lg shadow-md max-w-xs max-h-60"
       onError={(e) => {
         console.error('Video failed to load')
-        e.target.outerHTML = '<div class="flex flex-col items-center justify-center h-48 bg-gray-100 rounded-lg"><div class="text-5xl mb-2">âŒ</div><p class="text-sm text-gray-600 font-semibold">Video URL expired</p></div>'
+        e.target.outerHTML = '<div class="flex flex-col items-center justify-center h-48 bg-gray-100 rounded-lg"><div class="text-5xl mb-2">❌</div><p class="text-sm text-gray-600 font-semibold">Video URL expired</p></div>'
       }}
     />
   ) : (
@@ -713,7 +550,7 @@ ConversaciÃ³n:\n${JSON.stringify(conversacion, null, 2)}`
       className="rounded-lg shadow-md max-w-xs max-h-60"
       onError={(e) => {
         console.error('Image failed to load')
-        e.target.outerHTML = '<div class="flex flex-col items-center justify-center h-48 bg-gray-100 rounded-lg"><div class="text-5xl mb-2">âŒ</div><p class="text-sm text-gray-600 font-semibold">Image URL expired</p></div>'
+        e.target.outerHTML = '<div class="flex flex-col items-center justify-center h-48 bg-gray-100 rounded-lg"><div class="text-5xl mb-2">❌</div><p class="text-sm text-gray-600 font-semibold">Image URL expired</p></div>'
       }}
     />
   )
@@ -721,7 +558,7 @@ ConversaciÃ³n:\n${JSON.stringify(conversacion, null, 2)}`
 
                       <div className="text-xs opacity-75 mt-1">
                         {new Date(msg.ts).toLocaleTimeString()}
-                        {msg.from === 'model' && msg.read && ' â€¢ Read âœ“'}
+                        {msg.from === 'model' && msg.read && ' • Read ✓'}
                       </div>
 
                       {msg.from === 'fan' && (
@@ -744,7 +581,7 @@ ConversaciÃ³n:\n${JSON.stringify(conversacion, null, 2)}`
                   <div className="mb-3 bg-blue-50 border-l-4 border-blue-500 p-3 rounded flex items-start justify-between">
                     <div className="flex-1">
                       <div className="text-xs font-semibold text-blue-700 mb-1">
-                        â†©ï¸ Replying to:
+                        ↩️ Replying to:
                       </div>
                       <div className="text-sm text-gray-700">
                         {replyingTo.message.slice(0, 80)}{replyingTo.message.length > 80 ? '...' : ''}
@@ -754,7 +591,7 @@ ConversaciÃ³n:\n${JSON.stringify(conversacion, null, 2)}`
                       onClick={() => setReplyingTo(null)}
                       className="text-gray-400 hover:text-gray-600 ml-2"
                     >
-                      âœ•
+                      ✕
                     </button>
                   </div>
                 )}
@@ -770,12 +607,12 @@ ConversaciÃ³n:\n${JSON.stringify(conversacion, null, 2)}`
                     className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
                   />
                   
-                  {/* ðŸ”¥ NEW PPV BUTTON */}
+                  {/* 🔥 NEW PPV BUTTON */}
                   <button
                     onClick={() => setShowPPVSelector(true)}
                     className="px-4 py-2 bg-gradient-to-r from-green-500 to-emerald-500 text-white rounded-lg hover:from-green-600 hover:to-emerald-600 font-semibold transition-all"
                   >
-                    ðŸ’° PPV
+                    💰 PPV
                   </button>
 
                   <button
@@ -783,7 +620,7 @@ ConversaciÃ³n:\n${JSON.stringify(conversacion, null, 2)}`
                     disabled={!newMessage.trim() || sending}
                     className="px-6 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 font-semibold disabled:opacity-50 disabled:cursor-not-allowed transition-all"
                   >
-                    {sending ? 'â³' : 'Send'}
+                    {sending ? '⏳' : 'Send'}
                   </button>
                 </div>
               </div>
@@ -793,12 +630,12 @@ ConversaciÃ³n:\n${JSON.stringify(conversacion, null, 2)}`
             {showNotesSidebar && (
               <div className="bg-white rounded-xl shadow-lg p-6 max-h-[700px] overflow-y-auto" style={{ width: '320px' }}>
                 <div className="flex items-center justify-between mb-4">
-                  <h2 className="text-xl font-bold text-gray-800">ðŸ“ Notes</h2>
+                  <h2 className="text-xl font-bold text-gray-800">📝 Notes</h2>
                   <button
                     onClick={() => setShowNotesSidebar(false)}
                     className="text-gray-400 hover:text-gray-600"
                   >
-                    âœ•
+                    ✕
                   </button>
                 </div>
 
@@ -851,7 +688,7 @@ ConversaciÃ³n:\n${JSON.stringify(conversacion, null, 2)}`
                 {/* Personal Notes */}
                 <div className="mb-6">
                   <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    ðŸ’­ Personal Notes
+                    💭 Personal Notes
                   </label>
                   <textarea
                     value={notesValue}
@@ -865,14 +702,14 @@ ConversaciÃ³n:\n${JSON.stringify(conversacion, null, 2)}`
                     disabled={savingNotes}
                     className="mt-2 w-full px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 text-sm disabled:opacity-50 font-semibold"
                   >
-                    {savingNotes ? 'Saving...' : 'ðŸ’¾ Save Notes'}
+                    {savingNotes ? 'Saving...' : '💾 Save Notes'}
                   </button>
                 </div>
 
                 {/* Chatter Tips */}
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    ðŸ’¡ Chatter Tips
+                    💡 Chatter Tips
                   </label>
                   <textarea
                     value={chatterNotesValue}
@@ -886,7 +723,7 @@ ConversaciÃ³n:\n${JSON.stringify(conversacion, null, 2)}`
                     disabled={savingNotes}
                     className="mt-2 w-full px-4 py-2 bg-purple-500 text-white rounded hover:bg-purple-600 text-sm disabled:opacity-50 font-semibold"
                   >
-                    {savingNotes ? 'Saving...' : 'ðŸ’¾ Save Tips'}
+                    {savingNotes ? 'Saving...' : '💾 Save Tips'}
                   </button>
                 </div>
               </div>
@@ -898,13 +735,13 @@ ConversaciÃ³n:\n${JSON.stringify(conversacion, null, 2)}`
               onClick={() => setShowNotesSidebar(true)}
               className="fixed right-6 bottom-6 w-14 h-14 bg-blue-500 text-white rounded-full shadow-lg hover:bg-blue-600 flex items-center justify-center text-2xl z-50"
             >
-              ðŸ“
+              📝
             </button>
           )}
         </div>
       </div>
 
-      {/* ðŸ”¥ PPV MODALS */}
+      {/* 🔥 PPV MODALS */}
       <PPVSelectorModal
         isOpen={showPPVSelector}
         onClose={() => setShowPPVSelector(false)}

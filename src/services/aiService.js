@@ -1,23 +1,27 @@
-// AI Service - Mock only
+// AI Service - Mock only (sin llamadas API)
+// Cuando quieras IA real, activas la edge function
 
 export async function generateAISuggestion(fanData, chatHistory, catalogParts) {
+  // Simular delay de API
   await new Promise(resolve => setTimeout(resolve, 1000));
+  
+  // Por ahora solo mock
   return generateMockSuggestion(fanData, catalogParts);
 }
 
 function generateMockSuggestion(fanData, catalogParts) {
   const suggestions = {
-    0: {
+    0: { // FREE tier
       message: "Hey love! 😘 I was just thinking about you... How's your day going?",
       lockedText: "Unlock to see what I've been up to 💦",
       partIndex: 0
     },
-    1: {
+    1: { // VIP tier
       message: "Baby! 🔥 I just finished my yoga session and you were on my mind the whole time... Want to see?",
       lockedText: "Unlock to watch me stretch 🧘‍♀️💕",
       partIndex: 1
     },
-    2: {
+    2: { // WHALE tier
       message: "Hey handsome 😍 I have something SPECIAL just for you... You're gonna love this",
       lockedText: "Unlock for exclusive content 🔥💦",
       partIndex: 2
@@ -38,6 +42,6 @@ function generateMockSuggestion(fanData, catalogParts) {
     message: suggestion.message,
     lockedText: suggestion.lockedText,
     recommendedPPV: recommendedPPV,
-    reasoning: `Mock suggestion for ${fanData.tier_name || 'FREE'} tier`
+    reasoning: `Mock suggestion for ${fanData.tier_name || 'tier ' + fanData.tier}`
   };
 }
