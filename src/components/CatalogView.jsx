@@ -118,7 +118,7 @@ export default function CatalogView({ modelId }) {
     }
 
     try {
-      // Solo quitar la referencia de session, NO eliminar los items
+      
       const { error } = await supabase
         .from('catalog')
         .update({ 
@@ -128,8 +128,10 @@ export default function CatalogView({ modelId }) {
   step_number: null,
   parent_type: null,        
   offer_id: null,           
-  keywords: null,           
-  status: 'inbox'          
+  keywords: null,  
+  of_media_ids: '[]',          
+  status: 'inbox',
+   title: supabase.sql`'Vault ' || file_type || ' - ' || of_media_id`          
 })
         .eq('session_id', session.session_id)
 
@@ -160,7 +162,9 @@ export default function CatalogView({ modelId }) {
         .update({ 
   is_single: false,
   parent_type: null,   
-  offer_id: null       
+  offer_id: null,
+  of_media_ids: '[]',
+  title: supabase.sql`'Vault ' || file_type || ' - ' || of_media_id`         
 })
         .eq('id', single.id)
 
