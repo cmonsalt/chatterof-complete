@@ -175,13 +175,17 @@ Respond with JSON only:
 {
   "message": "The flirty message to send",
   "tease_text": "Short unlock tease (if offering PPV)",
-  "recommended_ppv": {
-    "session_name": "Session name",
-    "part_number": 0,
-    "title": "Part title",
-    "price": 15,
-    "level": 5
-  },
+ "recommended_ppv": {
+  "id": 123,
+  "session_name": "Session name",
+  "part_number": 0,
+  "title": "Part title",
+  "base_price": 15,
+  "nivel": 5,
+  "media_thumb": "https://...",
+  "media_url": "https://...",
+  "of_media_id": "123456"
+}
   "reasoning": "Why this approach"
 }
 
