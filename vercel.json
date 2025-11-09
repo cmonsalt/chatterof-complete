@@ -5,6 +5,12 @@
       "destination": "/index.html"
     }
   ],
+  "functions": {
+    "api/**/*.js": {
+      "memory": 1024,
+      "maxDuration": 30
+    }
+  },
   "crons": [{
     "path": "/api/onlyfans/cron-check-notifications",
     "schedule": "*/5 * * * *"
