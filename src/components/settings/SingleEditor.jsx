@@ -66,6 +66,7 @@ export default function SingleEditor({ isOpen, single, onClose, modelId }) {
       const { error } = await supabase
         .from('catalog')
         .update({
+          parent_type: 'single', 
           title,
           base_price: basePrice,
           nivel,
