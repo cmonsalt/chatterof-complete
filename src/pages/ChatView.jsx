@@ -315,54 +315,54 @@ export default function ChatView({ embedded = false }) {
     }
   }
 
-  async function analizarConIA() {
-    const currentModelId = modelId || user?.user_metadata?.model_id;
-    if (!currentModelId) return;
+//   async function analizarConIA() {
+//     const currentModelId = modelId || user?.user_metadata?.model_id;
+//     if (!currentModelId) return;
     
-    setIaLoading(true);
+//     setIaLoading(true);
 
-    try {
-      const conversacion = messages.map(m => ({
-        role: m.from === 'fan' ? 'user' : 'assistant',
-        content: m.message
-      }));
+//     try {
+//       const conversacion = messages.map(m => ({
+//         role: m.from === 'fan' ? 'user' : 'assistant',
+//         content: m.message
+//       }));
 
-      const response = await fetch('https://api.anthropic.com/v1/messages', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-api-key': import.meta.env.VITE_ANTHROPIC_API_KEY,
-          'anthropic-version': '2023-06-01'
-        },
-        body: JSON.stringify({
-          model: 'claude-3-5-sonnet-20241022',
-          max_tokens: 1024,
-          messages: [
-            {
-              role: 'user',
-              content: `Eres un experto asesor de OnlyFans. Analiza esta conversación y dame:
-1. Resumen del fan
-2. Estado emocional
-3. Siguiente mejor acción para maximizar revenue
-4. Sugerencia de mensaje
+//       const response = await fetch('https://api.anthropic.com/v1/messages', {
+//         method: 'POST',
+//         headers: {
+//           'Content-Type': 'application/json',
+//           'x-api-key': import.meta.env.VITE_ANTHROPIC_API_KEY,
+//           'anthropic-version': '2023-06-01'
+//         },
+//         body: JSON.stringify({
+//           model: 'claude-3-5-sonnet-20241022',
+//           max_tokens: 1024,
+//           messages: [
+//             {
+//               role: 'user',
+//               content: `Eres un experto asesor de OnlyFans. Analiza esta conversación y dame:
+// 1. Resumen del fan
+// 2. Estado emocional
+// 3. Siguiente mejor acción para maximizar revenue
+// 4. Sugerencia de mensaje
 
-Conversación:\n${JSON.stringify(conversacion, null, 2)}`
-            }
-          ]
-        })
-      });
+// Conversación:\n${JSON.stringify(conversacion, null, 2)}`
+//             }
+//           ]
+//         })
+//       });
 
-      if (!response.ok) throw new Error('API error');
+//       if (!response.ok) throw new Error('API error');
 
-      const data = await response.json();
-      setIaAnalisis(data.content[0].text);
-    } catch (error) {
-      console.error('Error IA:', error);
-      alert('Error al analizar con IA');
-    } finally {
-      setIaLoading(false);
-    }
-  }
+//       const data = await response.json();
+//       setIaAnalisis(data.content[0].text);
+//     } catch (error) {
+//       console.error('Error IA:', error);
+//       alert('Error al analizar con IA');
+//     } finally {
+//       setIaLoading(false);
+//     }
+//   }
 
   async function handleSaveNotes() {
     setSavingNotes(true);
@@ -541,14 +541,6 @@ Conversación:\n${JSON.stringify(conversacion, null, 2)}`
               <div className="w-80 bg-gradient-to-br from-purple-50 to-pink-50 rounded-xl shadow-lg p-6 border border-purple-200">
                 <h2 className="text-xl font-bold text-gray-800 mb-4">🤖 AI Assistant</h2>
                 
-                <button
-                  onClick={analizarConIA}
-                  disabled={iaLoading}
-                  className="w-full px-4 py-3 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-lg hover:from-purple-600 hover:to-pink-600 font-semibold disabled:opacity-50 mb-4"
-                >
-                  {iaLoading ? '⏳ Analyzing...' : '🔍 Analyze Conversation'}
-                </button>
-
                 {iaAnalisis && (
                   <div className="bg-white rounded-lg p-4 border border-purple-200 max-h-96 overflow-y-auto">
                     <pre className="text-sm text-gray-700 whitespace-pre-wrap">{iaAnalisis}</pre>
