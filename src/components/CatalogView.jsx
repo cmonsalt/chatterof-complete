@@ -129,7 +129,10 @@ export default function CatalogView({ modelId }) {
   parent_type: null,        
   offer_id: null,           
   keywords: null,  
-  of_media_ids: null,          
+  of_media_ids: null, 
+  base_price: 0,         
+  nivel: 1,               
+  title: 'Unorganized',          
   status: 'inbox'    
 })
         .eq('session_id', session.session_id)
@@ -164,7 +167,10 @@ export default function CatalogView({ modelId }) {
   offer_id: null,
   of_media_ids: null,
   description: null,   
-  keywords: null            
+  keywords: null,
+  base_price: 0,         
+  nivel: 1,                
+  title: 'Unorganized'              
 })
         .eq('id', single.id)
 
