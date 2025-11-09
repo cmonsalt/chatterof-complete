@@ -242,7 +242,23 @@ export default function PPVSelectorModal({
                             return (
                               <div 
                                 key={part.id}
-                                onClick={() => toggleSelection(part)}
+                                onClick={() => {
+  // Si el part tiene múltiples medias, agregar todos
+  if (part.medias_info && part.medias_info.length > 0) {
+    part.medias_info.forEach(media => {
+      toggleSelection({
+        ...part,
+        of_media_id: media.of_media_id,
+        media_thumb: media.media_thumb,
+        media_url: media.media_url,
+        r2_url: media.r2_url,
+        file_type: media.file_type
+      });
+    });
+  } else {
+    toggleSelection(part);
+  }
+}}
                                 className={`flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-all ${
                                   isSelected 
                                     ? 'bg-green-50 border-2 border-green-500' 
