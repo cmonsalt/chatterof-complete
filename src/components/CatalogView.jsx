@@ -162,7 +162,9 @@ export default function CatalogView({ modelId }) {
   is_single: false,
   parent_type: null,   
   offer_id: null,
-  of_media_ids: null         
+  of_media_ids: null,
+  description: null,   
+  keywords: null            
 })
         .eq('id', single.id)
 
