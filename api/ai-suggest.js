@@ -16,7 +16,7 @@ export default async function handler(req, res) {
     // 1. Inicializar Supabase y Anthropic
     const supabase = createClient(
       process.env.VITE_SUPABASE_URL,
-      process.env.SUPABASE_SERVICE_KEY
+      process.env.SUPABASE_SERVICE_ROLE_KEY
     )
 
     // 2. Verificar límite directamente en DB
