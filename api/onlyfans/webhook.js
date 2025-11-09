@@ -222,29 +222,18 @@ async function handleVaultContent(payload, modelId) {
       }
 
       // Guardar en catalog
-      // const catalogData = {
-      //   model_id: modelId,
-      //   of_media_id: mediaId,
-      //   title: `Vault ${mediaType} - ${mediaId}`, // Título temporal
-      //   base_price: 0, // Se asignará después al organizar
-      //   nivel: 1, // Nivel por defecto
-      //   file_type: mediaType,
-      //   r2_url: r2Url,
-      //   media_thumb: r2ThumbUrl || thumbUrl,
-      //   status: 'inbox', // Pendiente de organizar
-      //   created_at: new Date().toISOString()
-      // }
-
       const catalogData = {
-  model_id: modelId,
-  of_media_id: mediaId,
-  title: `Vault ${mediaType} - ${mediaId}`,
-  file_type: mediaType,
-  r2_url: r2Url,
-  media_thumb: r2ThumbUrl || thumbUrl,
-  status: 'inbox',
-  created_at: new Date().toISOString()
-}
+        model_id: modelId,
+        of_media_id: mediaId,
+        title: `Vault ${mediaType} - ${mediaId}`, // Título temporal
+        base_price: 0, // Se asignará después al organizar
+        nivel: 1, // Nivel por defecto
+        file_type: mediaType,
+        r2_url: r2Url,
+        media_thumb: r2ThumbUrl || thumbUrl,
+        status: 'inbox', // Pendiente de organizar
+        created_at: new Date().toISOString()
+      }
 
       const { error } = await supabase
         .from('catalog')
