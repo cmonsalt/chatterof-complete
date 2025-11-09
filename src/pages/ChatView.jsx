@@ -6,7 +6,7 @@ import Navbar from '../components/Navbar';
 import PPVSelectorModal from '../components/PPVSelectorModal';
 import PPVSendModal from '../components/PPVSendModal';
 import PPVMessage from '../components/PPVMessage';
-import { generateAISuggestion } from '../services/aiService';
+
 
 export default function ChatView({ embedded = false }) {
   const { fanId } = useParams();
@@ -198,59 +198,38 @@ export default function ChatView({ embedded = false }) {
   }
 
   // 🤖 NEW: AI Suggestion Handler
-  async function handleConsultarIA() {
-    const currentModelId = modelId || user?.user_metadata?.model_id;
-    if (!currentModelId || !fan) return;
-    
-    setAiGenerating(true);
-    
-    try {
-      // Load catalog sessions
-      const { data: catalogData } = await supabase
-        .from('catalog')
-        .select('*')
-        .eq('model_id', currentModelId)
-        .eq('parent_type', 'session') 
-        .order('session_name');
+async function handleConsultarIA() {
+  const currentModelId = modelId || user?.user_metadata?.model_id;
+  if (!currentModelId || !fan) return;
+  
+  setAiGenerating(true);
+  
+  try {
+    const response = await fetch('/api/ai-suggest', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        fan_id: fan.fan_id,
+        model_id: currentModelId
+      })
+    });
 
-      // Group into sessions
-      const sessionsMap = {};
-      catalogData?.forEach(item => {
-        if (!sessionsMap[item.session_name]) {
-          sessionsMap[item.session_name] = {
-            session_name: item.session_name,
-            parts: []
-          };
-        }
-        sessionsMap[item.session_name].parts.push(item);
-      });
-
-      const catalogSessions = Object.values(sessionsMap);
-
-      // Generate AI suggestion
-      const suggestion = await generateAISuggestion(
-        {
-          ...fan,
-          model_id: currentModelId,
-          tier_name: getTierBadge(fan.tier).label
-        },
-        {
-          lastMessage: messages[messages.length - 1]?.message || ''
-        },
-        catalogSessions
-      );
-      
-      setAiSuggestion(suggestion);
-      setShowAISuggestion(true);
-      
-    } catch (error) {
-      console.error('Error generating AI suggestion:', error);
-      alert('Error generating suggestion: ' + error.message);
-    } finally {
-      setAiGenerating(false);
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error);
     }
-  }
 
+    const data = await response.json();
+    setAiSuggestion(data.suggestion);
+    setShowAISuggestion(true);
+    
+  } catch (error) {
+    console.error('Error generating AI suggestion:', error);
+    alert('Error: ' + error.message);
+  } finally {
+    setAiGenerating(false);
+  }
+}
   // 🤖 Handle using AI suggestion
   function handleUseAISuggestion() {
     if (aiSuggestion?.message) {
