@@ -284,6 +284,7 @@ export default function CatalogView({ modelId }) {
                     </div>
 
                     <div className="flex items-center gap-2">
+                    {/*
                       <button
                         onClick={(e) => {
                           e.stopPropagation()
@@ -293,6 +294,7 @@ export default function CatalogView({ modelId }) {
                       >
                         âœï¸ Edit
                       </button>
+                      */}
                       <button
                         onClick={(e) => {
                           e.stopPropagation()
