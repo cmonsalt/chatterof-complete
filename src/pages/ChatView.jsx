@@ -210,7 +210,7 @@ export default function ChatView({ embedded = false }) {
         .from('catalog')
         .select('*')
         .eq('model_id', currentModelId)
-        .eq('type', 'session')
+        .eq('parent_type', 'session') 
         .order('session_name');
 
       // Group into sessions
