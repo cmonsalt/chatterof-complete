@@ -250,7 +250,7 @@ export default function ConfigTab({ modelId }) {
         {/* Claude API Settings */}
         <div className="border-t pt-6">
           <h3 className="text-lg font-semibold text-gray-900 mb-4">Claude API</h3>
-          
+            {/*
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -282,7 +282,7 @@ export default function ConfigTab({ modelId }) {
                 <option value="claude-3-opus-20240229">Claude 3 Opus</option>
               </select>
             </div>
-          </div>
+          </div>*/}
 
           <div className="mt-6">
             <label className="block text-sm font-medium text-gray-700 mb-2">
