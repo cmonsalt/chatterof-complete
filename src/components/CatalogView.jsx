@@ -130,8 +130,7 @@ export default function CatalogView({ modelId }) {
   offer_id: null,           
   keywords: null,  
   of_media_ids: '[]',          
-  status: 'inbox',
-   title: supabase.sql`'Vault ' || file_type || ' - ' || of_media_id`          
+  status: 'inbox'    
 })
         .eq('session_id', session.session_id)
 
@@ -163,8 +162,7 @@ export default function CatalogView({ modelId }) {
   is_single: false,
   parent_type: null,   
   offer_id: null,
-  of_media_ids: '[]',
-  title: supabase.sql`'Vault ' || file_type || ' - ' || of_media_id`         
+  of_media_ids: '[]'       
 })
         .eq('id', single.id)
 
