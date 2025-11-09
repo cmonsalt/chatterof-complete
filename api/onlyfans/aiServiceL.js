@@ -1,44 +1,12 @@
-// AI Service - Calls Supabase Edge Function
+// AI Service - Mock only (sin edge function por ahora)
 
 export async function generateAISuggestion(fanData, chatHistory, catalogParts) {
-  try {
-    const response = await fetch(
-      'https://lppgwmkkvxwyskkcvsib.supabase.co/functions/v1/generate-suggestion',
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ 
-          model_id: fanData.model_id, 
-          fan_id: fanData.fan_id 
-        })
-      }
-    );
-
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.error || 'AI generation failed');
-    }
-
-    const data = await response.json();
-    
-    return {
-      message: data.suggestion.message,
-      lockedText: data.suggestion.lockedText,
-      recommendedPPV: data.suggestion.recommendedPPV,
-      reasoning: data.suggestion.reasoning
-    };
-
-  } catch (error) {
-    console.error('Error generating AI suggestion:', error);
-    
-    // Fallback a mock si falla
-    return generateMockSuggestion(fanData, catalogParts);
-  }
+  // Simular delay de API
+  await new Promise(resolve => setTimeout(resolve, 1000));
+  
+  return generateMockSuggestion(fanData, catalogParts);
 }
 
-// Mock fallback
 function generateMockSuggestion(fanData, catalogParts) {
   const suggestions = {
     0: {
@@ -72,6 +40,6 @@ function generateMockSuggestion(fanData, catalogParts) {
     message: suggestion.message,
     lockedText: suggestion.lockedText,
     recommendedPPV: recommendedPPV,
-    reasoning: `Mock suggestion for ${fanData.tier_name} tier`
+    reasoning: `Mock suggestion for ${fanData.tier_name || 'FREE'} tier`
   };
 }
