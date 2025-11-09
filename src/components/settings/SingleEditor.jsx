@@ -73,7 +73,8 @@ export default function SingleEditor({ isOpen, single, onClose, modelId }) {
           keywords,
           description,
           is_single: true, // Marcar como single
-          offer_id: `single_${single.of_media_id}` // Generar offer_id
+          offer_id: `single_${single.of_media_id}`, // Generar offer_id
+          of_media_ids: [single.of_media_id]
         })
         .eq('id', single.id)
 
