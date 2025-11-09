@@ -61,6 +61,11 @@ export default function SingleEditor({ isOpen, single, onClose, modelId }) {
     }
 
     setLoading(true)
+    console.log('Guardando single:', {
+  of_media_id: single.of_media_id,
+  of_media_ids_array: [single.of_media_id]
+})
+
 
     try {
       const { error } = await supabase
