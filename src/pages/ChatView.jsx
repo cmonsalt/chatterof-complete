@@ -770,15 +770,6 @@ ConversaciÃ³n:\n${JSON.stringify(conversacion, null, 2)}`
                     className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
                   />
                   
-                  
-                  {/* 🤖 AI BUTTON */}
-                  <button
-                    onClick={handleConsultarIA}
-                    disabled={aiGenerating}
-                    className="px-4 py-2 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-lg hover:from-purple-600 hover:to-pink-600 font-semibold transition-all disabled:opacity-50"
-                  >
-                    {aiGenerating ? '⏳' : '🤖 AI'}
-                  </button>
                   {/* ðŸ”¥ NEW PPV BUTTON */}
                   <button
                     onClick={() => setShowPPVSelector(true)}
@@ -932,14 +923,6 @@ ConversaciÃ³n:\n${JSON.stringify(conversacion, null, 2)}`
         fanId={fanId}
         modelId={modelId || user?.user_metadata?.model_id}
         onSendPPV={handleSendPPV}
-      />
-
-      <AISuggestionModal
-        isOpen={showAISuggestion}
-        onClose={() => setShowAISuggestion(false)}
-        suggestion={aiSuggestion}
-        onAccept={handleAIAccept}
-        onEdit={handleAIEdit}
       />
     </>
   );
