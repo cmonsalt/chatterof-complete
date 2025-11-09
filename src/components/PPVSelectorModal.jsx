@@ -111,6 +111,41 @@ export default function PPVSelectorModal({
     });
   }
 
+  function handlePartSelection(part) {
+    // Si el part tiene múltiples medias, necesitamos crear items separados para cada uno
+    if (part.medias_info && part.medias_info.length > 1) {
+      const isAnySelected = part.medias_info.some(media => 
+        selectedItems.find(item => item.of_media_id === media.of_media_id)
+      );
+
+      if (isAnySelected) {
+        // Deseleccionar todos los medias de este part
+        setSelectedItems(prev => 
+          prev.filter(item => 
+            !part.medias_info.find(media => media.of_media_id === item.of_media_id)
+          )
+        );
+      } else {
+        // Seleccionar todos los medias de este part
+        const newItems = part.medias_info.map(media => ({
+          id: `${part.id}_${media.of_media_id}`,
+          of_media_id: media.of_media_id,
+          media_thumb: media.media_thumb,
+          media_url: media.media_url,
+          r2_url: media.r2_url,
+          file_type: media.file_type,
+          title: part.title,
+          base_price: part.base_price / part.medias_info.length, // Dividir precio entre medias
+          nivel: part.nivel
+        }));
+        setSelectedItems(prev => [...prev, ...newItems]);
+      }
+    } else {
+      // Solo 1 media, usar toggleSelection normal
+      toggleSelection(part);
+    }
+  }
+
   function handleConfirm() {
     if (selectedItems.length === 0) return;
     onSelectContent(selectedItems);
@@ -238,27 +273,17 @@ export default function PPVSelectorModal({
                         </h3>
                         <div className="space-y-2">
                           {session.parts.map((part) => {
-                            const isSelected = !!selectedItems.find(i => i.id === part.id);
+                            // Verificar si algún media de este part está seleccionado
+                            const isSelected = part.medias_info && part.medias_info.length > 1
+                              ? part.medias_info.some(media => 
+                                  selectedItems.find(item => item.of_media_id === media.of_media_id)
+                                )
+                              : !!selectedItems.find(i => i.id === part.id);
+                            
                             return (
                               <div 
                                 key={part.id}
-                                onClick={() => {
-  // Si el part tiene múltiples medias, agregar todos
-  if (part.medias_info && part.medias_info.length > 0) {
-    part.medias_info.forEach(media => {
-      toggleSelection({
-        ...part,
-        of_media_id: media.of_media_id,
-        media_thumb: media.media_thumb,
-        media_url: media.media_url,
-        r2_url: media.r2_url,
-        file_type: media.file_type
-      });
-    });
-  } else {
-    toggleSelection(part);
-  }
-}}
+                                onClick={() => handlePartSelection(part)}
                                 className={`flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-all ${
                                   isSelected 
                                     ? 'bg-green-50 border-2 border-green-500' 
@@ -308,6 +333,11 @@ export default function PPVSelectorModal({
                                   <div className="flex items-center gap-2 mt-1">
                                     <span className="text-xs text-gray-500">Level {part.nivel}/10</span>
                                     <span className="text-sm font-bold text-purple-600">${part.base_price}</span>
+                                    {part.medias_info && part.medias_info.length > 1 && (
+                                      <span className="text-xs bg-blue-100 text-blue-600 px-2 py-0.5 rounded-full">
+                                        {part.medias_info.length} medias
+                                      </span>
+                                    )}
                                   </div>
                                 </div>
 
