@@ -13,16 +13,18 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const { 
-    accountId, 
-    modelId, 
-    chatId, 
-    text, 
-    mediaFiles, 
-    price,
-    replyToMessageId,
-    replyToText
-  } = req.body;
+ const { 
+  accountId, 
+  modelId, 
+  chatId, 
+  text, 
+  mediaFiles, 
+  price,
+  lockedText,          
+  previewMediaIds,     
+  replyToMessageId,
+  replyToText
+} = req.body;
   
   const API_KEY = process.env.ONLYFANS_API_KEY;
 
@@ -46,19 +48,25 @@ export default async function handler(req, res) {
       const numId = typeof id === 'string' ? parseInt(id, 10) : id;
       return numId;
     });
+
+    const finalPreviewIds = (previewMediaIds || []).map(id => {
+  const numId = typeof id === 'string' ? parseInt(id, 10) : id;
+  return numId;
+});
     
     console.log('✅ Media IDs as numbers:', finalMediaFiles);
     
     const formattedText = text.startsWith('<p>') ? text : `<p>${text}</p>`;
 
-    const payload = {
-      text: formattedText,
-      mediaFiles: finalMediaFiles,
-      ...(price && price > 0 && { price }),
-      ...(replyToMessageId && { replyToMessageId }),
-      ...(replyToText && { replyToText })
-    };
-
+  const payload = {
+  text: formattedText,
+  mediaFiles: finalMediaFiles,
+  ...(price && price > 0 && { price }),
+  ...(lockedText && { lockedText }),                                  
+  ...(finalPreviewIds.length > 0 && { previewMediaIds: finalPreviewIds }), 
+  ...(replyToMessageId && { replyToMessageId }),
+  ...(replyToText && { replyToText })
+};
     console.log('📦 Sending to OnlyFans...');
 
     // Enviar a OnlyFans API
