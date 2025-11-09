@@ -8,8 +8,7 @@ export default function PPVSendModal({
   fanTier = 0,
   fanId,
   modelId,
-  onSendPPV,
-  aiSuggestion = null  // ← NUEVO PROP
+  onSendPPV 
 }) {
   const [tiers, setTiers] = useState([]);
   const [message, setMessage] = useState('');
@@ -17,22 +16,6 @@ export default function PPVSendModal({
   const [previewMediaIds, setPreviewMediaIds] = useState([]);
   const [sending, setSending] = useState(false);
   const [customPrice, setCustomPrice] = useState(null);
-
-  // ← NUEVO: Auto-rellenar cuando viene de IA
-  useEffect(() => {
-    if (aiSuggestion) {
-      if (aiSuggestion.message) {
-        setMessage(aiSuggestion.message);
-      }
-      if (aiSuggestion.teaseText) {
-        setLockedText(aiSuggestion.teaseText);
-      }
-    } else {
-      // Limpiar si no hay sugerencia de IA
-      setMessage('');
-      setLockedText('');
-    }
-  }, [aiSuggestion]);
 
   useEffect(() => {
     if (isOpen && modelId) {
@@ -262,11 +245,6 @@ export default function PPVSendModal({
               rows={3}
               className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent resize-none"
             />
-            {aiSuggestion && (
-              <p className="text-xs text-purple-600 mt-1">
-                ✨ Pre-filled by AI
-              </p>
-            )}
           </div>
 
           {/* Locked Text (Tease) */}
@@ -284,11 +262,6 @@ export default function PPVSendModal({
             <p className="text-xs text-gray-500 mt-1">
               This text appears before fan unlocks the content
             </p>
-            {aiSuggestion && aiSuggestion.teaseText && (
-              <p className="text-xs text-purple-600 mt-1">
-                ✨ Pre-filled by AI
-              </p>
-            )}
           </div>
 
         </div>
