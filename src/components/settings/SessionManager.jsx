@@ -229,6 +229,7 @@ export default function SessionManager({ isOpen, onClose, modelId, editingSessio
         const firstMedia = part.selectedMedias[0]
         
         const partData = {
+          parent_type: 'session', 
           title: part.title || `${sessionName} - Part ${part.step_number}`,
           base_price: part.base_price,
           nivel: part.nivel,
