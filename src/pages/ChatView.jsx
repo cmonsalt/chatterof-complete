@@ -5,7 +5,8 @@ import { useAuth } from '../contexts/AuthContext';
 import Navbar from '../components/Navbar';
 import PPVSelectorModal from '../components/PPVSelectorModal';
 import PPVSendModal from '../components/PPVSendModal';
-import PPVMessage from '../components/PPVMessage'
+import PPVMessage from '../components/PPVMessage';
+import { generateAISuggestion } from '../services/aiService';
 
 export default function ChatView({ embedded = false }) {
   const { fanId } = useParams();
@@ -18,9 +19,10 @@ export default function ChatView({ embedded = false }) {
   const [newMessage, setNewMessage] = useState('');
   const [sending, setSending] = useState(false);
   
-  const [iaAnalisis, setIaAnalisis] = useState(null);
-  const [iaLoading, setIaLoading] = useState(false);
-  const [showIaPanel, setShowIaPanel] = useState(true);
+  // 🤖 AI STATES
+  const [aiGenerating, setAiGenerating] = useState(false);
+  const [aiSuggestion, setAiSuggestion] = useState(null);
+  const [showAISuggestion, setShowAISuggestion] = useState(false);
   
   const [showNotesSidebar, setShowNotesSidebar] = useState(true);
   const [editingNickname, setEditingNickname] = useState(false);
@@ -37,7 +39,7 @@ export default function ChatView({ embedded = false }) {
     lastInteraction: null
   });
   
-  // 🔥 PPV MODALS - NEW
+  // 🔥 PPV MODALS
   const [showPPVSelector, setShowPPVSelector] = useState(false);
   const [showPPVSend, setShowPPVSend] = useState(false);
   const [selectedPPVContent, setSelectedPPVContent] = useState([]);
@@ -146,6 +148,8 @@ export default function ChatView({ embedded = false }) {
       }
 
       setFan(fanData);
+      setNotesValue(fanData.notes || '');
+      setChatterNotesValue(fanData.chatter_notes || '');
 
       const { data: messagesData, error: messagesError} = await supabase
         .from('chat')
@@ -193,14 +197,85 @@ export default function ChatView({ embedded = false }) {
     });
   }
 
-  // 🔥 NEW: Handle PPV content selection
+  // 🤖 NEW: AI Suggestion Handler
+  async function handleConsultarIA() {
+    const currentModelId = modelId || user?.user_metadata?.model_id;
+    if (!currentModelId || !fan) return;
+    
+    setAiGenerating(true);
+    
+    try {
+      // Load catalog sessions
+      const { data: catalogData } = await supabase
+        .from('catalog')
+        .select('*')
+        .eq('model_id', currentModelId)
+        .eq('type', 'session')
+        .order('session_name');
+
+      // Group into sessions
+      const sessionsMap = {};
+      catalogData?.forEach(item => {
+        if (!sessionsMap[item.session_name]) {
+          sessionsMap[item.session_name] = {
+            session_name: item.session_name,
+            parts: []
+          };
+        }
+        sessionsMap[item.session_name].parts.push(item);
+      });
+
+      const catalogSessions = Object.values(sessionsMap);
+
+      // Generate AI suggestion
+      const suggestion = await generateAISuggestion(
+        {
+          ...fan,
+          model_id: currentModelId,
+          tier_name: getTierBadge(fan.tier).label
+        },
+        {
+          lastMessage: messages[messages.length - 1]?.message || ''
+        },
+        catalogSessions
+      );
+      
+      setAiSuggestion(suggestion);
+      setShowAISuggestion(true);
+      
+    } catch (error) {
+      console.error('Error generating AI suggestion:', error);
+      alert('Error generating suggestion: ' + error.message);
+    } finally {
+      setAiGenerating(false);
+    }
+  }
+
+  // 🤖 Handle using AI suggestion
+  function handleUseAISuggestion() {
+    if (aiSuggestion?.message) {
+      setNewMessage(aiSuggestion.message);
+      setShowAISuggestion(false);
+    }
+  }
+
+  // 🤖 Handle sending AI suggestion with PPV
+  function handleSendAIWithPPV() {
+    if (!aiSuggestion?.recommendedPPV) return;
+    
+    setSelectedPPVContent([aiSuggestion.recommendedPPV]);
+    setShowAISuggestion(false);
+    setShowPPVSend(true);
+  }
+
+  // 🔥 Handle PPV content selection
   function handlePPVContentSelected(content) {
     setSelectedPPVContent(content);
     setShowPPVSelector(false);
     setShowPPVSend(true);
   }
 
-  // 🔥 NEW: Handle PPV send
+  // 🔥 Handle PPV send
   async function handleSendPPV(ppvData) {
     const currentModelId = modelId || user?.user_metadata?.model_id;
     if (!currentModelId) return;
@@ -241,7 +316,6 @@ export default function ChatView({ embedded = false }) {
         throw new Error(error.error || 'Failed to send message');
       }
 
-      // Reset states
       setSelectedPPVContent([]);
       setShowPPVSend(false);
       setReplyingTo(null);
@@ -441,12 +515,6 @@ export default function ChatView({ embedded = false }) {
 
               <div className="flex items-center gap-3">
                 <button
-                  onClick={() => setShowIaPanel(!showIaPanel)}
-                  className="px-4 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600 font-semibold"
-                >
-                  🤖 AI Analysis
-                </button>
-                <button
                   onClick={() => setShowNotesSidebar(!showNotesSidebar)}
                   className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 font-semibold"
                 >
@@ -487,23 +555,6 @@ export default function ChatView({ embedded = false }) {
           </div>
 
           <div className="flex-1 flex gap-4 p-6">
-            {/* AI Panel */}
-            {showIaPanel && (
-              <div className="w-80 bg-gradient-to-br from-purple-50 to-pink-50 rounded-xl shadow-lg p-6 border border-purple-200">
-                <h2 className="text-xl font-bold text-gray-800 mb-4">🤖 AI Assistant</h2>
-                
-                <p className="text-sm text-gray-600 mb-4">
-                  Click the button below to get AI-powered suggestions for this conversation.
-                </p>
-
-                {iaAnalisis && (
-                  <div className="bg-white rounded-lg p-4 border border-purple-200 max-h-96 overflow-y-auto mb-4">
-                    <pre className="text-sm text-gray-700 whitespace-pre-wrap">{iaAnalisis}</pre>
-                  </div>
-                )}
-              </div>
-            )}
-
             {/* Chat */}
             <div className="flex-1 bg-white rounded-xl shadow-lg flex flex-col">
               <div className="flex-1 overflow-y-auto p-6 space-y-4">
@@ -531,30 +582,30 @@ export default function ChatView({ embedded = false }) {
                       <p className="text-sm">{msg.message}</p>
 
                       {msg.media_url && (
-  msg.is_ppv ? (
-    <PPVMessage message={msg} />
-  ) : msg.media_type === 'video' ? (
-    <video
-      src={msg.media_url}
-      controls
-      className="rounded-lg shadow-md max-w-xs max-h-60"
-      onError={(e) => {
-        console.error('Video failed to load')
-        e.target.outerHTML = '<div class="flex flex-col items-center justify-center h-48 bg-gray-100 rounded-lg"><div class="text-5xl mb-2">❌</div><p class="text-sm text-gray-600 font-semibold">Video URL expired</p></div>'
-      }}
-    />
-  ) : (
-    <img
-      src={msg.media_url}
-      alt="Media"
-      className="rounded-lg shadow-md max-w-xs max-h-60"
-      onError={(e) => {
-        console.error('Image failed to load')
-        e.target.outerHTML = '<div class="flex flex-col items-center justify-center h-48 bg-gray-100 rounded-lg"><div class="text-5xl mb-2">❌</div><p class="text-sm text-gray-600 font-semibold">Image URL expired</p></div>'
-      }}
-    />
-  )
-)}
+                        msg.is_ppv ? (
+                          <PPVMessage message={msg} />
+                        ) : msg.media_type === 'video' ? (
+                          <video
+                            src={msg.media_url}
+                            controls
+                            className="rounded-lg shadow-md max-w-xs max-h-60"
+                            onError={(e) => {
+                              console.error('Video failed to load')
+                              e.target.outerHTML = '<div class="flex flex-col items-center justify-center h-48 bg-gray-100 rounded-lg"><div class="text-5xl mb-2">❌</div><p class="text-sm text-gray-600 font-semibold">Video URL expired</p></div>'
+                            }}
+                          />
+                        ) : (
+                          <img
+                            src={msg.media_url}
+                            alt="Media"
+                            className="rounded-lg shadow-md max-w-xs max-h-60"
+                            onError={(e) => {
+                              console.error('Image failed to load')
+                              e.target.outerHTML = '<div class="flex flex-col items-center justify-center h-48 bg-gray-100 rounded-lg"><div class="text-5xl mb-2">❌</div><p class="text-sm text-gray-600 font-semibold">Image URL expired</p></div>'
+                            }}
+                          />
+                        )
+                      )}
 
                       <div className="text-xs opacity-75 mt-1">
                         {new Date(msg.ts).toLocaleTimeString()}
@@ -607,7 +658,16 @@ export default function ChatView({ embedded = false }) {
                     className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
                   />
                   
-                  {/* 🔥 NEW PPV BUTTON */}
+                  {/* 🤖 AI BUTTON */}
+                  <button
+                    onClick={handleConsultarIA}
+                    disabled={aiGenerating}
+                    className="px-4 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600 font-semibold transition-all disabled:opacity-50"
+                  >
+                    {aiGenerating ? '⏳' : '🤖 AI'}
+                  </button>
+
+                  {/* 🔥 PPV BUTTON */}
                   <button
                     onClick={() => setShowPPVSelector(true)}
                     className="px-4 py-2 bg-gradient-to-r from-green-500 to-emerald-500 text-white rounded-lg hover:from-green-600 hover:to-emerald-600 font-semibold transition-all"
@@ -740,6 +800,113 @@ export default function ChatView({ embedded = false }) {
           )}
         </div>
       </div>
+
+      {/* 🤖 AI SUGGESTION MODAL */}
+      {showAISuggestion && aiSuggestion && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-6">
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-2xl font-bold text-gray-800">🤖 AI Suggestion</h2>
+                <button
+                  onClick={() => setShowAISuggestion(false)}
+                  className="text-gray-400 hover:text-gray-600 text-2xl"
+                >
+                  ✕
+                </button>
+              </div>
+
+              <div className="space-y-6">
+                {/* Suggested Message */}
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    💬 Suggested Message
+                  </label>
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                    <p className="text-gray-800">{aiSuggestion.message}</p>
+                  </div>
+                </div>
+
+                {/* Locked Text */}
+                {aiSuggestion.lockedText && (
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">
+                      🔒 Tease Text
+                    </label>
+                    <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
+                      <p className="text-gray-800">{aiSuggestion.lockedText}</p>
+                    </div>
+                  </div>
+                )}
+
+                {/* Recommended PPV */}
+                {aiSuggestion.recommendedPPV && (
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">
+                      📦 Recommended PPV
+                    </label>
+                    <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="font-semibold text-gray-800">
+                            {aiSuggestion.recommendedPPV.title}
+                          </p>
+                          <p className="text-sm text-gray-600">
+                            Level {aiSuggestion.recommendedPPV.nivel}/10
+                          </p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-2xl font-bold text-green-600">
+                            ${aiSuggestion.recommendedPPV.base_price}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Reasoning */}
+                {aiSuggestion.reasoning && (
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">
+                      💡 Why this suggestion?
+                    </label>
+                    <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                      <p className="text-sm text-gray-600">{aiSuggestion.reasoning}</p>
+                    </div>
+                  </div>
+                )}
+
+                {/* Actions */}
+                <div className="flex gap-3 pt-4">
+                  <button
+                    onClick={handleUseAISuggestion}
+                    className="flex-1 px-6 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 font-semibold transition-all"
+                  >
+                    📝 Use Message
+                  </button>
+                  
+                  {aiSuggestion.recommendedPPV && (
+                    <button
+                      onClick={handleSendAIWithPPV}
+                      className="flex-1 px-6 py-3 bg-gradient-to-r from-green-500 to-emerald-500 text-white rounded-lg hover:from-green-600 hover:to-emerald-600 font-semibold transition-all"
+                    >
+                      💰 Send with PPV
+                    </button>
+                  )}
+                  
+                  <button
+                    onClick={() => setShowAISuggestion(false)}
+                    className="px-6 py-3 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 font-semibold transition-all"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* 🔥 PPV MODALS */}
       <PPVSelectorModal
