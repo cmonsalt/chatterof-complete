@@ -51,6 +51,9 @@ export default function ChatView({ embedded = false }) {
   const justSentMessage = useRef(false);
   const messagesEndRef = useRef(null);
 
+
+  const [aiSuggestionForPPV, setAISuggestionForPPV] = useState(null);
+
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
@@ -239,13 +242,15 @@ async function handleConsultarIA() {
   }
 
   // 🤖 Handle sending AI suggestion with PPV
-  function handleSendAIWithPPV() {
-    if (!aiSuggestion?.recommendedPPV) return;
-    
-    setSelectedPPVContent([aiSuggestion.recommendedPPV]);
-    setShowAISuggestion(false);
-    setShowPPVSend(true);
-  }
+ function handleSendAIWithPPV() {
+  if (!aiSuggestion?.recommendedPPV) return;
+  
+  // Pasar sugerencia completa al modal PPV
+  setSelectedPPVContent([aiSuggestion.recommendedPPV]);
+  setAISuggestionForPPV(aiSuggestion); // Nueva state
+  setShowAISuggestion(false);
+  setShowPPVSend(true);
+}
 
   // 🔥 Handle PPV content selection
   function handlePPVContentSelected(content) {
@@ -896,17 +901,19 @@ async function handleConsultarIA() {
       />
 
       <PPVSendModal
-        isOpen={showPPVSend}
-        onClose={() => {
-          setShowPPVSend(false);
-          setSelectedPPVContent([]);
-        }}
-        selectedContent={selectedPPVContent}
-        fanTier={fan?.tier || 0}
-        fanId={fanId}
-        modelId={modelId || user?.user_metadata?.model_id}
-        onSendPPV={handleSendPPV}
-      />
+  isOpen={showPPVSend}
+  onClose={() => {
+    setShowPPVSend(false);
+    setSelectedPPVContent([]);
+    setAISuggestionForPPV(null);  // ← Limpiar también
+  }}
+  selectedContent={selectedPPVContent}
+  fanTier={fan?.tier || 0}
+  fanId={fanId}
+  modelId={modelId || user?.user_metadata?.model_id}
+  onSendPPV={handleSendPPV}
+  aiSuggestion={aiSuggestionForPPV}  // ← AGREGAR ESTE PROP
+/>
     </>
   );
 }
