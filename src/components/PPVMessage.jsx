@@ -1,22 +1,15 @@
 export default function PPVMessage({ message }) {
-  console.log('📦 PPV Message:', {
-    mediaUrls: message.media_urls,
-    metadata: message.ppv_metadata,
-    allIds: message.ppv_metadata?.all_media_ids,
-    previewIds: message.ppv_metadata?.preview_media_ids
-  });
   const isPPV = message.is_ppv || message.amount > 0
   const isLocked = message.is_locked && !message.is_purchased
   const price = message.ppv_price || message.amount || 0
-  
-
-  
 
   if (!isPPV) return null
 
   // Obtener arrays
   const mediaUrls = message.media_urls?.split(',').filter(Boolean) || [];
-  const metadata = message.ppv_metadata || {};
+  const metadata = typeof message.ppv_metadata === 'string' 
+  ? JSON.parse(message.ppv_metadata)
+  : message.ppv_metadata || {};
   const previewIds = metadata.preview_media_ids || [];
   const allIds = metadata.all_media_ids || [];
 
