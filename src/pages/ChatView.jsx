@@ -164,13 +164,12 @@ export default function ChatView({ embedded = false }) {
 `)
         .eq('fan_id', fanId)
         .eq('model_id', currentModelId)
-        .order('ts', { ascending: false })  // ← DESC
+        .order('ts', { ascending: true  })  // ← DESC
         .limit(100);
 
       if (messagesError) {
         console.error('❌ Messages error:', messagesError);
       } else {
-        console.log('📨 ALL PPVs:', messagesData.filter(m => m.is_ppv));
         setMessages(messagesData || []);
       }
 
