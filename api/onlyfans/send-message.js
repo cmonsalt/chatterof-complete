@@ -155,7 +155,11 @@ if (mediaFiles && mediaFiles.length > 0) {
       amount: price || 0,
       is_locked: price > 0,
       is_purchased: false,
-      ppv_unlocked: false
+      ppv_unlocked: false,
+      ppv_metadata: {  // ← AGREGAR
+      preview_media_ids: previewMediaIds || [],
+      all_media_ids: mediaFiles
+  }
     };
 
     const { error: dbError } = await supabase
