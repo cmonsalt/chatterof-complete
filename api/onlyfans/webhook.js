@@ -43,7 +43,7 @@ async function createNotification(modelId, fanId, type, title, message, amount, 
 
 // 📨 MESSAGES.RECEIVED - Mensaje recibido de un fan
 async function handleMessageReceived(payload, modelId) {
-  const fanId = payload.from?.id?.toString() || payload.fromUser?.id?.toString()
+ const fanId = payload.fromUser?.id?.toString() || payload.from?.id?.toString()
   
   if (!fanId) {
     console.log('⚠️ No fanId in message')
@@ -303,7 +303,7 @@ async function handleMessageSent(payload, modelId) {
 
 // 💰 MESSAGES.PPV.UNLOCKED - PPV desbloqueado
 async function handlePPVUnlocked(payload, modelId) {
-  const fanId = payload.from?.id?.toString() || payload.fromUser?.id?.toString()
+ const fanId = payload.fromUser?.id?.toString() || payload.from?.id?.toString()
   
   if (!fanId) return
 
