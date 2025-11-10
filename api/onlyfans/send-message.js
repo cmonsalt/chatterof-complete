@@ -102,8 +102,8 @@ export default async function handler(req, res) {
     }
 
     const data = JSON.parse(responseText);
-    console.log('📦 FULL RESPONSE:', JSON.stringify(data, null, 2));
-    console.log('✅ Message sent! ID:', data.id);
+const messageId = data.data?.id?.toString() || data.id?.toString();
+console.log('✅ Message sent! ID:', messageId);
 
     // Obtener media info del catálogo para guardar en BD
     let mediaUrl = null;
@@ -132,7 +132,7 @@ export default async function handler(req, res) {
 
     // Guardar en BD
     const chatData = {
-      of_message_id: data.id?.toString(),
+      of_message_id: messageId,
       fan_id: chatId,
       model_id: modelId,
       message: text.replace(/<[^>]*>/g, ''),
