@@ -43,7 +43,7 @@ async function createNotification(modelId, fanId, type, title, message, amount, 
 
 // 📨 MESSAGES.RECEIVED - Mensaje recibido de un fan
 async function handleMessageReceived(payload, modelId) {
- const fanId = payload.fromUser?.id?.toString() || payload.from?.id?.toString()
+ const fanId = payload.fromUser?.id?.toString()
   
   if (!fanId) {
     console.log('⚠️ No fanId in message')
@@ -64,6 +64,9 @@ async function handleMessageReceived(payload, modelId) {
   }
   
   const isTip = payload.price > 0 && !payload.isOpened
+
+  const tipAmount = payload.fanData?.spending?.tips || 0
+  const hasTip = tipAmount > 0 
   
   // Guardar mensaje
   const messageData = {
@@ -96,9 +99,12 @@ async function handleMessageReceived(payload, modelId) {
   
   console.log('✅ Message saved to chat')
   
+  
   // Si es tip
-  // Si es tip
-if (isTip) {
+// Si es tip
+if (isTip || hasTip) {
+  const amount = isTip ? payload.price : tipAmount
+  
   const { data: fanData } = await supabase
     .from('fans')
     .select('of_username, display_name, name')
@@ -114,12 +120,12 @@ if (isTip) {
     .insert({
       fan_id: fanId,
       model_id: modelId,
-      amount: payload.price,
+      amount: amount,
       type: 'tip',
       description: `Tip received`,
       detected_by: 'webhook',
       purchase_metadata: {
-        message_id: payload.id?.toString()
+        message_id: payload.queueId?.toString() || payload.id?.toString()
       }
     })
 
@@ -128,15 +134,15 @@ if (isTip) {
     fanId,
     'new_tip',
     `${fanName} (${fanId}) sent a tip! 💰`,
-    `You received a $${payload.price} tip!`,
-    payload.price,
+    `You received a $${amount} tip!`,
+    amount,
     { message_id: payload.id }
   )
   
   await supabase.rpc('increment_fan_spent', {
     p_fan_id: fanId,
     p_model_id: modelId,
-    p_amount: payload.price
+    p_amount: amount
   })
 } else {
   const { data: fanData } = await supabase
@@ -320,10 +326,10 @@ async function handleMessageSent(payload, modelId) {
   }
 }
 
-// 💰 MESSAGES.PPV.UNLOCKED - PPV desbloqueado
+
 // 💰 MESSAGES.PPV.UNLOCKED - PPV desbloqueado
 async function handlePPVUnlocked(payload, modelId) {
-  const fanId = payload.fromUser?.id?.toString() || payload.from?.id?.toString()
+  const fanId = payload.user_id?.toString()
   const messageId = payload.id?.toString()
   const price = parseFloat(payload.price || 0)
   
