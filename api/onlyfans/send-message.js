@@ -102,6 +102,7 @@ export default async function handler(req, res) {
     }
 
     const data = JSON.parse(responseText);
+    console.log('📦 FULL RESPONSE:', JSON.stringify(data, null, 2));
     console.log('✅ Message sent! ID:', data.id);
 
     // Obtener media info del catálogo para guardar en BD
