@@ -80,7 +80,9 @@ async function handleMessageReceived(payload, modelId) {
     media_type: mediaType,
     amount: isTip ? payload.price : 0,
     is_ppv: false,
-    ppv_price: 0
+    ppv_price: 0,
+    is_purchased: null,     
+    ppv_unlocked: false      
   }
   
   const { error: chatError } = await supabase

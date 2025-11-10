@@ -123,23 +123,32 @@ export default async function handler(req, res) {
             const messageId = msg.id?.toString() || 
               `generated_${fanId}_${msg.createdAt}_${Math.random().toString(36).substr(2, 9)}`
             
-            const chatData = {
-              fan_id: fanId,
-              message: cleanHTML(msg.text),
-              model_id: modelId,
-              timestamp: msg.createdAt || new Date().toISOString(),
-              from: msg.isSentByMe ? 'model' : 'fan',
-              message_type: msg.mediaCount > 0 ? 'media' : 'text',
-              of_message_id: messageId,
-              media_url: msg.media?.[0]?.files?.full?.url || msg.media?.[0]?.files?.thumb?.url,
-              media_urls: msg.media?.map(m => m.files?.full?.url || m.files?.thumb?.url).filter(Boolean).join(','),
-              amount: parseFloat(msg.price || 0),
-              read: msg.isOpened || false,
-              source: 'api_sync',
-              is_locked: !msg.isFree,
-              is_purchased: msg.canPurchaseReason === 'purchased' || msg.canPurchaseReason === 'opened' || msg.isFree,
-              locked_text: msg.lockedText || false
-            }
+          const chatData = {
+  fan_id: fanId,
+  message: cleanHTML(msg.text),
+  model_id: modelId,
+  timestamp: msg.createdAt || new Date().toISOString(),
+  from: msg.isSentByMe ? 'model' : 'fan',
+  message_type: msg.mediaCount > 0 ? 'media' : 'text',
+  of_message_id: messageId,
+  media_url: msg.media?.[0]?.files?.full?.url || msg.media?.[0]?.files?.thumb?.url,
+  media_urls: msg.media?.map(m => m.files?.full?.url || m.files?.thumb?.url).filter(Boolean).join(','),
+  amount: parseFloat(msg.price || 0),
+  read: msg.isOpened || false,
+  source: 'api_sync',
+  
+  // Lógica de PPV corregida
+  is_ppv: msg.price > 0,
+  ppv_price: parseFloat(msg.price || 0),
+  is_locked: msg.price > 0 && !msg.isFree,
+  is_purchased: msg.price > 0 
+    ? (msg.canPurchaseReason === 'purchased' || msg.canPurchaseReason === 'opened')
+    : null,
+  ppv_unlocked: msg.price > 0 
+    ? (msg.canPurchaseReason === 'purchased' || msg.canPurchaseReason === 'opened')
+    : false,
+  locked_text: msg.lockedText || false
+}
 
             const { error } = await supabase
               .from('chat')
