@@ -164,8 +164,8 @@ export default function ChatView({ embedded = false }) {
 `)
         .eq('fan_id', fanId)
         .eq('model_id', currentModelId)
-        .order('ts', { ascending: true })
-        .limit(50);
+        .order('ts', { ascending: false })  // ← DESC
+        .limit(100);
 
       if (messagesError) {
         console.error('❌ Messages error:', messagesError);
