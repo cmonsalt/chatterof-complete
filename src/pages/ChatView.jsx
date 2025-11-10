@@ -549,7 +549,7 @@ async function handleConsultarIA() {
           <div className="flex-1 flex gap-4 p-6">
             {/* Chat */}
             <div className="flex-1 bg-white rounded-xl shadow-lg flex flex-col">
-              <div className="flex-1 overflow-y-auto p-6 space-y-4">
+              <div className="flex-1 overflow-y-auto p-6 space-y-4 max-h-[calc(100vh-200px)]">
                 {messages.map((msg) => (
                   <div
                     key={msg.id}
