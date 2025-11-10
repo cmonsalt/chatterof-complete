@@ -71,42 +71,36 @@ export default function PPVSendModal({
     return customPrice !== null ? customPrice : Math.round(basePrice * multiplier);
   }
 
-  async function handleSend() {
-    if (!message.trim()) {
-      alert('Please write a message to send with the PPV');
-      return;
-    }
-
-    setSending(true);
-    try {
-      const price = calculatePrice();
-      const mediaFiles = selectedContent.map(item => item.of_media_id);
-
-      const ppvData = {
-        text: message,
-        mediaFiles,
-        price
-      };
-
-      // Agregar tease/preview si están configurados
-      if (lockedText.trim()) {
-        ppvData.lockedText = lockedText;
-      }
-
-      if (previewMediaIds.length > 0) {
-        ppvData.previewMediaIds = previewMediaIds;
-      }
-
-      await onSendPPV(ppvData);
-
-      onClose();
-    } catch (error) {
-      console.error('Error sending PPV:', error);
-      alert('Error sending PPV: ' + error.message);
-    } finally {
-      setSending(false);
-    }
+async function handleSend() {
+  if (!message.trim()) {
+    alert('Please write a message to send with the PPV');
+    return;
   }
+
+  setSending(true);
+  try {
+    const price = calculatePrice();
+    const mediaFiles = selectedContent.map(item => item.of_media_id);
+
+    const ppvData = {
+      text: message,
+      mediaFiles,
+      price,
+      lockedText: lockedText.trim() || undefined,
+      previewMediaIds: previewMediaIds.length > 0 ? previewMediaIds : undefined
+    };
+
+    console.log('📤 Sending PPV data:', ppvData);  // ← DEBUG
+
+    await onSendPPV(ppvData);
+    onClose();
+  } catch (error) {
+    console.error('Error sending PPV:', error);
+    alert('Error sending PPV: ' + error.message);
+  } finally {
+    setSending(false);
+  }
+}
 
   function togglePreview(mediaId) {
     setPreviewMediaIds(prev => {

@@ -67,7 +67,7 @@ export default async function handler(req, res) {
   ...(replyToMessageId && { replyToMessageId }),
   ...(replyToText && { replyToText })
 };
-    console.log('📦 Sending to OnlyFans...');
+    console.log('📦 Payload to OnlyFans:', JSON.stringify(payload, null, 2));
 
     // Enviar a OnlyFans API
     const response = await fetch(
