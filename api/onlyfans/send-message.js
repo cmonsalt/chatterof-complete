@@ -106,29 +106,35 @@ const messageId = data.data?.id?.toString() || data.id?.toString();
 console.log('✅ Message sent! ID:', messageId);
 
     // Obtener media info del catálogo para guardar en BD
-    let mediaUrl = null;
-    let mediaThumb = null;
-    let mediaType = null;
+   // Obtener media info del catálogo para guardar en BD
+let mediaUrl = null;
+let mediaThumb = null;
+let mediaType = null;
+let allMediaUrls = [];
+
+if (mediaFiles && mediaFiles.length > 0) {
+  // Obtener TODAS las medias del catálogo
+  const { data: catalogItems } = await supabase
+    .from('catalog')
+    .select('of_media_id, r2_url, media_url, media_thumb, file_type')
+    .in('of_media_id', mediaFiles.map(id => id.toString()));
+  
+  if (catalogItems && catalogItems.length > 0) {
+    // Primera media para campos individuales
+    const firstItem = catalogItems[0];
+    mediaUrl = firstItem.r2_url || firstItem.media_url;
+    mediaThumb = firstItem.media_thumb;
+    mediaType = firstItem.file_type;
     
-    if (mediaFiles && mediaFiles.length > 0) {
-      try {
-        const { data: catalogItem } = await supabase
-          .from('catalog')
-          .select('media_url, media_thumb, file_type, r2_url')
-          .eq('of_media_id', mediaFiles[0].toString())
-          .single();
-        
-        if (catalogItem) {
-          // Priorizar R2 URL (permanente) sobre media_url (temporal)
-          mediaUrl = catalogItem.r2_url || catalogItem.media_url;
-          mediaThumb = catalogItem.media_thumb;
-          mediaType = catalogItem.file_type;
-          console.log('✅ Got media from catalog');
-        }
-      } catch (err) {
-        console.warn('⚠️ Could not get media from catalog');
-      }
-    }
+    // Todas las URLs en orden
+    allMediaUrls = mediaFiles.map(id => {
+      const item = catalogItems.find(c => c.of_media_id === id.toString());
+      return item ? (item.r2_url || item.media_url) : null;
+    }).filter(Boolean);
+    
+    console.log('✅ Got', catalogItems.length, 'medias from catalog');
+  }
+}
 
     // Guardar en BD
     const chatData = {
@@ -141,6 +147,7 @@ console.log('✅ Message sent! ID:', messageId);
       read: true,
       source: 'api',
       media_url: mediaUrl,
+      media_urls: allMediaUrls.join(','),
       media_thumb: mediaThumb,
       media_type: mediaType,
       is_ppv: price > 0,
