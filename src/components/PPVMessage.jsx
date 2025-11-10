@@ -28,11 +28,12 @@ export default function PPVMessage({ message }) {
       <div key={index} className="relative">
         {/* Mostrar video o imagen */}
         {isVideo ? (
-          <video 
-            src={url}
-            className="w-full h-32 object-cover rounded-lg"
-            muted
-          />
+         <video 
+  src={url}
+  className="w-full h-32 object-cover rounded-lg"
+  controls
+  preload="metadata"
+/>
         ) : (
           <img 
             src={url}
