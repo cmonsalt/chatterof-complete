@@ -170,7 +170,7 @@ export default function ChatView({ embedded = false }) {
       if (messagesError) {
         console.error('❌ Messages error:', messagesError);
       } else {
-        console.log('📨 ONE PPV message:', messagesData.find(m => m.is_ppv));
+        console.log('📨 ALL PPVs:', messagesData.filter(m => m.is_ppv));
         setMessages(messagesData || []);
       }
 
