@@ -156,7 +156,12 @@ export default function ChatView({ embedded = false }) {
 
       const { data: messagesData, error: messagesError} = await supabase
         .from('chat')
-        .select('*')
+        .select(`
+  id, ts, fan_id, message, created_at, model_id, from, read, source,
+  media_url, media_thumb, media_type, amount, is_ppv, ppv_price,
+  is_locked, is_purchased, ppv_unlocked, of_message_id,
+  media_urls, ppv_metadata
+`)
         .eq('fan_id', fanId)
         .eq('model_id', currentModelId)
         .order('ts', { ascending: true })
