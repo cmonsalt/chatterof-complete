@@ -63,7 +63,7 @@ export default async function handler(req, res) {
   mediaFiles: finalMediaFiles,
   ...(price && price > 0 && { price }),
   ...(lockedText && { lockedText }),                                  
-  ...(finalPreviewIds.length > 0 && { previewMediaIds: finalPreviewIds }), 
+  ...(finalPreviewIds.length > 0 && { previews: finalPreviewIds }),
   ...(replyToMessageId && { replyToMessageId }),
   ...(replyToText && { replyToText })
 };
