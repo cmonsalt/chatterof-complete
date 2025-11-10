@@ -18,41 +18,51 @@ export default function PPVMessage({ message }) {
     return (
       <div className="space-y-2">
         {/* Grid de medias */}
-        <div className="grid grid-cols-2 gap-2 max-w-md">
-          {mediaUrls.map((url, index) => {
-            const mediaId = allIds[index];
-            const isPreview = previewIds.includes(mediaId);
-            
-            return (
-              <div key={index} className="relative">
-                <img 
-                  src={url}
-                  alt={isPreview ? "Free preview" : "Locked"}
-                  className="w-full h-32 object-cover rounded-lg"
-                />
-                
-                {/* Si NO es preview, blur + lock */}
-                {!isPreview && (
-                  <>
-                    <div className="absolute inset-0 backdrop-blur-xl bg-black/40 rounded-lg"></div>
-                    <div className="absolute inset-0 flex items-center justify-center">
-                      <div className="bg-gradient-to-r from-purple-500 to-pink-500 text-white px-3 py-1 rounded-full text-xs font-bold">
-                        🔒 Locked
-                      </div>
-                    </div>
-                  </>
-                )}
-                
-                {/* Si es preview, badge verde */}
-                {isPreview && (
-                  <div className="absolute top-1 right-1 bg-green-500 text-white px-2 py-1 rounded-full text-xs font-bold">
-                    ✓ FREE
-                  </div>
-                )}
+    <div className="grid grid-cols-2 gap-2 max-w-md">
+  {mediaUrls.map((url, index) => {
+    const mediaId = allIds[index];
+    const isPreview = previewIds.includes(mediaId);
+    const isVideo = url.includes('.mp4');
+    
+    return (
+      <div key={index} className="relative">
+        {/* Mostrar video o imagen */}
+        {isVideo ? (
+          <video 
+            src={url}
+            className="w-full h-32 object-cover rounded-lg"
+            muted
+          />
+        ) : (
+          <img 
+            src={url}
+            alt={isPreview ? "Free preview" : "Locked"}
+            className="w-full h-32 object-cover rounded-lg"
+          />
+        )}
+        
+        {/* Si NO es preview, blur + lock */}
+        {!isPreview && (
+          <>
+            <div className="absolute inset-0 backdrop-blur-xl bg-black/40 rounded-lg"></div>
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div className="bg-gradient-to-r from-purple-500 to-pink-500 text-white px-3 py-1 rounded-full text-xs font-bold">
+                🔒 Locked
               </div>
-            );
-          })}
-        </div>
+            </div>
+          </>
+        )}
+        
+        {/* Si es preview, badge verde */}
+        {isPreview && (
+          <div className="absolute top-1 right-1 bg-green-500 text-white px-2 py-1 rounded-full text-xs font-bold">
+            ✓ FREE
+          </div>
+        )}
+      </div>
+    );
+  })}
+</div>
         
         {/* Precio */}
         <div className="bg-gradient-to-r from-purple-500 to-pink-500 text-white px-4 py-2 rounded-lg inline-flex items-center gap-2 font-bold">
