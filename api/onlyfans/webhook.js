@@ -97,33 +97,48 @@ async function handleMessageReceived(payload, modelId) {
   console.log('✅ Message saved to chat')
   
   // Si es tip
-  if (isTip) {
-        const { data: fanData } = await supabase
-  .from('fans')
-  .select('of_username, display_name, name')
-  .eq('fan_id', fanId)
-  .eq('model_id', modelId)
-  .single()
+  // Si es tip
+if (isTip) {
+  const { data: fanData } = await supabase
+    .from('fans')
+    .select('of_username, display_name, name')
+    .eq('fan_id', fanId)
+    .eq('model_id', modelId)
+    .single()
+  
+  const fanName = fanData?.name || fanData?.display_name || fanData?.of_username || 'Fan'
 
-const fanName = fanData?.name || fanData?.display_name || fanData?.of_username || 'Fan'
-const fanTitle = `${fanName} (${fanId})`
-
-    await createNotification(
-      modelId,
-      fanId,
-      'new_tip',
-      `${fanTitle} sent a tip! 💰`,
-      `You received a $${payload.price} tip!`,
-      payload.price,
-      { message_id: payload.id }
-    )
-    
-    await supabase.rpc('increment_fan_spent', {
-      p_fan_id: fanId,
-      p_model_id: modelId,
-      p_amount: payload.price
+  // Guardar transacción de tip
+  await supabase
+    .from('transactions')
+    .insert({
+      fan_id: fanId,
+      model_id: modelId,
+      amount: payload.price,
+      type: 'tip',
+      description: `Tip received`,
+      detected_by: 'webhook',
+      purchase_metadata: {
+        message_id: payload.id?.toString()
+      }
     })
-  } else {
+
+  await createNotification(
+    modelId,
+    fanId,
+    'new_tip',
+    `${fanName} (${fanId}) sent a tip! 💰`,
+    `You received a $${payload.price} tip!`,
+    payload.price,
+    { message_id: payload.id }
+  )
+  
+  await supabase.rpc('increment_fan_spent', {
+    p_fan_id: fanId,
+    p_model_id: modelId,
+    p_amount: payload.price
+  })
+} else {
   const { data: fanData } = await supabase
   .from('fans')
   .select('of_username, display_name, name')
@@ -306,29 +321,86 @@ async function handleMessageSent(payload, modelId) {
 }
 
 // 💰 MESSAGES.PPV.UNLOCKED - PPV desbloqueado
+// 💰 MESSAGES.PPV.UNLOCKED - PPV desbloqueado
 async function handlePPVUnlocked(payload, modelId) {
- const fanId = payload.fromUser?.id?.toString() || payload.from?.id?.toString()
+  const fanId = payload.fromUser?.id?.toString() || payload.from?.id?.toString()
+  const messageId = payload.id?.toString()
+  const price = parseFloat(payload.price || 0)
   
-  if (!fanId) return
+  if (!fanId || !messageId) {
+    console.log('⚠️ Missing fanId or messageId in PPV unlock')
+    return
+  }
 
-  console.log(`💰 PPV unlocked by fan ${fanId}`)
+  console.log(`💰 PPV unlocked by fan ${fanId}, message ${messageId}, price $${price}`)
   
+  // 1. Actualizar mensaje en chat
+  const { error: chatError } = await supabase
+    .from('chat')
+    .update({ 
+      is_purchased: true,
+      ppv_unlocked: true
+    })
+    .eq('of_message_id', messageId)
+    .eq('model_id', modelId)
+  
+  if (chatError) {
+    console.error('❌ Error updating chat:', chatError)
+  } else {
+    console.log('✅ Chat updated: PPV unlocked')
+  }
+  
+  // 2. Guardar transacción
+  const { error: txError } = await supabase
+    .from('transactions')
+    .insert({
+      fan_id: fanId,
+      model_id: modelId,
+      amount: price,
+      type: 'compra',
+      description: `PPV unlocked`,
+      detected_by: 'webhook',
+      purchase_metadata: {
+        message_id: messageId,
+        event_type: 'ppv_unlock'
+      }
+    })
+  
+  if (txError) {
+    console.error('❌ Error saving transaction:', txError)
+  } else {
+    console.log('✅ Transaction saved')
+  }
+  
+  // 3. Obtener nombre del fan para notificación
+  const { data: fanData } = await supabase
+    .from('fans')
+    .select('of_username, display_name, name')
+    .eq('fan_id', fanId)
+    .eq('model_id', modelId)
+    .single()
+  
+  const fanName = fanData?.name || fanData?.display_name || fanData?.of_username || 'Fan'
+  
+  // 4. Crear notificación
   await createNotification(
     modelId,
     fanId,
     'ppv_unlocked',
-    'PPV Unlocked! 💸',
-    `Fan unlocked your PPV for $${payload.price}`,
-    payload.price,
-    { message_id: payload.id }
+    `${fanName} (${fanId}) unlocked PPV! 💸`,
+    `Earned $${price}`,
+    price,
+    { message_id: messageId }
   )
   
-  // Actualizar spent_total
+  // 5. Actualizar spent_total del fan
   await supabase.rpc('increment_fan_spent', {
     p_fan_id: fanId,
     p_model_id: modelId,
-    p_amount: payload.price
+    p_amount: price
   })
+  
+  console.log('✅ PPV unlock complete')
 }
 
 // 🆕 SUBSCRIPTIONS.NEW - Nueva suscripción
