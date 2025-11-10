@@ -570,13 +570,7 @@ async function handleConsultarIA() {
                       )}
 
                       <p className="text-sm">{msg.message}</p>
-
-                      {msg.is_ppv && (
-  <>
-    {console.log('🎯 PPV:', msg.of_message_id)}
-    <PPVMessage message={msg} />
-  </>
-)}
+                      
 
                       {msg.media_url && (
                         msg.is_ppv ? (
