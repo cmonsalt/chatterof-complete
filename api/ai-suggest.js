@@ -143,6 +143,7 @@ export default async function handler(req, res) {
 
     // 11. Crear prompt para Claude
     const prompt = `You are an AI assistant helping an OnlyFans chatter respond to a fan. 
+    ${extra_instructions ? `\n🎯 CHATTER'S ADDITIONAL CONTEXT:\n${extra_instructions}\n` : ''}
 
 FAN INFO:
 - Username: ${fan.of_username || 'Anonymous'}

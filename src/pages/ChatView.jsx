@@ -23,6 +23,7 @@ export default function ChatView({ embedded = false }) {
   const [aiGenerating, setAiGenerating] = useState(false);
   const [aiSuggestion, setAiSuggestion] = useState(null);
   const [showAISuggestion, setShowAISuggestion] = useState(false);
+  const [aiExtraInstructions, setAiExtraInstructions] = useState(''); // ← AGREGAR
   
   const [showNotesSidebar, setShowNotesSidebar] = useState(true);
   const [editingNickname, setEditingNickname] = useState(false);
@@ -220,7 +221,8 @@ async function handleConsultarIA() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         fan_id: fan.fan_id,
-        model_id: currentModelId
+        model_id: currentModelId,
+        extra_instructions: aiExtraInstructions
       })
     });
 
@@ -869,6 +871,37 @@ async function handleConsultarIA() {
                     </div>
                   </div>
                 )}
+
+                {/* Additional Instructions */}
+<div>
+  <label className="block text-sm font-semibold text-gray-700 mb-2">
+    💬 Additional Instructions (optional)
+  </label>
+  <textarea
+    value={aiExtraInstructions}
+    onChange={(e) => setAiExtraInstructions(e.target.value)}
+    className="w-full px-3 py-2 border rounded text-sm resize-none focus:ring-2 focus:ring-purple-500 focus:outline-none"
+    rows="2"
+    placeholder="e.g., Be more flirty, focus on her birthday, mention last purchase..."
+  />
+</div>
+
+{/* Actions */}
+<div className="flex gap-3 pt-4">
+  <button
+    onClick={handleRegenerateAI}
+    disabled={aiGenerating}
+    className="px-6 py-3 bg-purple-500 text-white rounded-lg hover:bg-purple-600 font-semibold transition-all disabled:opacity-50"
+  >
+    {aiGenerating ? '⏳ Regenerating...' : '🔄 Regenerate'}
+  </button>
+  
+  <button
+    onClick={handleUseAISuggestion}
+    className="flex-1 px-6 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 font-semibold transition-all"
+  >
+    📝 Use Message
+  </button>
 
                 {/* Actions */}
                 <div className="flex gap-3 pt-4">
