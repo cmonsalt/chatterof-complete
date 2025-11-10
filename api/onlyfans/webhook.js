@@ -96,11 +96,20 @@ async function handleMessageReceived(payload, modelId) {
   
   // Si es tip
   if (isTip) {
+        const { data: fanData } = await supabase
+      .from('fans')
+      .select('of_username, nickname')
+      .eq('fan_id', fanId)
+      .eq('model_id', modelId)
+      .single()
+    
+    const fanName = fanData?.nickname || fanData?.of_username || 'Fan'
+
     await createNotification(
       modelId,
       fanId,
       'new_tip',
-      'New Tip Received! 💰',
+      `${fanName} sent a tip! 💰`,
       `You received a $${payload.price} tip!`,
       payload.price,
       { message_id: payload.id }
@@ -112,12 +121,20 @@ async function handleMessageReceived(payload, modelId) {
       p_amount: payload.price
     })
   } else {
+  const { data: fanData } = await supabase
+      .from('fans')
+      .select('of_username, nickname')
+      .eq('fan_id', fanId)
+      .eq('model_id', modelId)
+      .single()
+    
+    const fanName = fanData?.nickname || fanData?.of_username || 'Fan'
     // Notificación de mensaje nuevo
-    await createNotification(
+   await createNotification(
       modelId,
       fanId,
       'new_message',
-      'New Message 💬',
+      `${fanName} 💬`,
       cleanText.substring(0, 100) || 'New media message',
       null,
       { message_id: payload.id }
@@ -286,7 +303,7 @@ async function handleMessageSent(payload, modelId) {
 
 // 💰 MESSAGES.PPV.UNLOCKED - PPV desbloqueado
 async function handlePPVUnlocked(payload, modelId) {
-  const fanId = payload.fromUser?.id?.toString()
+  const fanId = payload.from?.id?.toString() || payload.fromUser?.id?.toString()
   
   if (!fanId) return
 
