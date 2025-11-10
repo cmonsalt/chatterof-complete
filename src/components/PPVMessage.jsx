@@ -1,6 +1,6 @@
 export default function PPVMessage({ message }) {
   const isPPV = message.is_ppv || message.amount > 0
-  const isLocked = message.is_locked && !message.is_purchased
+  const isLocked = message.is_locked && !message.is_purchased && message.from !== 'model'
   const price = message.ppv_price || message.amount || 0
 
   if (!isPPV) return null
