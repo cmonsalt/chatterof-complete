@@ -98,12 +98,12 @@ async function handleMessageReceived(payload, modelId) {
   if (isTip) {
         const { data: fanData } = await supabase
       .from('fans')
-      .select('of_username, nickname')
+      .select('of_username, display_name')
       .eq('fan_id', fanId)
       .eq('model_id', modelId)
       .single()
     
-    const fanName = fanData?.nickname || fanData?.of_username || 'Fan'
+    const fanName = fanData?.display_name || fanData?.of_username || 'Fan'
 
     await createNotification(
       modelId,
@@ -123,12 +123,12 @@ async function handleMessageReceived(payload, modelId) {
   } else {
   const { data: fanData } = await supabase
       .from('fans')
-      .select('of_username, nickname')
+      .select('of_username, display_name')
       .eq('fan_id', fanId)
       .eq('model_id', modelId)
       .single()
     
-    const fanName = fanData?.nickname || fanData?.of_username || 'Fan'
+    const fanName = fanData?.display_name || fanData?.of_username || 'Fan'
     // Notificación de mensaje nuevo
    await createNotification(
       modelId,
