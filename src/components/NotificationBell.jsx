@@ -107,7 +107,7 @@ export default function NotificationBell() {
 
     // Navegar según el tipo - TODOS llevan al chat del fan
     if (notification.fan_id) {
-      navigate(`/chat/${notification.name}`)
+      navigate(`/chat/${notification.fan_id}`)
     } else if (notification.type === 'new_subscriber') {
       // Si es suscriptor nuevo pero sin fan_id, ir a dashboard
       navigate('/dashboard')

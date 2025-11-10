@@ -97,19 +97,20 @@ async function handleMessageReceived(payload, modelId) {
   // Si es tip
   if (isTip) {
         const { data: fanData } = await supabase
-      .from('fans')
-      .select('of_username, display_name')
-      .eq('fan_id', fanId)
-      .eq('model_id', modelId)
-      .single()
-    
-    const fanName = fanData?.display_name || fanData?.of_username || 'Fan'
+  .from('fans')
+  .select('of_username, display_name, name')
+  .eq('fan_id', fanId)
+  .eq('model_id', modelId)
+  .single()
+
+const fanName = fanData?.name || fanData?.display_name || fanData?.of_username || 'Fan'
+const fanTitle = `${fanName} (${fanId})`
 
     await createNotification(
       modelId,
       fanId,
       'new_tip',
-      `${fanName} sent a tip! 💰`,
+      `${fanTitle} sent a tip! 💰`,
       `You received a $${payload.price} tip!`,
       payload.price,
       { message_id: payload.id }
@@ -122,19 +123,20 @@ async function handleMessageReceived(payload, modelId) {
     })
   } else {
   const { data: fanData } = await supabase
-      .from('fans')
-      .select('of_username, display_name')
-      .eq('fan_id', fanId)
-      .eq('model_id', modelId)
-      .single()
-    
-    const fanName = fanData?.display_name || fanData?.of_username || 'Fan'
+  .from('fans')
+  .select('of_username, display_name, name')
+  .eq('fan_id', fanId)
+  .eq('model_id', modelId)
+  .single()
+
+const fanName = fanData?.name || fanData?.display_name || fanData?.of_username || 'Fan'
+const fanTitle = `${fanName} (${fanId})`
     // Notificación de mensaje nuevo
    await createNotification(
       modelId,
       fanId,
       'new_message',
-      `${fanName} 💬`,
+      `${fanTitle} 💬`,
       cleanText.substring(0, 100) || 'New media message',
       null,
       { message_id: payload.id }
