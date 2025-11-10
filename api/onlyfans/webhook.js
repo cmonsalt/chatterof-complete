@@ -410,6 +410,18 @@ async function handleNewSubscription(payload, modelId) {
   if (!fanId) return
 
   console.log(`🆕 New subscription from fan ${fanId}`)
+    // Crear/actualizar fan en BD
+  await supabase
+    .from('fans')
+    .upsert({
+      fan_id: fanId,
+      model_id: modelId,
+      of_username: payload.user?.username || payload.user?.name || 'Unknown',
+      name: payload.user?.name || null,
+      is_subscribed: true,
+      subscription_active: true,
+      subscription_date: new Date().toISOString()
+    }, { onConflict: 'fan_id,model_id' })
   
   await createNotification(
     modelId,
