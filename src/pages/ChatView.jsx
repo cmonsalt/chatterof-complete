@@ -165,6 +165,7 @@ export default function ChatView({ embedded = false }) {
       if (messagesError) {
         console.error('❌ Messages error:', messagesError);
       } else {
+        console.log('📨 Messages loaded:', messagesData);
         setMessages(messagesData || []);
       }
 
