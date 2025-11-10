@@ -59,9 +59,11 @@ export default function ChatView({ embedded = false }) {
   };
 
   useEffect(() => {
+  // Solo scroll si acabas de enviar mensaje
+  if (justSentMessage.current) {
     scrollToBottom();
-  }, [messages]);
-
+  }
+}, [messages]);
   const getTierBadge = (tier) => {
     const tiers = {
       0: { emoji: '🆓', label: 'New Fan', color: 'bg-gray-100 text-gray-700' },
