@@ -51,18 +51,26 @@ export default function PPVMessage({ message }) {
   />
 )}
         
-        {/* Si NO es preview, blur + lock */}
-        {!isPreview && (
-          <>
-            <div className="absolute inset-0 backdrop-blur-xl bg-black/40 rounded-lg"></div>
-            <div className="absolute inset-0 flex items-center justify-center">
-              <div className="bg-gradient-to-r from-purple-500 to-pink-500 text-white px-3 py-1 rounded-full text-xs font-bold">
-                🔒 Locked
-              </div>
-            </div>
-          </>
-        )}
-        
+      {/* Si NO es preview, blur + lock (solo para imágenes) */}
+{!isPreview && !isVideo && (
+  <>
+    <div className="absolute inset-0 backdrop-blur-xl bg-black/40 rounded-lg"></div>
+    <div className="absolute inset-0 flex items-center justify-center">
+      <div className="bg-gradient-to-r from-purple-500 to-pink-500 text-white px-3 py-1 rounded-full text-xs font-bold">
+        🔒 Locked
+      </div>
+    </div>
+  </>
+)}
+
+{/* Badge locked para videos */}
+{!isPreview && isVideo && (
+  <div className="absolute inset-0 flex items-center justify-center">
+    <div className="bg-gradient-to-r from-purple-500 to-pink-500 text-white px-3 py-1 rounded-full text-xs font-bold">
+      🔒 Locked
+    </div>
+  </div>
+)}
         {/* Si es preview, badge verde */}
         {isPreview && (
           <div className="absolute top-1 right-1 bg-green-500 text-white px-2 py-1 rounded-full text-xs font-bold">
