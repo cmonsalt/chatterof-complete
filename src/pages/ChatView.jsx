@@ -290,6 +290,7 @@ async function handleConsultarIA() {
           text: ppvData.text,
           mediaFiles: ppvData.mediaFiles,
           price: ppvData.price,
+          previewMediaIds: ppvData.previewMediaIds,
           replyToMessageId: replyingTo?.id || null,
           replyToText: replyingTo?.message || null
         })
