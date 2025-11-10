@@ -27,20 +27,29 @@ export default function PPVMessage({ message }) {
     return (
       <div key={index} className="relative">
         {/* Mostrar video o imagen */}
-        {isVideo ? (
-         <video 
-  src={url}
-  className="w-full h-32 object-cover rounded-lg"
-  controls
-  preload="metadata"
-/>
-        ) : (
-          <img 
-            src={url}
-            alt={isPreview ? "Free preview" : "Locked"}
-            className="w-full h-32 object-cover rounded-lg"
-          />
-        )}
+       {isVideo ? (
+  isPreview ? (
+    // Video preview - mostrar con controles
+    <video 
+      src={url}
+      className="w-full h-32 object-cover rounded-lg"
+      controls
+      preload="metadata"
+    />
+  ) : (
+    // Video bloqueado - mostrar placeholder
+    <div className="w-full h-32 bg-gradient-to-br from-purple-900 to-pink-900 rounded-lg flex items-center justify-center">
+      <div className="text-5xl">🎥</div>
+    </div>
+  )
+) : (
+  // Imagen - mostrar siempre
+  <img 
+    src={url}
+    alt={isPreview ? "Free preview" : "Locked"}
+    className="w-full h-32 object-cover rounded-lg"
+  />
+)}
         
         {/* Si NO es preview, blur + lock */}
         {!isPreview && (
