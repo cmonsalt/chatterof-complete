@@ -715,55 +715,56 @@ async function handleRegenerateAI() {
                   </div>
                 )}
 
-                <div className="flex gap-2 items-end">
-                  <input
-                    type="text"
-                    value={newMessage}
-                    onChange={(e) => setNewMessage(e.target.value)}
-                    onKeyPress={(e) => e.key === 'Enter' && !sending && enviarMensaje()}
-                    placeholder={replyingTo ? "Write your reply..." : "Type your message..."}
-                    disabled={sending}
-                    className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
-                  />
-                  
-                  {/* 🤖 AI BUTTON */}
-                  <button
-                    onClick={handleConsultarIA}
-                    disabled={aiGenerating}
-                    className="px-4 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600 font-semibold transition-all disabled:opacity-50"
-                  >
-                    {aiGenerating ? '⏳' : '🤖 AI'}
-                  </button>
+           <div className="space-y-2">
+                  {/* Botones en línea */}
+                  <div className="flex gap-2 items-end">
+                    <input
+                      type="text"
+                      value={newMessage}
+                      onChange={(e) => setNewMessage(e.target.value)}
+                      onKeyPress={(e) => e.key === 'Enter' && !sending && enviarMensaje()}
+                      placeholder={replyingTo ? "Write your reply..." : "Type your message..."}
+                      disabled={sending}
+                      className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
+                    />
+                    
+                    {/* 🤖 AI BUTTON */}
+                    <button
+                      onClick={handleConsultarIA}
+                      disabled={aiGenerating}
+                      className="px-4 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600 font-semibold transition-all disabled:opacity-50"
+                    >
+                      {aiGenerating ? '⏳' : '🤖 AI'}
+                    </button>
 
-                  
+                    {/* 🔥 PPV BUTTON */}
+                    <button
+                      onClick={() => setShowPPVSelector(true)}
+                      className="px-4 py-2 bg-gradient-to-r from-green-500 to-emerald-500 text-white rounded-lg hover:from-green-600 hover:to-emerald-600 font-semibold transition-all"
+                    >
+                      💰 PPV
+                    </button>
 
-                  {/* 🔥 PPV BUTTON */}
-                  <button
-                    onClick={() => setShowPPVSelector(true)}
-                    className="px-4 py-2 bg-gradient-to-r from-green-500 to-emerald-500 text-white rounded-lg hover:from-green-600 hover:to-emerald-600 font-semibold transition-all"
-                  >
-                    💰 PPV
-                  </button>
+                    <button
+                      onClick={enviarMensaje}
+                      disabled={sending || !newMessage.trim()}
+                      className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 font-semibold transition-all disabled:opacity-50"
+                    >
+                      {sending ? 'Enviando...' : 'Enviar'}
+                    </button>
+                  </div>
 
-                  <button
-  onClick={enviarMensaje}
-  disabled={sending || !newMessage.trim()}
-  className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 font-semibold transition-all disabled:opacity-50"
->
-  {sending ? 'Enviando...' : 'Enviar'}
-</button>
-
-{/* 👇 AGREGAR ESTO AQUÍ 👇 */}
-{fanIsTyping && (
-  <div className="px-4 py-2 text-sm text-gray-500 italic flex items-center gap-2">
-    <div className="flex gap-1">
-      <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></span>
-      <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></span>
-      <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></span>
-    </div>
-    Fan escribiendo...
-  </div>
-)}
+                  {/* Typing indicator FUERA del flex */}
+                  {fanIsTyping && (
+                    <div className="px-4 py-1 text-sm text-gray-500 italic flex items-center gap-2">
+                      <div className="flex gap-1">
+                        <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></span>
+                        <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></span>
+                        <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></span>
+                      </div>
+                      Fan escribiendo...
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
