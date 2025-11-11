@@ -250,6 +250,88 @@ export default function ConfigTab({ modelId }) {
         {/* Claude API Settings */}
         <div className="border-t pt-6">
           <h3 className="text-lg font-semibold text-gray-900 mb-4">Claude API</h3>
+
+          {/* Custom Content Policy */}
+        <div className="border-t pt-6">
+          <h3 className="text-lg font-semibold text-gray-900 mb-4">🎥 Custom Content Policy</h3>
+          
+          <div className="mb-4">
+            <label className="flex items-center cursor-pointer">
+              <input
+                type="checkbox"
+                checked={config.does_customs || false}
+                onChange={(e) => setConfig({ ...config, does_customs: e.target.checked })}
+                className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
+              />
+              <span className="ml-2 text-sm font-medium text-gray-700">Offers custom content</span>
+            </label>
+          </div>
+
+          {config.does_customs && (
+            <div className="space-y-4 pl-6 border-l-2 border-indigo-200">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  What customs she does
+                </label>
+                <textarea
+                  value={config.custom_what_she_does || ''}
+                  onChange={(e) => setConfig({ ...config, custom_what_she_does: e.target.value })}
+                  rows={3}
+                  placeholder="e.g., Solo, B/G, roleplay, fetish-friendly, specific requests..."
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-vertical"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  What she DOESN'T do
+                </label>
+                <textarea
+                  value={config.custom_what_she_doesnt || ''}
+                  onChange={(e) => setConfig({ ...config, custom_what_she_doesnt: e.target.value })}
+                  rows={3}
+                  placeholder="e.g., No face, no extreme, no bodily fluids, no..."
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-vertical"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Price Range
+                  </label>
+                  <input
+                    type="text"
+                    value={config.custom_price_range || ''}
+                    onChange={(e) => setConfig({ ...config, custom_price_range: e.target.value })}
+                    placeholder="$50-200"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Typical Delivery Time
+                  </label>
+                  <input
+                    type="text"
+                    value={config.custom_delivery || ''}
+                    onChange={(e) => setConfig({ ...config, custom_delivery: e.target.value })}
+                    placeholder="3-7 days"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  />
+                </div>
+              </div>
+
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                <p className="text-xs text-blue-800">
+                  💡 <strong>Tip:</strong> When fans ask for customs, the AI will alert the chatter and gather details. 
+                  It will NOT quote prices automatically - you control the final quote based on the request.
+                </p>
+              </div>
+            </div>
+          )}
+        </div>
             {/*
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
