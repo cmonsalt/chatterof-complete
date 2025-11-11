@@ -13,26 +13,26 @@ export default function ChatView({ embedded = false }) {
   const { fanId } = useParams();
   const { user, modelId } = useAuth();
   const navigate = useNavigate();
-  
+
   const [fan, setFan] = useState(null);
   const [messages, setMessages] = useState([]);
   const [loading, setLoading] = useState(true);
   const [newMessage, setNewMessage] = useState('');
   const [sending, setSending] = useState(false);
-  
+
   // 🤖 AI STATES
   const [aiGenerating, setAiGenerating] = useState(false);
   const [aiSuggestion, setAiSuggestion] = useState(null);
   const [showAISuggestion, setShowAISuggestion] = useState(false);
   const [aiExtraInstructions, setAiExtraInstructions] = useState(''); // ← AGREGAR
-  
+
   const [showNotesSidebar, setShowNotesSidebar] = useState(true);
   const [editingNickname, setEditingNickname] = useState(false);
   const [nicknameValue, setNicknameValue] = useState('');
   const [notesValue, setNotesValue] = useState('');
   const [chatterNotesValue, setChatterNotesValue] = useState('');
   const [savingNotes, setSavingNotes] = useState(false);
-  
+
   const [fanStats, setFanStats] = useState({
     totalTips: 0,
     tipsCount: 0,
@@ -40,15 +40,15 @@ export default function ChatView({ embedded = false }) {
     ppvCount: 0,
     lastInteraction: null
   });
-  
+
   // 🔥 PPV MODALS
   const [showPPVSelector, setShowPPVSelector] = useState(false);
   const [showPPVSend, setShowPPVSend] = useState(false);
   const [selectedPPVContent, setSelectedPPVContent] = useState([]);
-  
+
   // 🔥 REPLY functionality
   const [replyingTo, setReplyingTo] = useState(null);
-  
+
   const lastCheckedMessageId = useRef(null);
   const justSentMessage = useRef(false);
   const messagesEndRef = useRef(null);
@@ -57,55 +57,58 @@ export default function ChatView({ embedded = false }) {
   const [aiSuggestionForPPV, setAISuggestionForPPV] = useState(null);
 
   const [fanIsTyping, setFanIsTyping] = useState(false)
- useEffect(() => {
-  if (!fanId || !modelId) return
+  const [floatingDate, setFloatingDate] = useState(null)
 
-  // Suscribirse a cambios de typing
-  const channel = supabase
-    .channel(`typing:${modelId}:${fanId}`)
-    .on(
-      'postgres_changes',
-      {
-        event: '*',
-        schema: 'public',
-        table: 'typing_status',
-        filter: `fan_id=eq.${fanId}`
-      },
-      (payload) => {
-        const typingData = payload.new
-        if (!typingData) return
-        
-        // Verificar si el timestamp es reciente (menos de 3 segundos)
-        const updatedAt = new Date(typingData.updated_at)
-        const now = new Date()
-        const secondsAgo = (now - updatedAt) / 1000
-        
-        setFanIsTyping(typingData.is_typing && secondsAgo < 3)
-      }
-    )
-    .subscribe()
 
-  // Limpiar typing indicator cada segundo
-  const interval = setInterval(() => {
-    setFanIsTyping(false)
-  }, 3000)
+  useEffect(() => {
+    if (!fanId || !modelId) return
 
-  return () => {
-    supabase.removeChannel(channel)
-    clearInterval(interval)
-  }
-}, [fanId, modelId])
+    // Suscribirse a cambios de typing
+    const channel = supabase
+      .channel(`typing:${modelId}:${fanId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'typing_status',
+          filter: `fan_id=eq.${fanId}`
+        },
+        (payload) => {
+          const typingData = payload.new
+          if (!typingData) return
+
+          // Verificar si el timestamp es reciente (menos de 3 segundos)
+          const updatedAt = new Date(typingData.updated_at)
+          const now = new Date()
+          const secondsAgo = (now - updatedAt) / 1000
+
+          setFanIsTyping(typingData.is_typing && secondsAgo < 3)
+        }
+      )
+      .subscribe()
+
+    // Limpiar typing indicator cada segundo
+    const interval = setInterval(() => {
+      setFanIsTyping(false)
+    }, 3000)
+
+    return () => {
+      supabase.removeChannel(channel)
+      clearInterval(interval)
+    }
+  }, [fanId, modelId])
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
 
   useEffect(() => {
-  // Solo scroll si acabas de enviar mensaje
-  if (justSentMessage.current) {
-    scrollToBottom();
-  }
-}, [messages]);
+    // Solo scroll si acabas de enviar mensaje
+    if (justSentMessage.current) {
+      scrollToBottom();
+    }
+  }, [messages]);
   const getTierBadge = (tier) => {
     const tiers = {
       0: { emoji: '🆓', label: 'New Fan', color: 'bg-gray-100 text-gray-700' },
@@ -123,15 +126,15 @@ export default function ChatView({ embedded = false }) {
 
   useEffect(() => {
     if (messages.length === 0) return;
-    
+
     if (justSentMessage.current) {
       console.log('⭐ Skipping read marking - just sent a message');
       justSentMessage.current = false;
       return;
     }
-    
+
     const lastMessage = messages[messages.length - 1];
-    
+
     if (lastMessage?.from === 'fan' && lastMessage.id !== lastCheckedMessageId.current) {
       console.log('📖 Fan responded! Marking previous model messages as read');
       lastCheckedMessageId.current = lastMessage.id;
@@ -142,7 +145,7 @@ export default function ChatView({ embedded = false }) {
   async function markPreviousModelMessagesAsRead(fanMessageTime) {
     const currentModelId = modelId || user?.user_metadata?.model_id;
     if (!fanId || !currentModelId) return;
-    
+
     try {
       const { data, error } = await supabase
         .from('chat')
@@ -187,7 +190,7 @@ export default function ChatView({ embedded = false }) {
         setLoading(false);
         return;
       }
-      
+
       if (!fanData) {
         console.log('⚠️ Fan no encontrado');
         setLoading(false);
@@ -198,7 +201,7 @@ export default function ChatView({ embedded = false }) {
       setNotesValue(fanData.notes || '');
       setChatterNotesValue(fanData.chatter_notes || '');
 
-      const { data: messagesData, error: messagesError} = await supabase
+      const { data: messagesData, error: messagesError } = await supabase
         .from('chat')
         .select(`
   id, ts, fan_id, message, created_at, model_id, from, read, source,
@@ -208,7 +211,7 @@ export default function ChatView({ embedded = false }) {
 `)
         .eq('fan_id', fanId)
         .eq('model_id', currentModelId)
-        .order('ts', { ascending: true  })  // ← DESC
+        .order('ts', { ascending: true })  // ← DESC
         .limit(100);
 
       if (messagesError) {
@@ -225,21 +228,40 @@ export default function ChatView({ embedded = false }) {
     }
   }
 
+  const handleScroll = (e) => {
+    const container = e.target
+
+    // Buscar el primer mensaje visible
+    const messageElements = container.querySelectorAll('[data-message-date]')
+
+    for (const el of messageElements) {
+      const rect = el.getBoundingClientRect()
+      const containerRect = container.getBoundingClientRect()
+
+      // Si el mensaje está visible cerca del top
+      if (rect.top >= containerRect.top && rect.top <= containerRect.top + 150) {
+        const date = el.getAttribute('data-message-date')
+        setFloatingDate(date)
+        break
+      }
+    }
+  }
+
   function calculateFanStats(msgs) {
     const tips = msgs.filter(m => m.from === 'fan' && m.amount > 0 && !m.media_url);
     const ppvs = msgs.filter(m => m.from === 'fan' && m.amount > 0 && m.media_url);
     const lastMsg = msgs[msgs.length - 1];
-    
+
     const totalTips = tips.reduce((sum, t) => {
       const amount = parseFloat(t.amount);
       return sum + (isNaN(amount) ? 0 : amount);
     }, 0);
-    
+
     const ppvTotal = ppvs.reduce((sum, p) => {
       const amount = parseFloat(p.amount);
       return sum + (isNaN(amount) ? 0 : amount);
     }, 0);
-    
+
     setFanStats({
       totalTips: totalTips,
       tipsCount: tips.length,
@@ -250,71 +272,71 @@ export default function ChatView({ embedded = false }) {
   }
 
   // 🤖 NEW: AI Suggestion Handler
-async function handleConsultarIA() {
-  const currentModelId = modelId || user?.user_metadata?.model_id;
-  if (!currentModelId || !fan) return;
-  
-  setAiGenerating(true);
-  
-  try {
-    const response = await fetch('/api/ai-suggest', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        fan_id: fan.fan_id,
-        model_id: currentModelId,
-        extra_instructions: aiExtraInstructions || ''
-      })
-    });
+  async function handleConsultarIA() {
+    const currentModelId = modelId || user?.user_metadata?.model_id;
+    if (!currentModelId || !fan) return;
 
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.error);
+    setAiGenerating(true);
+
+    try {
+      const response = await fetch('/api/ai-suggest', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          fan_id: fan.fan_id,
+          model_id: currentModelId,
+          extra_instructions: aiExtraInstructions || ''
+        })
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error);
+      }
+
+      const data = await response.json();
+      setAiSuggestion(data.suggestion);
+      setShowAISuggestion(true);
+
+    } catch (error) {
+      console.error('Error generating AI suggestion:', error);
+      alert('Error: ' + error.message);
+    } finally {
+      setAiGenerating(false);
     }
-
-    const data = await response.json();
-    setAiSuggestion(data.suggestion);
-    setShowAISuggestion(true);
-    
-  } catch (error) {
-    console.error('Error generating AI suggestion:', error);
-    alert('Error: ' + error.message);
-  } finally {
-    setAiGenerating(false);
   }
-}
 
-async function handleRegenerateAI() {
-  const currentModelId = modelId || user?.user_metadata?.model_id;
-  if (!currentModelId || !fan) return;
-  
-  setAiGenerating(true);
-  
-  try {
-    const response = await fetch('/api/ai-suggest', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        fan_id: fan.fan_id,
-        model_id: currentModelId,
-        extra_instructions: aiExtraInstructions
-      })
-    });
+  async function handleRegenerateAI() {
+    const currentModelId = modelId || user?.user_metadata?.model_id;
+    if (!currentModelId || !fan) return;
 
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.error);
+    setAiGenerating(true);
+
+    try {
+      const response = await fetch('/api/ai-suggest', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          fan_id: fan.fan_id,
+          model_id: currentModelId,
+          extra_instructions: aiExtraInstructions
+        })
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error);
+      }
+
+      const data = await response.json();
+      setAiSuggestion(data.suggestion);
+      setAiGenerating(false);
+    } catch (error) {
+      console.error('AI Error:', error);
+      alert('Error: ' + error.message);
+      setAiGenerating(false);
     }
-
-    const data = await response.json();
-    setAiSuggestion(data.suggestion);
-    setAiGenerating(false);
-  } catch (error) {
-    console.error('AI Error:', error);
-    alert('Error: ' + error.message);
-    setAiGenerating(false);
   }
-}
   // 🤖 Handle using AI suggestion
   function handleUseAISuggestion() {
     if (aiSuggestion?.message) {
@@ -324,15 +346,15 @@ async function handleRegenerateAI() {
   }
 
   // 🤖 Handle sending AI suggestion with PPV
- function handleSendAIWithPPV() {
-  if (!aiSuggestion?.recommendedPPV) return;
-  
-  // Pasar sugerencia completa al modal PPV
-  setSelectedPPVContent([aiSuggestion.recommendedPPV]);
-  setAISuggestionForPPV(aiSuggestion); // Nueva state
-  setShowAISuggestion(false);
-  setShowPPVSend(true);
-}
+  function handleSendAIWithPPV() {
+    if (!aiSuggestion?.recommendedPPV) return;
+
+    // Pasar sugerencia completa al modal PPV
+    setSelectedPPVContent([aiSuggestion.recommendedPPV]);
+    setAISuggestionForPPV(aiSuggestion); // Nueva state
+    setShowAISuggestion(false);
+    setShowPPVSend(true);
+  }
 
   // 🔥 Handle PPV content selection
   function handlePPVContentSelected(content) {
@@ -386,10 +408,10 @@ async function handleRegenerateAI() {
       setSelectedPPVContent([]);
       setShowPPVSend(false);
       setReplyingTo(null);
-      
+
       await new Promise(resolve => setTimeout(resolve, 500));
       await loadFanAndMessages();
-      
+
     } catch (error) {
       console.error('❌ Error sending PPV:', error);
       alert('Error sending PPV: ' + error.message);
@@ -401,7 +423,7 @@ async function handleRegenerateAI() {
 
   async function enviarMensaje() {
     if (!newMessage.trim() || sending) return;
-    
+
     const currentModelId = modelId || user?.user_metadata?.model_id;
     if (!currentModelId) return;
 
@@ -443,10 +465,10 @@ async function handleRegenerateAI() {
 
       setNewMessage('');
       setReplyingTo(null);
-      
+
       await new Promise(resolve => setTimeout(resolve, 500));
       await loadFanAndMessages();
-      
+
     } catch (error) {
       console.error('❌ Error enviando mensaje:', error);
       alert('Error al enviar mensaje: ' + error.message);
@@ -613,7 +635,7 @@ async function handleRegenerateAI() {
               <div className="bg-gray-50 rounded-lg p-3 border border-gray-200">
                 <div className="text-sm font-semibold text-gray-700">Last Activity</div>
                 <div className="text-xs text-gray-500">
-                  {fanStats.lastInteraction 
+                  {fanStats.lastInteraction
                     ? new Date(fanStats.lastInteraction).toLocaleDateString()
                     : 'Never'}
                 </div>
@@ -623,74 +645,91 @@ async function handleRegenerateAI() {
 
           <div className="flex-1 flex gap-4 p-6">
             {/* Chat */}
-            <div className="flex-1 bg-white rounded-xl shadow-lg flex flex-col">
-              <div className="flex-1 overflow-y-auto p-6 space-y-4 max-h-[calc(100vh-200px)]">
-                {messages.map((msg) => (
-                  <div
-                    key={msg.id}
-                    className={`flex ${msg.from === 'model' ? 'justify-end' : 'justify-start'}`}
-                  >
+            <div className="flex-1 bg-white rounded-xl shadow-lg flex flex-col relative">
+              {/* Fecha flotante */}
+              {floatingDate && (
+                <div className="absolute top-4 left-1/2 transform -translate-x-1/2 bg-black/80 text-white px-4 py-2 rounded-full text-sm font-medium z-50 shadow-lg">
+                  {floatingDate}
+                </div>
+              )}
+              <div className="flex-1 overflow-y-auto p-6 space-y-4 max-h-[calc(100vh-200px)]"
+                onScroll={handleScroll}
+              >
+                {messages.map((msg) => {
+                  // Formatear fecha del mensaje
+                  const messageDate = new Date(msg.timestamp || msg.ts).toLocaleDateString('en-US', {
+                    month: 'long',
+                    day: 'numeric',
+                    year: 'numeric'
+                  })
+
+                  return (
                     <div
-                      className={`max-w-[70%] rounded-2xl px-4 py-3 ${
-                        msg.from === 'model'
+                      key={msg.id}
+                      data-message-date={messageDate}
+                      className={`flex ${msg.from === 'model' ? 'justify-end' : 'justify-start'}`}
+                    >
+                      <div
+                        className={`max-w-[70%] rounded-2xl px-4 py-3 ${msg.from === 'model'
                           ? 'bg-blue-500 text-white'
                           : 'bg-gray-100 text-gray-800'
-                      }`}
-                    >
-                      {msg.reply_to_text && (
-                        <div className="mb-2 pb-2 border-b border-opacity-30 border-white">
-                          <div className="text-xs opacity-75">↩️ Reply to:</div>
-                          <div className="text-xs italic opacity-90">
-                            {msg.reply_to_text.slice(0, 50)}...
+                          }`}
+                      >
+                        {msg.reply_to_text && (
+                          <div className="mb-2 pb-2 border-b border-opacity-30 border-white">
+                            <div className="text-xs opacity-75">↩️ Reply to:</div>
+                            <div className="text-xs italic opacity-90">
+                              {msg.reply_to_text.slice(0, 50)}...
+                            </div>
                           </div>
+                        )}
+
+                        <p className="text-sm">{msg.message}</p>
+
+
+                        {msg.media_url && (
+                          msg.is_ppv ? (
+                            <PPVMessage message={msg} />
+                          ) : msg.media_type === 'video' ? (
+                            <video
+                              src={msg.media_url}
+                              controls
+                              className="rounded-lg shadow-md max-w-xs max-h-60"
+                              onError={(e) => {
+                                console.error('Video failed to load')
+                                e.target.outerHTML = '<div class="flex flex-col items-center justify-center h-48 bg-gray-100 rounded-lg"><div class="text-5xl mb-2">❌</div><div class="text-sm text-gray-600 font-semibold">Video URL expired</div></div>'
+                              }}
+                            />
+                          ) : (
+                            <img
+                              src={msg.media_url}
+                              alt="Media"
+                              className="rounded-lg shadow-md max-w-xs max-h-60"
+                              onError={(e) => {
+                                console.error('Image failed to load')
+                                e.target.outerHTML = '<div class="flex flex-col items-center justify-center h-48 bg-gray-100 rounded-lg"><div class="text-5xl mb-2">❌</div><div class="text-sm text-gray-600 font-semibold">Image URL expired</div></div>'
+                              }}
+                            />
+                          )
+                        )}
+
+                        <div className="text-xs opacity-75 mt-1">
+                          {new Date(msg.ts).toLocaleTimeString()}
+                          {msg.from === 'model' && msg.read && ' • Read ✓'}
                         </div>
-                      )}
 
-                      <p className="text-sm">{msg.message}</p>
-                      
-
-                      {msg.media_url && (
-                        msg.is_ppv ? (
-                          <PPVMessage message={msg} />
-                        ) : msg.media_type === 'video' ? (
-                          <video
-                            src={msg.media_url}
-                            controls
-                            className="rounded-lg shadow-md max-w-xs max-h-60"
-                            onError={(e) => {
-                              console.error('Video failed to load')
-                              e.target.outerHTML = '<div class="flex flex-col items-center justify-center h-48 bg-gray-100 rounded-lg"><div class="text-5xl mb-2">❌</div><p class="text-sm text-gray-600 font-semibold">Video URL expired</p></div>'
-                            }}
-                          />
-                        ) : (
-                          <img
-                            src={msg.media_url}
-                            alt="Media"
-                            className="rounded-lg shadow-md max-w-xs max-h-60"
-                            onError={(e) => {
-                              console.error('Image failed to load')
-                              e.target.outerHTML = '<div class="flex flex-col items-center justify-center h-48 bg-gray-100 rounded-lg"><div class="text-5xl mb-2">❌</div><p class="text-sm text-gray-600 font-semibold">Image URL expired</p></div>'
-                            }}
-                          />
-                        )
-                      )}
-
-                      <div className="text-xs opacity-75 mt-1">
-                        {new Date(msg.ts).toLocaleTimeString()}
-                        {msg.from === 'model' && msg.read && ' • Read ✓'}
+                        {msg.from === 'fan' && (
+                          <button
+                            onClick={() => setReplyingTo(msg)}
+                            className="text-xs underline opacity-75 hover:opacity-100 mt-1"
+                          >
+                            Reply
+                          </button>
+                        )}
                       </div>
-
-                      {msg.from === 'fan' && (
-                        <button
-                          onClick={() => setReplyingTo(msg)}
-                          className="text-xs underline opacity-75 hover:opacity-100 mt-1"
-                        >
-                          Reply
-                        </button>
-                      )}
                     </div>
-                  </div>
-                ))}
+                  )
+                })}
                 <div ref={messagesEndRef} />
               </div>
 
@@ -715,7 +754,7 @@ async function handleRegenerateAI() {
                   </div>
                 )}
 
-           <div className="space-y-2">
+                <div className="space-y-2">
                   {/* Botones en línea */}
                   <div className="flex gap-2 items-end">
                     <input
@@ -727,7 +766,7 @@ async function handleRegenerateAI() {
                       disabled={sending}
                       className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
                     />
-                    
+
                     {/* 🤖 AI BUTTON */}
                     <button
                       onClick={handleConsultarIA}
@@ -850,7 +889,7 @@ async function handleRegenerateAI() {
                 </div>
 
                 {/* Chatter Tips */}
-                 {/*<div>
+                {/*<div>
                   <label className="block text-sm font-semibold text-gray-700 mb-2">
                     💡 Chatter Tips
                   </label>
@@ -961,20 +1000,20 @@ async function handleRegenerateAI() {
                 )}
 
                 {/* Additional Instructions */}
-<div>
-  <label className="block text-sm font-semibold text-gray-700 mb-2">
-    💬 Additional Instructions (optional)
-  </label>
-  <textarea
-    value={aiExtraInstructions}
-    onChange={(e) => setAiExtraInstructions(e.target.value)}
-    className="w-full px-3 py-2 border rounded text-sm resize-none focus:ring-2 focus:ring-purple-500 focus:outline-none"
-    rows="2"
-    placeholder="e.g., Be more flirty, focus on her birthday, mention last purchase..."
-  />
-</div>
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    💬 Additional Instructions (optional)
+                  </label>
+                  <textarea
+                    value={aiExtraInstructions}
+                    onChange={(e) => setAiExtraInstructions(e.target.value)}
+                    className="w-full px-3 py-2 border rounded text-sm resize-none focus:ring-2 focus:ring-purple-500 focus:outline-none"
+                    rows="2"
+                    placeholder="e.g., Be more flirty, focus on her birthday, mention last purchase..."
+                  />
+                </div>
 
-{/* Actions */}
+                {/* Actions */}
                 <div className="flex gap-3 pt-4">
                   <button
                     onClick={handleRegenerateAI}
@@ -983,14 +1022,14 @@ async function handleRegenerateAI() {
                   >
                     {aiGenerating ? '⏳ Regenerating...' : '🔄 Regenerate'}
                   </button>
-                  
+
                   <button
                     onClick={handleUseAISuggestion}
                     className="flex-1 px-6 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 font-semibold transition-all"
                   >
                     📝 Use Message
                   </button>
-                  
+
                   {aiSuggestion.recommendedPPV && (
                     <button
                       onClick={handleSendAIWithPPV}
@@ -999,7 +1038,7 @@ async function handleRegenerateAI() {
                       💰 Send with PPV
                     </button>
                   )}
-                  
+
                   <button
                     onClick={() => setShowAISuggestion(false)}
                     className="px-6 py-3 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 font-semibold transition-all"
@@ -1022,19 +1061,19 @@ async function handleRegenerateAI() {
       />
 
       <PPVSendModal
-  isOpen={showPPVSend}
-  onClose={() => {
-    setShowPPVSend(false);
-    setSelectedPPVContent([]);
-    setAISuggestionForPPV(null);  // ← Limpiar también
-  }}
-  selectedContent={selectedPPVContent}
-  fanTier={fan?.tier || 0}
-  fanId={fanId}
-  modelId={modelId || user?.user_metadata?.model_id}
-  onSendPPV={handleSendPPV}
-  aiSuggestion={aiSuggestionForPPV}  // ← AGREGAR ESTE PROP
-/>
+        isOpen={showPPVSend}
+        onClose={() => {
+          setShowPPVSend(false);
+          setSelectedPPVContent([]);
+          setAISuggestionForPPV(null);  // ← Limpiar también
+        }}
+        selectedContent={selectedPPVContent}
+        fanTier={fan?.tier || 0}
+        fanId={fanId}
+        modelId={modelId || user?.user_metadata?.model_id}
+        onSendPPV={handleSendPPV}
+        aiSuggestion={aiSuggestionForPPV}  // ← AGREGAR ESTE PROP
+      />
     </>
   );
 }
