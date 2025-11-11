@@ -41,12 +41,11 @@ export default function TiersTab({ modelId }) {
     if (error) throw error;
 
     // Mapeo de tier_name a tier numérico
-    const tierMap = {
-      'Free': 0,
-      'VIP': 1,
-      'Whale': 2
-    };
-
+  const tierMap = {
+  'FREE': 0,
+  'VIP': 1,
+  'WHALE': 2
+};
     // Recalcular tier para cada fan
     for (const fan of fans) {
       let newTier = 0;
