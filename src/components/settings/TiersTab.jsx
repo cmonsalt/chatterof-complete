@@ -30,6 +30,54 @@ export default function TiersTab({ modelId }) {
     }
   }
 
+  const recalculateAllFanTiers = async () => {
+  try {
+    // Obtener todos los fans del modelo
+    const { data: fans, error } = await supabase
+      .from('fans')
+      .select('fan_id, spent_total')
+      .eq('model_id', modelId);
+
+    if (error) throw error;
+
+    // Mapeo de tier_name a tier numérico
+    const tierMap = {
+      'Free': 0,
+      'VIP': 1,
+      'Whale': 2
+    };
+
+    // Recalcular tier para cada fan
+    for (const fan of fans) {
+      let newTier = 0;
+      
+      // Buscar en qué tier cae según spent_total
+      for (const rule of tierRules) {
+        const spentTotal = parseFloat(fan.spent_total) || 0;
+        const minSpent = parseFloat(rule.min_spent);
+        const maxSpent = rule.max_spent ? parseFloat(rule.max_spent) : 999999;
+        
+        if (spentTotal >= minSpent && spentTotal <= maxSpent) {
+          newTier = tierMap[rule.tier_name] || 0;
+          break;
+        }
+      }
+
+      // Actualizar el tier del fan
+      await supabase
+        .from('fans')
+        .update({ tier: newTier })
+        .eq('fan_id', fan.fan_id)
+        .eq('model_id', modelId);
+    }
+
+    console.log('✅ All fan tiers recalculated');
+  } catch (error) {
+    console.error('Error recalculating tiers:', error);
+    throw error;
+  }
+}
+
   const handleSaveTierRules = async () => {
     setSaving(true)
     setMessage(null)
@@ -47,6 +95,8 @@ export default function TiersTab({ modelId }) {
 
         if (error) throw error
       }
+
+      await recalculateAllFanTiers()
 
       setMessage({ type: 'success', text: '✅ Tier rules saved!' })
     } catch (error) {
