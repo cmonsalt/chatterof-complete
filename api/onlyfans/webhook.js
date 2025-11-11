@@ -34,7 +34,7 @@ async function createNotification(modelId, fanId, type, title, message, amount, 
       console.error('❌ Notification insert error:', error)
       throw error
     }
-    
+
     console.log(`✅ Notification created: ${type} for fan ${fanId}`)
   } catch (error) {
     console.error('❌ Notification error:', error)
@@ -43,31 +43,31 @@ async function createNotification(modelId, fanId, type, title, message, amount, 
 
 // 📨 MESSAGES.RECEIVED - Mensaje recibido de un fan
 async function handleMessageReceived(payload, modelId) {
- const fanId = payload.fromUser?.id?.toString()
-  
+  const fanId = payload.fromUser?.id?.toString()
+
   if (!fanId) {
     console.log('⚠️ No fanId in message')
     return
   }
 
   const cleanText = cleanHTML(payload.text || '')
-  
+
   let mediaUrl = null
   let mediaThumb = null
   let mediaType = null
-  
+
   if (payload.media && payload.media.length > 0) {
     const firstMedia = payload.media[0]
     mediaUrl = firstMedia.files?.full?.url || firstMedia.url
     mediaThumb = firstMedia.files?.thumb?.url || firstMedia.thumb
     mediaType = firstMedia.type
   }
-  
+
   const isTip = payload.price > 0 && !payload.isOpened
 
   const tipAmount = payload.fanData?.spending?.tips || 0
-  const hasTip = tipAmount > 0 
-  
+  const hasTip = tipAmount > 0
+
   // Asegurar que el fan existe (crear si no existe)
   const { data: existingFan } = await supabase
     .from('fans')
@@ -75,10 +75,10 @@ async function handleMessageReceived(payload, modelId) {
     .eq('fan_id', fanId)
     .eq('model_id', modelId)
     .single()
-  
+
   if (!existingFan) {
     console.log(`⚠️ Fan ${fanId} not found, creating...`)
-    
+
     const { error: fanCreateError } = await supabase
       .from('fans')
       .insert({
@@ -92,15 +92,15 @@ async function handleMessageReceived(payload, modelId) {
         net_revenue: 0,
         is_subscribed: false
       })
-    
+
     if (fanCreateError) {
       console.error('❌ Error creating fan:', fanCreateError)
       return
     }
-    
+
     console.log(`✅ Fan ${fanId} created automatically`)
   }
-  
+
   // Guardar mensaje
   const messageData = {
     of_message_id: payload.id?.toString(),
@@ -117,78 +117,78 @@ async function handleMessageReceived(payload, modelId) {
     amount: isTip ? payload.price : 0,
     is_ppv: false,
     ppv_price: 0,
-    is_purchased: null,     
-    ppv_unlocked: false      
+    is_purchased: null,
+    ppv_unlocked: false
   }
-  
+
   const { error: chatError } = await supabase
     .from('chat')
     .upsert(messageData, { onConflict: 'of_message_id' })
-  
+
   if (chatError) {
     console.error('❌ Chat save error:', chatError)
     return
   }
-  
+
   console.log('✅ Message saved to chat')
-  
-  
+
+
   // Si es tip
-// Si es tip
-if (isTip || hasTip) {
-  const amount = isTip ? payload.price : tipAmount
-  
-  const { data: fanData } = await supabase
-    .from('fans')
-    .select('of_username, display_name, name')
-    .eq('fan_id', fanId)
-    .eq('model_id', modelId)
-    .single()
-  
-  const fanName = fanData?.name || fanData?.display_name || fanData?.of_username || 'Fan'
+  // Si es tip
+  if (isTip || hasTip) {
+    const amount = isTip ? payload.price : tipAmount
 
-  // Guardar transacción de tip
-  await supabase
-    .from('transactions')
-    .insert({
-      fan_id: fanId,
-      model_id: modelId,
-      amount: amount,
-      type: 'tip',
-      description: `Tip received`,
-      detected_by: 'webhook',
-      purchase_metadata: {
-        message_id: payload.queueId?.toString() || payload.id?.toString()
-      }
+    const { data: fanData } = await supabase
+      .from('fans')
+      .select('of_username, display_name, name')
+      .eq('fan_id', fanId)
+      .eq('model_id', modelId)
+      .single()
+
+    const fanName = fanData?.name || fanData?.display_name || fanData?.of_username || 'Fan'
+
+    // Guardar transacción de tip
+    await supabase
+      .from('transactions')
+      .insert({
+        fan_id: fanId,
+        model_id: modelId,
+        amount: amount,
+        type: 'tip',
+        description: `Tip received`,
+        detected_by: 'webhook',
+        purchase_metadata: {
+          message_id: payload.queueId?.toString() || payload.id?.toString()
+        }
+      })
+
+    await createNotification(
+      modelId,
+      fanId,
+      'new_tip',
+      `${fanName} (${fanId}) sent a tip! 💰`,
+      `You received a $${amount} tip!`,
+      amount,
+      { message_id: payload.id }
+    )
+
+    await supabase.rpc('increment_fan_spent', {
+      p_fan_id: fanId,
+      p_model_id: modelId,
+      p_amount: amount
     })
+  } else {
+    const { data: fanData } = await supabase
+      .from('fans')
+      .select('of_username, display_name, name')
+      .eq('fan_id', fanId)
+      .eq('model_id', modelId)
+      .single()
 
-  await createNotification(
-    modelId,
-    fanId,
-    'new_tip',
-    `${fanName} (${fanId}) sent a tip! 💰`,
-    `You received a $${amount} tip!`,
-    amount,
-    { message_id: payload.id }
-  )
-  
-  await supabase.rpc('increment_fan_spent', {
-    p_fan_id: fanId,
-    p_model_id: modelId,
-    p_amount: amount
-  })
-} else {
-  const { data: fanData } = await supabase
-  .from('fans')
-  .select('of_username, display_name, name')
-  .eq('fan_id', fanId)
-  .eq('model_id', modelId)
-  .single()
-
-const fanName = fanData?.name || fanData?.display_name || fanData?.of_username || 'Fan'
-const fanTitle = `${fanName} (${fanId})`
+    const fanName = fanData?.name || fanData?.display_name || fanData?.of_username || 'Fan'
+    const fanTitle = `${fanName} (${fanId})`
     // Notificación de mensaje nuevo
-   await createNotification(
+    await createNotification(
       modelId,
       fanId,
       'new_message',
@@ -227,7 +227,7 @@ async function handleVaultContent(payload, modelId) {
 
       // Descargar desde OnlyFans CDN
       const response = await fetch(cdnUrl)
-      
+
       if (!response.ok) {
         console.error(`❌ Failed to download: ${response.status}`)
         continue
@@ -235,20 +235,20 @@ async function handleVaultContent(payload, modelId) {
 
       const arrayBuffer = await response.arrayBuffer()
       const buffer = Buffer.from(arrayBuffer)
-      
+
       console.log(`✅ Downloaded ${buffer.length} bytes`)
 
       // Determinar extensión y content type
       const ext = mediaType === 'video' ? 'mp4' : 'jpg'
       const contentType = mediaType === 'video' ? 'video/mp4' : 'image/jpeg'
-      
+
       // Generar key único para R2
       const timestamp = Date.now()
       const r2Key = `vault/${modelId}/${mediaId}_${timestamp}.${ext}`
-      
+
       // Subir a R2
       const { S3Client, PutObjectCommand } = await import('@aws-sdk/client-s3')
-      
+
       const r2Client = new S3Client({
         region: 'auto',
         endpoint: `https://${process.env.R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
@@ -269,7 +269,7 @@ async function handleVaultContent(payload, modelId) {
 
       // URL pública de R2 (permanente)
       const r2Url = `${process.env.R2_PUBLIC_URL}/${r2Key}`
-      
+
       console.log(`✅ Uploaded to R2: ${r2Url}`)
 
       // También subir thumbnail si existe
@@ -280,14 +280,14 @@ async function handleVaultContent(payload, modelId) {
           if (thumbResponse.ok) {
             const thumbBuffer = Buffer.from(await thumbResponse.arrayBuffer())
             const thumbKey = `vault/${modelId}/${mediaId}_${timestamp}_thumb.jpg`
-            
+
             await r2Client.send(new PutObjectCommand({
               Bucket: process.env.R2_BUCKET_NAME,
               Key: thumbKey,
               Body: thumbBuffer,
               ContentType: 'image/jpeg',
             }))
-            
+
             r2ThumbUrl = `${process.env.R2_PUBLIC_URL}/${thumbKey}`
             console.log(`✅ Thumbnail uploaded to R2`)
           }
@@ -329,10 +329,10 @@ async function handleVaultContent(payload, modelId) {
 // 📤 MESSAGES.SENT - Mensaje enviado por la modelo
 async function handleMessageSent(payload, modelId) {
   console.log('📤 Message sent by model')
-  
+
   // Verificar si es al vault fan
   const recipientId = payload.toUser?.id?.toString()
-  
+
   if (!recipientId) {
     console.log('⚠️ No recipient in sent message')
     return
@@ -365,30 +365,30 @@ async function handlePPVUnlocked(payload, modelId) {
   const fanId = payload.user_id?.toString()
   const messageId = payload.id?.toString()
   const price = parseFloat(payload.price || 0)
-  
+
   if (!fanId || !messageId) {
     console.log('⚠️ Missing fanId or messageId in PPV unlock')
     return
   }
 
   console.log(`💰 PPV unlocked by fan ${fanId}, message ${messageId}, price $${price}`)
-  
+
   // 1. Actualizar mensaje en chat
   const { error: chatError } = await supabase
     .from('chat')
-    .update({ 
+    .update({
       is_purchased: true,
       ppv_unlocked: true
     })
     .eq('of_message_id', messageId)
     .eq('model_id', modelId)
-  
+
   if (chatError) {
     console.error('❌ Error updating chat:', chatError)
   } else {
     console.log('✅ Chat updated: PPV unlocked')
   }
-  
+
   // 2. Guardar transacción
   const { error: txError } = await supabase
     .from('transactions')
@@ -404,13 +404,13 @@ async function handlePPVUnlocked(payload, modelId) {
         event_type: 'ppv_unlock'
       }
     })
-  
+
   if (txError) {
     console.error('❌ Error saving transaction:', txError)
   } else {
     console.log('✅ Transaction saved')
   }
-  
+
   // 3. Obtener nombre del fan para notificación
   const { data: fanData } = await supabase
     .from('fans')
@@ -418,9 +418,9 @@ async function handlePPVUnlocked(payload, modelId) {
     .eq('fan_id', fanId)
     .eq('model_id', modelId)
     .single()
-  
+
   const fanName = fanData?.name || fanData?.display_name || fanData?.of_username || 'Fan'
-  
+
   // 4. Crear notificación
   await createNotification(
     modelId,
@@ -431,25 +431,33 @@ async function handlePPVUnlocked(payload, modelId) {
     price,
     { message_id: messageId }
   )
-  
+
   // 5. Actualizar spent_total del fan
   await supabase.rpc('increment_fan_spent', {
     p_fan_id: fanId,
     p_model_id: modelId,
     p_amount: price
   })
-  
+
   console.log('✅ PPV unlock complete')
 }
 
 // 🆕 SUBSCRIPTIONS.NEW - Nueva suscripción
 async function handleNewSubscription(payload, modelId) {
   const fanId = payload.user?.id?.toString()
-  
+
   if (!fanId) return
 
-  console.log(`🆕 New subscription from fan ${fanId}`)
-    // Crear/actualizar fan en BD
+  // Obtener precio de suscripción (0 si es gratis)
+  const subscriptionPrice = parseFloat(payload.user?.subscribePrice || 0)
+  const isFreeSubscription = subscriptionPrice === 0 || payload.replacePairs?.['{PRICE}'] === 'free'
+
+  const netRevenue = subscriptionPrice
+  const grossRevenue = netRevenue > 0 ? netRevenue / 0.8 : 0
+
+  console.log(`🆕 New subscription from fan ${fanId} - ${isFreeSubscription ? 'FREE' : `$${grossRevenue}`}`)
+
+  // Crear/actualizar fan en BD
   await supabase
     .from('fans')
     .upsert({
@@ -459,17 +467,49 @@ async function handleNewSubscription(payload, modelId) {
       name: payload.user?.name || null,
       is_subscribed: true,
       subscription_active: true,
-      subscription_date: new Date().toISOString()
+      subscription_date: new Date().toISOString(),
+      subscription_price: subscriptionPrice
     }, { onConflict: 'fan_id,model_id' })
-  
+
+  // SOLO si es suscripción PAGADA, guardar transacción
+  if (!isFreeSubscription && grossRevenue > 0) {
+    // Guardar transacción
+    await supabase
+      .from('transactions')
+      .insert({
+        fan_id: fanId,
+        model_id: modelId,
+        amount: grossRevenue,
+        type: 'subscription',
+        description: 'Paid subscription',
+        detected_by: 'webhook',
+        purchase_metadata: {
+          subscription_id: payload.id,
+          subscription_price: subscriptionPrice,
+          sub_type: payload.subType
+        }
+      })
+
+    // Actualizar spent_total del fan
+    await supabase.rpc('increment_fan_spent', {
+      p_fan_id: fanId,
+      p_model_id: modelId,
+      p_amount: grossRevenue
+    })
+  }
+
+  // Crear notificación
   await createNotification(
     modelId,
     fanId,
     'new_subscription',
-    'New Subscriber! 🎉',
-    `${payload.user?.name || 'Someone'} just subscribed!`,
-    payload.price || 0,
-    { subscription_id: payload.id }
+    isFreeSubscription ? 'New Free Subscriber! 🎉' : 'New Paid Subscriber! 💰',
+    `${payload.user?.name || 'Someone'} just subscribed!${grossRevenue > 0 ? ` ($${grossRevenue})` : ' (FREE)'}`,
+    grossRevenue,
+    {
+      subscription_id: payload.id,
+      is_free: isFreeSubscription
+    }
   )
 }
 
@@ -482,16 +522,16 @@ async function handlePostLiked(payload, modelId) {
 // ⌨️ USERS.TYPING - Usuario escribiendo
 async function handleUserTyping(payload, modelId) {
   console.log('🔍 FULL PAYLOAD:', JSON.stringify(payload))
-  
+
   const fanId = payload.id?.toString() || payload.user?.id?.toString()
-  
+
   if (!fanId) {
     console.log('⚠️ No fanId - payload.user:', payload.user)
     return
   }
-  
+
   console.log(`⌨️ Fan ${fanId} is typing`)
-  
+
   try {
     const { error } = await supabase
       .from('typing_status')
@@ -501,7 +541,7 @@ async function handleUserTyping(payload, modelId) {
         is_typing: true,
         updated_at: new Date().toISOString()
       }, { onConflict: 'fan_id,model_id' })
-    
+
     if (error) {
       console.error('❌ Typing DB error:', error)
     } else {
@@ -515,10 +555,10 @@ async function handleUserTyping(payload, modelId) {
 // 🔌 ACCOUNTS.* - Eventos de cuenta
 async function handleAccountEvent(event, payload, modelId) {
   console.log(`🔌 Account event: ${event}`)
-  
+
   // Actualizar connection_status en models
   let status = 'connected'
-  
+
   if (event === 'accounts.session_expired') {
     status = 'session_expired'
   } else if (event === 'accounts.authentication_failed') {
@@ -528,15 +568,15 @@ async function handleAccountEvent(event, payload, modelId) {
   } else if (event === 'accounts.face_otp_required') {
     status = 'face_otp_required'
   }
-  
+
   await supabase
     .from('models')
-    .update({ 
+    .update({
       connection_status: status,
       last_connection_check: new Date().toISOString()
     })
     .eq('model_id', modelId)
-  
+
   console.log(`✅ Connection status updated: ${status}`)
 }
 
@@ -581,31 +621,31 @@ export default async function handler(req, res) {
     const modelId = model.model_id
 
     // Rutear eventos
-    switch(event) {
+    switch (event) {
       case 'messages.received':
         await handleMessageReceived(payload, modelId)
         break
-        
+
       case 'messages.sent':
         await handleMessageSent(payload, modelId)
         break
-        
+
       case 'messages.ppv.unlocked':
         await handlePPVUnlocked(payload, modelId)
         break
-        
+
       case 'subscriptions.new':
         await handleNewSubscription(payload, modelId)
         break
-        
+
       case 'posts.liked':
         await handlePostLiked(payload, modelId)
         break
-        
+
       case 'users.typing':
         await handleUserTyping(payload, modelId)
         break
-        
+
       case 'accounts.connected':
       case 'accounts.reconnected':
       case 'accounts.session_expired':
@@ -614,7 +654,7 @@ export default async function handler(req, res) {
       case 'accounts.face_otp_required':
         await handleAccountEvent(event, payload, modelId)
         break
-        
+
       default:
         console.log(`⚠️ Unhandled event: ${event}`)
     }
