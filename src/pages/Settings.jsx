@@ -7,6 +7,7 @@ import ReconnectAccount from '../components/ReconnectAccount'
 import ConfigTab from '../components/settings/ConfigTab'
 import TiersTab from '../components/settings/TiersTab'
 import VaultTab from '../components/settings/VaultTab'
+import SyncTab from '../components/settings/SyncTab'
 
 
 export default function Settings() {
@@ -30,7 +31,7 @@ export default function Settings() {
         .select('of_account_id, connection_status')
         .eq('model_id', modelId)
         .single()
-      
+
       if (data?.of_account_id) {
         setIsConnected(true)
         setAccountId(data.of_account_id)
@@ -45,16 +46,16 @@ export default function Settings() {
 
   const handleDisconnect = async () => {
     if (!confirm('Disconnect OnlyFans? You will need to reconnect.')) return
-    
+
     try {
       await supabase
         .from('models')
-        .update({ 
+        .update({
           of_account_id: null,
           connection_status: 'disconnected'
         })
         .eq('model_id', modelId)
-      
+
       setIsConnected(false)
       setAccountId(null)
       setConnectionStatus('disconnected')
@@ -68,7 +69,7 @@ export default function Settings() {
       <Navbar />
       <div className="min-h-screen bg-gray-50 py-8">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          
+
           {/* Header */}
           <div className="mb-8">
             <h1 className="text-3xl font-bold text-gray-900">Settings</h1>
@@ -105,6 +106,15 @@ export default function Settings() {
                   icon="🗂️"
                   label="Vault"
                 />
+                <button
+                  onClick={() => setActiveTab('sync')}
+                  className={`px-6 py-3 rounded-lg font-semibold transition-all ${activeTab === 'sync'
+                      ? 'bg-orange-500 text-white'
+                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    }`}
+                >
+                  🔄 Sync
+                </button>
               </nav>
             </div>
 
@@ -127,7 +137,7 @@ export default function Settings() {
                           Account ID: {accountId}
                         </p>
                       </div>
-                      <button 
+                      <button
                         onClick={handleDisconnect}
                         className="px-6 py-3 border-2 border-red-500 text-red-500 bg-white rounded-lg font-semibold hover:bg-red-50 transition-colors"
                       >
@@ -137,7 +147,7 @@ export default function Settings() {
                   </div>
                 ) : isConnected && connectionStatus === 'disconnected' ? (
                   <div>
-                    <ReconnectAccount 
+                    <ReconnectAccount
                       modelId={modelId}
                       onSuccess={(accId) => {
                         setAccountId(accId)
@@ -147,7 +157,7 @@ export default function Settings() {
                     />
                   </div>
                 ) : (
-                  <ConnectOnlyFans 
+                  <ConnectOnlyFans
                     modelId={modelId}
                     onSuccess={(accId) => {
                       setIsConnected(true)
@@ -160,6 +170,7 @@ export default function Settings() {
               {activeTab === 'config' && <ConfigTab modelId={modelId} />}
               {activeTab === 'tiers' && <TiersTab modelId={modelId} />}
               {activeTab === 'vault' && <VaultTab modelId={modelId} />}
+              {activeTab === 'sync' && <SyncTab modelId={modelId} />}
             </div>
           </div>
         </div>
@@ -173,11 +184,10 @@ function TabButton({ active, onClick, icon, label }) {
   return (
     <button
       onClick={onClick}
-      className={`px-6 py-4 text-sm font-medium border-b-2 transition-colors ${
-        active
+      className={`px-6 py-4 text-sm font-medium border-b-2 transition-colors ${active
           ? 'border-indigo-600 text-indigo-600'
           : 'border-transparent text-gray-600 hover:text-gray-900 hover:border-gray-300'
-      }`}
+        }`}
     >
       {icon} {label}
     </button>
