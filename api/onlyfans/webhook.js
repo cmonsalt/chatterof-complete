@@ -483,7 +483,7 @@ async function handlePostLiked(payload, modelId) {
 async function handleUserTyping(payload, modelId) {
   console.log('🔍 FULL PAYLOAD:', JSON.stringify(payload))
   
-  const fanId = payload.user?.id?.toString()
+  const fanId = payload.id?.toString() || payload.user?.id?.toString()
   
   if (!fanId) {
     console.log('⚠️ No fanId - payload.user:', payload.user)
