@@ -459,12 +459,12 @@ async function handleRegenerateAI() {
     try {
       const { error } = await supabase
         .from('fans')
-        .update({ nickname: nicknameValue })
+        .update({ display_name: nicknameValue })
         .eq('fan_id', fanId)
         .eq('model_id', modelId || user?.user_metadata?.model_id);
 
       if (error) throw error;
-      setFan(prev => ({ ...prev, nickname: nicknameValue }));
+      setFan(prev => ({ ...prev, display_name: nicknameValue }));
       setEditingNickname(false);
     } catch (error) {
       console.error('Error saving nickname:', error);
@@ -530,7 +530,7 @@ async function handleRegenerateAI() {
                 <div>
                   <div className="flex items-center gap-3">
                     <h1 className="text-2xl font-bold text-gray-800">
-                      {fan.nickname || fan.of_username || 'Fan'}
+                      {fan.display_name || fan.of_username || 'Fan'}
                     </h1>
                     <span className={`px-3 py-1 rounded-full text-sm font-semibold ${tierInfo.color}`}>
                       {tierInfo.emoji} {tierInfo.label}
@@ -754,7 +754,7 @@ async function handleRegenerateAI() {
                         <button
                           onClick={() => {
                             setEditingNickname(false);
-                            setNicknameValue(fan.nickname || '');
+                            setNicknameValue(fan.display_name || '');
                           }}
                           className="flex-1 px-3 py-1 bg-gray-200 text-gray-700 rounded text-sm hover:bg-gray-300"
                         >
@@ -766,11 +766,11 @@ async function handleRegenerateAI() {
                     <div
                       onClick={() => {
                         setEditingNickname(true);
-                        setNicknameValue(fan.nickname || '');
+                        setNicknameValue(fan.display_name || '');
                       }}
                       className="px-3 py-2 bg-gray-50 border rounded text-sm cursor-pointer hover:bg-gray-100"
                     >
-                      {fan.nickname || 'Click to add nickname...'}
+                      {fan.display_name || 'Click to add nickname...'}
                     </div>
                   )}
                 </div>
