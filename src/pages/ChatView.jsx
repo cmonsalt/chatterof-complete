@@ -887,24 +887,15 @@ async function handleConsultarIA() {
 </div>
 
 {/* Actions */}
-<div className="flex gap-3 pt-4">
-  <button
-    onClick={handleRegenerateAI}
-    disabled={aiGenerating}
-    className="px-6 py-3 bg-purple-500 text-white rounded-lg hover:bg-purple-600 font-semibold transition-all disabled:opacity-50"
-  >
-    {aiGenerating ? '⏳ Regenerating...' : '🔄 Regenerate'}
-  </button>
-  
-  <button
-    onClick={handleUseAISuggestion}
-    className="flex-1 px-6 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 font-semibold transition-all"
-  >
-    📝 Use Message
-  </button>
-
-                {/* Actions */}
                 <div className="flex gap-3 pt-4">
+                  <button
+                    onClick={handleRegenerateAI}
+                    disabled={aiGenerating}
+                    className="px-6 py-3 bg-purple-500 text-white rounded-lg hover:bg-purple-600 font-semibold transition-all disabled:opacity-50"
+                  >
+                    {aiGenerating ? '⏳ Regenerating...' : '🔄 Regenerate'}
+                  </button>
+                  
                   <button
                     onClick={handleUseAISuggestion}
                     className="flex-1 px-6 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 font-semibold transition-all"
