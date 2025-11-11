@@ -244,37 +244,6 @@ async function handleConsultarIA() {
   }
 }
 
-async function handleRegenerateAI() {
-  const currentModelId = modelId || user?.user_metadata?.model_id;
-  if (!currentModelId || !fan) return;
-  
-  setAiGenerating(true);
-  
-  try {
-    const response = await fetch('/api/ai-suggest', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        fan_id: fan.fan_id,
-        model_id: currentModelId,
-        extra_instructions: aiExtraInstructions
-      })
-    });
-
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.error);
-    }
-
-    const data = await response.json();
-    setAiSuggestion(data.suggestion);
-    setAiGenerating(false);
-  } catch (error) {
-    console.error('AI Error:', error);
-    alert('Error: ' + error.message);
-    setAiGenerating(false);
-  }
-}
   // 🤖 Handle using AI suggestion
   function handleUseAISuggestion() {
     if (aiSuggestion?.message) {
