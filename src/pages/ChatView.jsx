@@ -56,6 +56,32 @@ export default function ChatView({ embedded = false }) {
 
   const [aiSuggestionForPPV, setAISuggestionForPPV] = useState(null);
 
+  const [fanIsTyping, setFanIsTyping] = useState(false)
+  useEffect(() => {
+  if (!fanId || !modelId) return
+
+  // Suscribirse a cambios de typing
+  const channel = supabase
+    .channel(`typing:${modelId}:${fanId}`)
+    .on(
+      'postgres_changes',
+      {
+        event: '*',
+        schema: 'public',
+        table: 'typing_status',
+        filter: `fan_id=eq.${fanId}`
+      },
+      (payload) => {
+        setFanIsTyping(payload.new?.is_typing || false)
+      }
+    )
+    .subscribe()
+
+  return () => {
+    supabase.removeChannel(channel)
+  }
+}, [fanId, modelId])
+
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
@@ -706,12 +732,24 @@ async function handleRegenerateAI() {
                   </button>
 
                   <button
-                    onClick={enviarMensaje}
-                    disabled={!newMessage.trim() || sending}
-                    className="px-6 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 font-semibold disabled:opacity-50 disabled:cursor-not-allowed transition-all"
-                  >
-                    {sending ? '⏳' : 'Send'}
-                  </button>
+  onClick={enviarMensaje}
+  disabled={sending || !newMessage.trim()}
+  className="..."
+>
+  {sending ? 'Enviando...' : 'Enviar'}
+</button>
+
+{/* 👇 AGREGAR ESTO AQUÍ 👇 */}
+{fanIsTyping && (
+  <div className="px-4 py-2 text-sm text-gray-500 italic flex items-center gap-2">
+    <div className="flex gap-1">
+      <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></span>
+      <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></span>
+      <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></span>
+    </div>
+    Fan escribiendo...
+  </div>
+)}
                 </div>
               </div>
             </div>
