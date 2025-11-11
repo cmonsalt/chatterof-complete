@@ -188,6 +188,45 @@ export default async function handler(req, res) {
 
     console.log(`[Setup] Initial setup complete!`)
 
+    // STEP 4: Auto-crear tiers default
+    const { data: existingTiers } = await supabase
+      .from('tiers')
+      .select('id')
+      .eq('model_id', modelId)
+      .limit(1)
+
+    if (!existingTiers || existingTiers.length === 0) {
+      console.log('[Setup] Creating default tiers...')
+      
+      await supabase
+        .from('tiers')
+        .insert([
+          {
+            model_id: modelId,
+            name: 'FREE',
+            min_spent: 0,
+            max_spent: 19,
+            price_multiplier: 1.0
+          },
+          {
+            model_id: modelId,
+            name: 'VIP',
+            min_spent: 20,
+            max_spent: 499,
+            price_multiplier: 1.5
+          },
+          {
+            model_id: modelId,
+            name: 'WHALE',
+            min_spent: 500,
+            max_spent: 999999,
+            price_multiplier: 2.0
+          }
+        ])
+      
+      console.log('[Setup] ✅ Default tiers created')
+    }
+
     return res.status(200).json({
       success: true,
       totalFans,
