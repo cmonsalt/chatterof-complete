@@ -57,7 +57,7 @@ export default function ChatView({ embedded = false }) {
   const [aiSuggestionForPPV, setAISuggestionForPPV] = useState(null);
 
   const [fanIsTyping, setFanIsTyping] = useState(false)
-  useEffect(() => {
+ useEffect(() => {
   if (!fanId || !modelId) return
 
   // Suscribirse a cambios de typing
@@ -72,13 +72,27 @@ export default function ChatView({ embedded = false }) {
         filter: `fan_id=eq.${fanId}`
       },
       (payload) => {
-        setFanIsTyping(payload.new?.is_typing || false)
+        const typingData = payload.new
+        if (!typingData) return
+        
+        // Verificar si el timestamp es reciente (menos de 3 segundos)
+        const updatedAt = new Date(typingData.updated_at)
+        const now = new Date()
+        const secondsAgo = (now - updatedAt) / 1000
+        
+        setFanIsTyping(typingData.is_typing && secondsAgo < 3)
       }
     )
     .subscribe()
 
+  // Limpiar typing indicator cada segundo
+  const interval = setInterval(() => {
+    setFanIsTyping(false)
+  }, 3000)
+
   return () => {
     supabase.removeChannel(channel)
+    clearInterval(interval)
   }
 }, [fanId, modelId])
 
