@@ -797,7 +797,7 @@ async function handleRegenerateAI() {
                 </div>
 
                 {/* Chatter Tips */}
-                {/* <div>
+                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-2">
                     💡 Chatter Tips
                   </label>
@@ -815,7 +815,7 @@ async function handleRegenerateAI() {
                   >
                     {savingNotes ? 'Saving...' : '💾 Save Tips'}
                   </button>
-                </div>*/}
+                </div>
               </div>
             )}
           </div>
