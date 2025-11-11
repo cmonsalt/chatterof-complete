@@ -77,35 +77,45 @@ export default function TiersTab({ modelId }) {
   }
 }
 
-  const handleSaveTierRules = async () => {
-    setSaving(true)
-    setMessage(null)
+ const handleSaveTierRules = async () => {
+  // Confirmar con el usuario
+  const confirmed = window.confirm(
+    '⚠️ This will recalculate ALL fan tiers. This may take several minutes.\n\nDo you want to continue?'
+  )
+  
+  if (!confirmed) return
 
-    try {
-      for (const tier of tierRules) {
-        const { error } = await supabase
-          .from('tier_rules')
-          .update({
-            min_spent: tier.min_spent,
-            max_spent: tier.max_spent,
-            price_multiplier: tier.price_multiplier
-          })
-          .eq('id', tier.id)
+  setSaving(true)
+  setMessage({ type: 'info', text: '⏳ Saving tier rules and recalculating all fans... This may take several minutes. Please wait.' })
 
-        if (error) throw error
-      }
+  try {
+    // 1. Guardar los rangos
+    for (const tier of tierRules) {
+      const { error } = await supabase
+        .from('tier_rules')
+        .update({
+          min_spent: tier.min_spent,
+          max_spent: tier.max_spent,
+          price_multiplier: tier.price_multiplier
+        })
+        .eq('id', tier.id)
 
-      await recalculateAllFanTiers()
-
-      setMessage({ type: 'success', text: '✅ Tier rules saved!' })
-    } catch (error) {
-      console.error('Error saving tier rules:', error)
-      setMessage({ type: 'error', text: '❌ Error saving tier rules' })
-    } finally {
-      setSaving(false)
-      setTimeout(() => setMessage(null), 3000)
+      if (error) throw error
     }
+
+    // 2. Recalcular TODOS los fans con los nuevos rangos
+    setMessage({ type: 'info', text: '⏳ Recalculating fan tiers... Please wait.' })
+    await recalculateAllFanTiers()
+
+    setMessage({ type: 'success', text: '✅ Tier rules saved and all fans recalculated!' })
+  } catch (error) {
+    console.error('Error saving tier rules:', error)
+    setMessage({ type: 'error', text: '❌ Error saving tier rules' })
+  } finally {
+    setSaving(false)
+    setTimeout(() => setMessage(null), 5000)
   }
+}
 
   if (loading) {
     return (
@@ -128,14 +138,16 @@ export default function TiersTab({ modelId }) {
       </div>
 
       {message && (
-        <div className={`mb-6 p-4 rounded-lg ${
-          message.type === 'success' 
-            ? 'bg-green-50 text-green-800 border border-green-200' 
-            : 'bg-red-50 text-red-800 border border-red-200'
-        }`}>
-          {message.text}
-        </div>
-      )}
+  <div className={`mb-6 p-4 rounded-lg ${
+    message.type === 'success' 
+      ? 'bg-green-50 text-green-800 border border-green-200' 
+      : message.type === 'info'
+      ? 'bg-blue-50 text-blue-800 border border-blue-200'
+      : 'bg-red-50 text-red-800 border border-red-200'
+  }`}>
+    {message.text}
+  </div>
+)}
 
       <div className="space-y-4">
         {tierRules.map((rule) => (
