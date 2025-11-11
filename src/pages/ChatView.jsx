@@ -734,7 +734,7 @@ async function handleRegenerateAI() {
                   <button
   onClick={enviarMensaje}
   disabled={sending || !newMessage.trim()}
-  className="..."
+  className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 font-semibold transition-all disabled:opacity-50"
 >
   {sending ? 'Enviando...' : 'Enviar'}
 </button>
