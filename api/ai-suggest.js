@@ -6,7 +6,7 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' })
   }
 
-  const { fan_id, model_id } = req.body
+  const { fan_id, model_id, extra_instructions = '' } = req.body
 
   if (!fan_id || !model_id) {
     return res.status(400).json({ error: 'fan_id and model_id required' })
@@ -142,8 +142,11 @@ export default async function handler(req, res) {
       .join('\n')
 
     // 11. Crear prompt para Claude
-    const prompt = `You are an AI assistant helping an OnlyFans chatter respond to a fan. 
-    ${extra_instructions ? `\n🎯 CHATTER'S ADDITIONAL CONTEXT:\n${extra_instructions}\n` : ''}
+   const extraContext = extra_instructions && extra_instructions.trim() 
+  ? `\n🎯 CHATTER'S ADDITIONAL CONTEXT:\n${extra_instructions}\n` 
+  : '';
+
+  const prompt = `You are an AI assistant helping an OnlyFans chatter respond to a fan.${extraContext}
 
 FAN INFO:
 - Username: ${fan.of_username || 'Anonymous'}
