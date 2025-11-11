@@ -173,6 +173,12 @@ export default async function handler(req, res) {
     const tierNames = { 0: 'FREE', 1: 'VIP', 2: 'WHALE' }
     const tierName = tierNames[fan.tier] || 'FREE'
 
+    // 11.5. Calcular tiempo desde último mensaje
+    const lastMsgDate = messages.length > 0 ? messages[0]?.ts : null
+    const daysSinceLastMsg = lastMsgDate 
+      ? Math.floor((Date.now() - new Date(lastMsgDate)) / (1000 * 60 * 60 * 24))
+      : 999
+
     // 12. Construir historial de chat CON indicadores de compra
     const chatHistory = messages
       .reverse()
@@ -227,6 +233,25 @@ Chatter Tips: ${fan.chatter_notes || 'None yet'}
 
 Subscription: ${fan.subscription_active ? '✅ Active' : '❌ Inactive'}
 Last Seen: ${fan.last_seen || 'Unknown'}
+
+═══════════════════════════════════════════════════
+⏰ CONVERSATION RECENCY
+═══════════════════════════════════════════════════
+Days since last message: ${daysSinceLastMsg} days
+
+REACTIVATION STRATEGY:
+- 0-1 days: Continue natural conversation flow
+- 2-3 days: Light reactivation - "Hey baby! How's it going? 😘"
+- 4-7 days: Acknowledge the gap - "Hey love! Been thinking about you 💕 How have you been?"
+- 8-14 days: Warmer reactivation - "Baby! I've missed you 😘 How's everything?"
+- 15-30 days: Clear acknowledgment - "Hey stranger! 😏 It's been a while... miss chatting with you 💕"
+- 30+ days: Strong reactivation - "Omg hey! Long time no talk! How have you been baby? 😘"
+
+If conversation is OLD (7+ days):
+• Start with reactivation message first
+• Build connection before offering content
+• Ask how they've been, show you missed them
+• Wait 2-3 messages before any PPV offer
 
 ═══════════════════════════════════════════════════
 💬 RECENT CHAT HISTORY
