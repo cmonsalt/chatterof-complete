@@ -223,7 +223,7 @@ async function handleConsultarIA() {
       body: JSON.stringify({
         fan_id: fan.fan_id,
         model_id: currentModelId,
-        extra_instructions: aiExtraInstructions
+        extra_instructions: aiExtraInstructions || ''
       })
     });
 
