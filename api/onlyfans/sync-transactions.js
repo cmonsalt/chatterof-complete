@@ -1,19 +1,19 @@
 import { createClient } from '@supabase/supabase-js'
 
 const supabase = createClient(
-  process.env.SUPABASE_URL,
-  process.env.SUPABASE_ANON_KEY
+  process.env.NEXT_PUBLIC_SUPABASE_URL,
+  process.env.SUPABASE_SERVICE_ROLE_KEY
 )
 
 export default async function handler(req, res) {
-  if (req.method !== 'GET') {
+  if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' })
   }
 
-  const { accountId, limit = 100 } = req.query
+  const { accountId, modelId, startDate, marker } = req.body
 
   if (!accountId) {
-    return res.status(400).json({ error: 'accountId is required' })
+    return res.status(400).json({ error: 'accountId required' })
   }
 
   try {
@@ -23,96 +23,151 @@ export default async function handler(req, res) {
       throw new Error('ONLYFANS_API_KEY not configured')
     }
 
-    // Get model_id from account_id
-    const { data: model, error: modelError } = await supabase
-      .from('models')
-      .select('model_id')
-      .eq('of_account_id', accountId)
-      .single()
+    // If modelId not provided, get it from accountId
+    let finalModelId = modelId
+    if (!finalModelId) {
+      const { data: model, error: modelError } = await supabase
+        .from('models')
+        .select('model_id')
+        .eq('of_account_id', accountId)
+        .single()
 
-    if (modelError || !model) {
-      throw new Error('Model not found for this account')
+      if (modelError || !model) {
+        throw new Error('Model not found for this account')
+      }
+
+      finalModelId = model.model_id
     }
 
-    const modelId = model.model_id
+    let synced = 0
+    let skipped = 0
+    const limit = 50
+    let creditsUsed = 0
 
-    // Fetch transactions from OnlyFans API
-    const response = await fetch(
-      `https://app.onlyfansapi.com/api/${accountId}/transactions?limit=${limit}`,
-      {
-        headers: {
-          'Authorization': `Bearer ${API_KEY}`
-        }
-      }
-    )
+    // Build URL with optional parameters
+    let url = `https://app.onlyfansapi.com/api/${accountId}/transactions?limit=${limit}`
+    if (startDate) url += `&startDate=${encodeURIComponent(startDate)}`
+    if (marker) url += `&marker=${marker}`
+
+    console.log(`🔄 Syncing transactions from OnlyFans...`)
+
+    // Fetch transactions from OnlyFans
+    const response = await fetch(url, {
+      headers: { 'Authorization': `Bearer ${API_KEY}` }
+    })
 
     if (!response.ok) {
       const errorText = await response.text()
+      
+      // If auth error, mark as disconnected
+      if (response.status === 401 || response.status === 403) {
+        await supabase
+          .from('models')
+          .update({ connection_status: 'disconnected' })
+          .eq('model_id', modelId)
+        
+        return res.status(401).json({
+          error: 'Authentication failed',
+          needsReauth: true,
+          message: 'Account needs re-authorization'
+        })
+      }
+      
       throw new Error(`OnlyFans API error: ${response.status} - ${errorText}`)
     }
 
-    const data = await response.json()
-    const transactions = data.list || data.transactions || []
+    const responseData = await response.json()
+    
+    const transactions = responseData.data?.list || []
+    const hasMore = responseData.data?.hasMore || false
+    const nextMarker = responseData.data?.nextMarker
+    creditsUsed = responseData._meta?._credits?.used || 1
 
-    let synced = 0
+    console.log(`📊 Fetched ${transactions.length} transactions, hasMore: ${hasMore}`)
 
-    for (const txn of transactions) {
-      // Determine transaction type
-      let type = 'compra'
-      if (txn.type === 'tip') type = 'tip'
-      if (txn.type === 'subscription') type = 'suscripcion'
-
-      const txnData = {
-        fan_id: txn.user?.id?.toString() || 'unknown',
-        type,
-        amount: parseFloat(txn.amount || 0),
-        model_id: modelId,
-        created_at: txn.createdAt || new Date().toISOString(),
-        description: txn.description || txn.text || '',
-        of_transaction_id: txn.id?.toString(),
-        payment_method: txn.paymentType || 'locked_content',
-        detected_by: 'api_sync'
+    for (const tx of transactions) {
+      const ofTxId = tx.id
+      const fanId = tx.user?.id?.toString()
+      
+      if (!fanId || !ofTxId) {
+        console.warn('⚠️ Missing fanId or transaction ID:', tx)
+        continue
       }
 
-      const { error } = await supabase
+      // Check if transaction already exists
+      const { data: existing } = await supabase
         .from('transactions')
-        .upsert(txnData, { onConflict: 'of_transaction_id' })
+        .select('id')
+        .eq('of_transaction_id', ofTxId)
+        .single()
 
-      if (!error) synced++
-
-      // Update fan spent_total
-      if (txn.user?.id) {
-        await supabase.rpc('increment_fan_spent', {
-          p_fan_id: txn.user.id.toString(),
-          p_amount: parseFloat(txn.amount || 0)
-        }).catch(() => {
-          // If RPC doesn't exist, do manual update
-          supabase
-            .from('fans')
-            .select('spent_total')
-            .eq('fan_id', txn.user.id.toString())
-            .single()
-            .then(({ data: fan }) => {
-              if (fan) {
-                supabase
-                  .from('fans')
-                  .update({ spent_total: (fan.spent_total || 0) + parseFloat(txn.amount || 0) })
-                  .eq('fan_id', txn.user.id.toString())
-              }
-            })
-        })
+      if (existing) {
+        skipped++
+        continue // Already exists, skip
       }
+
+      // Determine transaction type from description
+      const description = tx.description || ''
+      let type = 'compra' // default
+      
+      if (description.includes('Subscription') || description.includes('Recurring subscription')) {
+        type = 'suscripcion'
+      } else if (description.includes('Tip')) {
+        type = 'tip'
+      } else if (description.includes('Payment for message')) {
+        type = 'compra' // PPV
+      }
+
+      // Calculate gross revenue (API returns gross as "amount")
+      const grossAmount = parseFloat(tx.amount || 0)
+      const netAmount = parseFloat(tx.net || 0)
+
+      // Insert transaction
+      const { error: txError } = await supabase
+        .from('transactions')
+        .insert({
+          of_transaction_id: ofTxId,
+          fan_id: fanId,
+          model_id: modelId,
+          amount: grossAmount,
+          type: type,
+          description: description.replace(/<[^>]*>/g, ''), // Strip HTML tags
+          created_at: tx.createdAt,
+          detected_by: 'sync',
+          purchase_metadata: {
+            net_amount: netAmount,
+            fee: parseFloat(tx.fee || 0),
+            status: tx.status,
+            currency: tx.currency
+          }
+        })
+
+      if (txError) {
+        console.error('❌ Error inserting transaction:', ofTxId, txError)
+        continue
+      }
+
+      synced++
+
+      // Note: spent_total is auto-updated by trigger "trigger_recalculate_spent_total"
+      // No need to manually call increment_fan_spent
     }
+
+    console.log(`✅ Sync complete: ${synced} new, ${skipped} skipped`)
 
     return res.status(200).json({
       success: true,
       synced,
+      skipped,
       total: transactions.length,
-      message: `Synced ${synced} transactions successfully`
+      hasMore,
+      nextMarker,
+      creditsUsed,
+      message: `Synced ${synced} new transactions (${skipped} already existed)`
     })
 
   } catch (error) {
-    console.error('Sync transactions error:', error)
+    console.error('❌ Sync transactions error:', error)
     return res.status(500).json({
       error: 'Failed to sync transactions',
       details: error.message
