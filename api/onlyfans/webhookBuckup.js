@@ -68,39 +68,6 @@ async function handleMessageReceived(payload, modelId) {
   const tipAmount = payload.fanData?.spending?.tips || 0
   const hasTip = tipAmount > 0 
   
-  // Asegurar que el fan existe (crear si no existe)
-  const { data: existingFan } = await supabase
-    .from('fans')
-    .select('fan_id')
-    .eq('fan_id', fanId)
-    .eq('model_id', modelId)
-    .single()
-  
-  if (!existingFan) {
-    console.log(`⚠️ Fan ${fanId} not found, creating...`)
-    
-    const { error: fanCreateError } = await supabase
-      .from('fans')
-      .insert({
-        fan_id: fanId,
-        model_id: modelId,
-        of_username: payload.fromUser?.username || `u${fanId}`,
-        display_name: payload.fromUser?.name || null,
-        tier: 0,
-        spent_total: 0,
-        gross_revenue: 0,
-        net_revenue: 0,
-        is_subscribed: false
-      })
-    
-    if (fanCreateError) {
-      console.error('❌ Error creating fan:', fanCreateError)
-      return
-    }
-    
-    console.log(`✅ Fan ${fanId} created automatically`)
-  }
-  
   // Guardar mensaje
   const messageData = {
     of_message_id: payload.id?.toString(),
