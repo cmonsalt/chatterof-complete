@@ -481,21 +481,35 @@ async function handlePostLiked(payload, modelId) {
 
 // ⌨️ USERS.TYPING - Usuario escribiendo
 async function handleUserTyping(payload, modelId) {
+  console.log('🔍 FULL PAYLOAD:', JSON.stringify(payload))
+  
   const fanId = payload.user?.id?.toString()
   
-  if (!fanId) return
+  if (!fanId) {
+    console.log('⚠️ No fanId - payload.user:', payload.user)
+    return
+  }
   
   console.log(`⌨️ Fan ${fanId} is typing`)
   
-  // Actualizar estado de typing con timestamp
-  await supabase
-    .from('typing_status')
-    .upsert({
-      fan_id: fanId,
-      model_id: modelId,
-      is_typing: true,
-      updated_at: new Date().toISOString()
-    }, { onConflict: 'fan_id,model_id' })
+  try {
+    const { error } = await supabase
+      .from('typing_status')
+      .upsert({
+        fan_id: fanId,
+        model_id: modelId,
+        is_typing: true,
+        updated_at: new Date().toISOString()
+      }, { onConflict: 'fan_id,model_id' })
+    
+    if (error) {
+      console.error('❌ Typing DB error:', error)
+    } else {
+      console.log('✅ Typing saved to DB')
+    }
+  } catch (err) {
+    console.error('❌ Typing exception:', err)
+  }
 }
 
 // 🔌 ACCOUNTS.* - Eventos de cuenta
