@@ -487,7 +487,7 @@ async function handleUserTyping(payload, modelId) {
   
   console.log(`⌨️ Fan ${fanId} is typing`)
   
-  // Actualizar estado de typing
+  // Actualizar estado de typing con timestamp
   await supabase
     .from('typing_status')
     .upsert({
@@ -496,15 +496,6 @@ async function handleUserTyping(payload, modelId) {
       is_typing: true,
       updated_at: new Date().toISOString()
     }, { onConflict: 'fan_id,model_id' })
-  
-  // Auto-limpiar después de 3 segundos
-  setTimeout(async () => {
-    await supabase
-      .from('typing_status')
-      .update({ is_typing: false })
-      .eq('fan_id', fanId)
-      .eq('model_id', modelId)
-  }, 3000)
 }
 
 // 🔌 ACCOUNTS.* - Eventos de cuenta
