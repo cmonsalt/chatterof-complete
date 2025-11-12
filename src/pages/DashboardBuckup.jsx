@@ -45,6 +45,7 @@ export default function Dashboard() {
         .from('fans')
         .select('*')
         .eq('model_id', actualModelId)
+        .range(0, 9999)
         .order('last_message_date', { ascending: false, nullsFirst: false })
 
       if (fansError) throw fansError
@@ -93,6 +94,9 @@ export default function Dashboard() {
 
       const activeFans = fansWithLastMessage.filter(f => f.isActive)
 
+      console.log('📊 FANS CARGADOS:', fansWithLastMessage.length)
+      console.log('📊 FANS DATA:', fansData?.length)
+
       setStats({
         hoy: 0,
         chats: activeFans.length,
@@ -122,6 +126,13 @@ export default function Dashboard() {
       fan.fan_id?.toLowerCase().includes(searchQuery.toLowerCase()) ||
       fan.display_name?.toLowerCase().includes(searchQuery.toLowerCase())
     )
+
+  // Contar fans por tier (todos, no filtrados)
+  const tierCounts = {
+    new: fans.filter(f => f.tier === 0).length,
+    vip: fans.filter(f => f.tier === 1).length,
+    whale: fans.filter(f => f.tier === 2).length
+  }
 
   const getTimeText = (fan) => {
     if (!fan.lastMessageTime) return 'No messages'
@@ -274,7 +285,7 @@ export default function Dashboard() {
                       : 'text-gray-600 hover:text-gray-900'
                       }`}
                   >
-                    🆕 New
+                    🆕 New ({tierCounts.new})
                   </button>
                   <button
                     onClick={() => {
@@ -282,11 +293,11 @@ export default function Dashboard() {
                       setShowActiveOnly(false)
                     }}
                     className={`px-3 py-1.5 rounded-md text-sm font-medium transition ${selectedTier === 1
-                        ? 'bg-white shadow text-blue-600 border border-blue-200'
-                        : 'text-gray-600 hover:text-gray-900'
+                      ? 'bg-white shadow text-blue-600 border border-blue-200'
+                      : 'text-gray-600 hover:text-gray-900'
                       }`}
                   >
-                    💎 VIP
+                    💎 VIP ({tierCounts.vip})
                   </button>
 
                   <button
@@ -295,11 +306,11 @@ export default function Dashboard() {
                       setShowActiveOnly(false)
                     }}
                     className={`px-3 py-1.5 rounded-md text-sm font-medium transition ${selectedTier === 2
-                        ? 'bg-white shadow text-purple-600 border border-purple-200'
-                        : 'text-gray-600 hover:text-gray-900'
+                      ? 'bg-white shadow text-purple-600 border border-purple-200'
+                      : 'text-gray-600 hover:text-gray-900'
                       }`}
                   >
-                    🐋 Whale
+                    🐋 Whale ({tierCounts.whale})
                   </button>
                 </div>
               </div>
