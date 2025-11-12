@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
+import { deleteFromR2 } from '../../lib/cloudflare'
 
 export default function InboxView({ modelId }) {
   const [allContent, setAllContent] = useState([])
@@ -31,52 +32,47 @@ export default function InboxView({ modelId }) {
   }
 
   const handleDelete = async (item) => {
-  if (!confirm(`¿Eliminar "${item.title}" permanentemente? Esta acción no se puede deshacer y lo quitará de Sessions/Singles también.`)) {
-    return
-  }
-
-  try {
-    console.log('🗑️ Deleting:', item.id, item.title)
-
-    // PASO 1: Borrar de Cloudflare R2 (si existe)
-    if (item.r2_file_key) {
-      console.log('🗑️ Deleting from R2:', item.r2_file_key)
-      const r2Success = await deleteFromR2(item.r2_file_key)
-      if (r2Success) {
-        console.log('✅ Deleted from R2')
-      } else {
-        console.warn('⚠️ Could not delete from R2, continuing...')
-      }
+    if (!confirm(`¿Eliminar "${item.title}" permanentemente? Esta acción no se puede deshacer y lo quitará de Sessions/Singles también.`)) {
+      return
     }
 
-    // PASO 2: Borrar de base de datos
-    const { error } = await supabase
-      .from('catalog')
-      .delete()
-      .eq('id', item.id)
+    try {
+      console.log('🗑️ Deleting:', item.id, item.title)
 
-    if (error) throw error
+      // PASO 1: Borrar de Cloudflare R2 (si existe)
+      if (item.r2_file_key) {
+        console.log('🗑️ Deleting from R2:', item.r2_file_key)
+        await deleteFromR2(item.r2_file_key)
+      }
 
-    console.log('✅ Deleted from database')
-    alert('✅ Eliminado permanentemente (BD + R2)')
-    loadAllContent()
+      // PASO 2: Borrar de base de datos
+      const { error } = await supabase
+        .from('catalog')
+        .delete()
+        .eq('id', item.id)
 
-  } catch (error) {
-    console.error('❌ Error deleting:', error)
-    alert('❌ Error: ' + error.message)
+      if (error) throw error
+
+      console.log('✅ Deleted from database')
+      alert('✅ Eliminado permanentemente (BD + R2)')
+      loadAllContent()
+
+    } catch (error) {
+      console.error('❌ Error deleting:', error)
+      alert('❌ Error: ' + error.message)
+    }
   }
-}
 
   const getItemBadges = (item) => {
     const badges = []
-    
+
     if (item.session_id) {
       badges.push({
         label: '📁 Session',
         color: 'bg-purple-100 text-purple-800'
       })
     }
-    
+
     if (item.is_single) {
       badges.push({
         label: '💎 Single',
@@ -94,11 +90,11 @@ export default function InboxView({ modelId }) {
     return badges
   }
 
-  const filteredContent = searchTerm 
-    ? allContent.filter(item => 
-        item.title?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        item.keywords?.some(k => k.toLowerCase().includes(searchTerm.toLowerCase()))
-      )
+  const filteredContent = searchTerm
+    ? allContent.filter(item =>
+      item.title?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      item.keywords?.some(k => k.toLowerCase().includes(searchTerm.toLowerCase()))
+    )
     : allContent
 
   if (loading) {
@@ -114,7 +110,7 @@ export default function InboxView({ modelId }) {
 
   return (
     <div className="space-y-6">
-      
+
       {/* Header */}
       <div className="bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg p-6 border border-blue-200">
         <div className="flex items-start justify-between mb-4">
@@ -173,14 +169,14 @@ export default function InboxView({ modelId }) {
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
           {filteredContent.map(item => {
             const badges = getItemBadges(item)
-            
+
             return (
               <div
                 key={item.id}
                 className="relative border-2 border-gray-200 rounded-lg overflow-hidden hover:shadow-lg hover:border-gray-300 transition-all group"
               >
                 {/* Thumbnail */}
-                <div 
+                <div
                   className="aspect-square bg-gray-100 cursor-pointer"
                   onClick={() => setPreviewMedia(item)}
                 >
@@ -285,7 +281,7 @@ function MediaPreviewModal({ media, onClose, onDelete }) {
   return (
     <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl max-h-[85vh] overflow-hidden flex flex-col">
-        
+
         <div className="bg-gradient-to-r from-blue-600 to-purple-600 text-white p-4 flex items-center justify-between">
           <div>
             <h3 className="text-lg font-bold">{media.title || 'Preview'}</h3>
