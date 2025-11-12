@@ -420,7 +420,7 @@ export default function Dashboard() {
                             )
                           })()}
                           <span className="font-semibold text-green-600">
-                            ${fan.spent_total || 0}
+                            ${(fan.spent_total || 0).toFixed(2)}
                           </span>
                           <span className="text-gray-400">•</span>
                           <span>{getTimeText(fan)}</span>
