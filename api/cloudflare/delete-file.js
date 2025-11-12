@@ -1,13 +1,17 @@
 import { S3Client, DeleteObjectCommand } from '@aws-sdk/client-s3'
 
+// Construir endpoint desde ACCOUNT_ID si R2_ENDPOINT no está definido
+const r2Endpoint = process.env.R2_ENDPOINT || 
+  `https://${process.env.R2_ACCOUNT_ID}.r2.cloudflarestorage.com`
+
 const r2 = new S3Client({
   region: 'auto',
-  endpoint: process.env.R2_ENDPOINT,
+  endpoint: r2Endpoint,
   credentials: {
     accessKeyId: process.env.R2_ACCESS_KEY_ID,
     secretAccessKey: process.env.R2_SECRET_ACCESS_KEY,
   },
-  forcePathStyle: true, // ← CRÍTICO: Fuerza usar el endpoint custom
+  forcePathStyle: true,
 })
 
 export default async function handler(req, res) {
@@ -24,7 +28,7 @@ export default async function handler(req, res) {
   try {
     console.log(`🗑️ Deleting from R2: ${fileKey}`)
     console.log(`Using bucket: ${process.env.R2_BUCKET_NAME}`)
-    console.log(`Using endpoint: ${process.env.R2_ENDPOINT}`)
+    console.log(`Using endpoint: ${r2Endpoint}`)
 
     await r2.send(new DeleteObjectCommand({
       Bucket: process.env.R2_BUCKET_NAME,
