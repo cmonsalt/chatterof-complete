@@ -32,7 +32,7 @@ export default function InboxView({ modelId }) {
   }
 
   const handleDelete = async (item) => {
-    if (!confirm(`¿Eliminar "${item.title}" permanentemente? Esta acción no se puede deshacer y lo quitará de Sessions/Singles también.`)) {
+    if (!confirm(`¿Eliminar "${item.title}" permanentemente?`)) {
       return
     }
 
@@ -40,9 +40,15 @@ export default function InboxView({ modelId }) {
       console.log('🗑️ Deleting:', item.id, item.title)
 
       // PASO 1: Borrar de Cloudflare R2 (si existe)
-      if (item.r2_file_key) {
-        console.log('🗑️ Deleting from R2:', item.r2_file_key)
-        await deleteFromR2(item.r2_file_key)
+      if (item.r2_url) {
+        // Extraer r2_file_key desde r2_url
+        const url = new URL(item.r2_url)
+        const r2_file_key = url.pathname.substring(1) // Quita el "/" inicial
+
+        console.log('🗑️ Deleting from R2:', r2_file_key)
+        await deleteFromR2(r2_file_key)
+      } else {
+        console.warn('⚠️ No r2_url found, skipping R2 delete')
       }
 
       // PASO 2: Borrar de base de datos
