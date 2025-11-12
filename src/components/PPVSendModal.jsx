@@ -87,7 +87,8 @@ async function handleSend() {
       mediaFiles,
       price,
       lockedText: lockedText.trim() || undefined,
-      previewMediaIds: previewMediaIds.length > 0 ? previewMediaIds : undefined
+      previewMediaIds: previewMediaIds.length > 0 ? previewMediaIds : undefined,
+      catalogIds: selectedContent.map(item => item.id)
     };
 
     console.log('📤 Sending PPV data:', ppvData);  // ← DEBUG
