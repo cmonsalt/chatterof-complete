@@ -63,10 +63,7 @@ async function handleMessageReceived(payload, modelId) {
     mediaType = firstMedia.type
   }
 
-  const isTip = payload.price > 0 && !payload.isOpened
-
-  const tipAmount = payload.fanData?.spending?.tips || 0
-  const hasTip = tipAmount > 0
+  const isTip = payload.isTip === true && payload.price > 0
 
   // Asegurar que el fan existe (crear si no existe)
   const { data: existingFan } = await supabase
@@ -134,9 +131,8 @@ async function handleMessageReceived(payload, modelId) {
 
 
   // Si es tip
-  // Si es tip
-  if (isTip || hasTip) {
-    const amount = isTip ? payload.price : tipAmount
+  if (isTip) {
+  const amount = payload.price
 
     const { data: fanData } = await supabase
       .from('fans')
@@ -376,7 +372,13 @@ async function handleMessageSent(payload, modelId) {
 async function handlePPVUnlocked(payload, modelId) {
   const fanId = payload.user_id?.toString()
   const messageId = payload.id?.toString()
-  const price = parseFloat(payload.price || 0)
+  
+  // Extraer precio de replacePairs
+  let price = 0
+  if (payload.replacePairs && payload.replacePairs["{AMOUNT}"]) {
+    const amountStr = payload.replacePairs["{AMOUNT}"].replace(/[^0-9.]/g, '')
+    price = parseFloat(amountStr) || 0
+  }
 
   if (!fanId || !messageId) {
     console.log('⚠️ Missing fanId or messageId in PPV unlock')
