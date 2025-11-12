@@ -11,43 +11,61 @@ export default function SyncTab({ modelId }) {
   })
   const [results, setResults] = useState({})
 
-  async function handleSyncFans() {
-    setSyncing(prev => ({ ...prev, fans: true }))
-    try {
-      // Get account_id from models
-      const { data: model } = await supabase
-        .from('models')
-        .select('of_account_id')
-        .eq('model_id', modelId)
-        .single()
+ async function handleSyncFans() {
+  setSyncing(prev => ({ ...prev, fans: true }))
+  
+  let offset = 0
+  let hasMore = true
+  let totalSynced = 0
+  
+  try {
+    const { data: model } = await supabase
+      .from('models')
+      .select('of_account_id')
+      .eq('model_id', modelId)
+      .single()
 
-      if (!model?.of_account_id) {
-        throw new Error('Account not connected')
-      }
+    if (!model?.of_account_id) {
+      throw new Error('Account not connected')
+    }
 
+    // Sync en batches hasta completar todos
+    while (hasMore) {
+      console.log(`Syncing fans at offset ${offset}...`)
+      
       const response = await fetch('/api/onlyfans/sync-fans', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           accountId: model.of_account_id,
           modelId: modelId,
-          offset: 0
+          offset: offset
         })
       })
 
+      if (!response.ok) {
+        const text = await response.text()
+        throw new Error(text || 'Sync failed')
+      }
+
       const data = await response.json()
       
-      if (!response.ok) throw new Error(data.error || 'Sync failed')
-
-      setResults(prev => ({ ...prev, fans: data }))
-      alert(`✅ Synced ${data.synced} fans!`)
-    } catch (error) {
-      console.error('Sync fans error:', error)
-      alert('❌ Error: ' + error.message)
-    } finally {
-      setSyncing(prev => ({ ...prev, fans: false }))
+      totalSynced += data.synced || 0
+      hasMore = data.hasMore || false
+      offset += 20
+      
+      console.log(`✅ Progress: ${totalSynced} fans synced`)
     }
+
+    setResults(prev => ({ ...prev, fans: { synced: totalSynced } }))
+    alert(`✅ Synced ${totalSynced} fans!`)
+  } catch (error) {
+    console.error('Sync fans error:', error)
+    alert('❌ Error: ' + error.message)
+  } finally {
+    setSyncing(prev => ({ ...prev, fans: false }))
   }
+}
 
   async function handleSyncChats() {
     setSyncing(prev => ({ ...prev, chats: true }))
