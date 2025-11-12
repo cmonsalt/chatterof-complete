@@ -123,13 +123,6 @@ export default function Dashboard() {
       fan.display_name?.toLowerCase().includes(searchQuery.toLowerCase())
     )
 
-  // Contar fans por tier (todos, no filtrados)
-  const tierCounts = {
-    new: fans.filter(f => f.tier === 0).length,
-    vip: fans.filter(f => f.tier === 1).length,
-    whale: fans.filter(f => f.tier === 2).length
-  }
-
   const getTimeText = (fan) => {
     if (!fan.lastMessageTime) return 'No messages'
     const date = new Date(fan.lastMessageTime)
@@ -281,7 +274,7 @@ export default function Dashboard() {
                       : 'text-gray-600 hover:text-gray-900'
                       }`}
                   >
-                    🆕 New ({tierCounts.new})
+                    🆕 New
                   </button>
                   <button
                     onClick={() => {
@@ -293,7 +286,7 @@ export default function Dashboard() {
                         : 'text-gray-600 hover:text-gray-900'
                       }`}
                   >
-                    💎 VIP ({tierCounts.vip})
+                    💎 VIP
                   </button>
 
                   <button
@@ -306,7 +299,7 @@ export default function Dashboard() {
                         : 'text-gray-600 hover:text-gray-900'
                       }`}
                   >
-                    🐋 Whale ({tierCounts.whale})
+                    🐋 Whale
                   </button>
                 </div>
               </div>
