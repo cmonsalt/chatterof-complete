@@ -94,6 +94,9 @@ export default function Dashboard() {
 
       const activeFans = fansWithLastMessage.filter(f => f.isActive)
 
+      console.log('📊 FANS CARGADOS:', fansWithLastMessage.length)
+      console.log('📊 FANS DATA:', fansData?.length)
+
       setStats({
         hoy: 0,
         chats: activeFans.length,
