@@ -351,23 +351,32 @@ export default function ChatView({ embedded = false }) {
 
     const recommended = aiSuggestion.recommendedPPV;
 
-    // Si es una session part, cargar TODAS las medias de esa parte
-    if (recommended.session_name && recommended.part_number !== undefined) {
+    if (recommended.session_name && recommended.step_number !== undefined) {
       try {
-        const { data: partMedias, error } = await supabase
+        // 1. Buscar el registro maestro de la parte
+        const { data: masterRecord, error: masterError } = await supabase
           .from('catalog')
-          .select('*')
+          .select('of_media_ids')
           .eq('model_id', modelId || user?.user_metadata?.model_id)
           .eq('session_name', recommended.session_name)
-          .eq('part_number', recommended.part_number)
-          .order('created_at', { ascending: true });
+          .eq('step_number', recommended.step_number)
+          .single();
 
-        if (error) throw error;
+        if (masterError) throw masterError;
 
-        if (partMedias && partMedias.length > 0) {
-          setSelectedPPVContent(partMedias);
+        // 2. Obtener TODOS los registros de esos media IDs
+        if (masterRecord?.of_media_ids && masterRecord.of_media_ids.length > 0) {
+          const { data: allMedias, error: mediasError } = await supabase
+            .from('catalog')
+            .select('*')
+            .eq('model_id', modelId || user?.user_metadata?.model_id)
+            .in('of_media_id', masterRecord.of_media_ids)
+            .order('created_at', { ascending: true });
+
+          if (mediasError) throw mediasError;
+
+          setSelectedPPVContent(allMedias || []);
         } else {
-          // Fallback si no encuentra medias
           setSelectedPPVContent([recommended]);
         }
       } catch (error) {
@@ -383,7 +392,6 @@ export default function ChatView({ embedded = false }) {
     setShowAISuggestion(false);
     setShowPPVSend(true);
   }
-
   // 🔥 Handle PPV content selection
   function handlePPVContentSelected(content) {
     setSelectedPPVContent(content);
