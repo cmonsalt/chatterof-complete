@@ -45,6 +45,7 @@ export default function Dashboard() {
         .from('fans')
         .select('*')
         .eq('model_id', actualModelId)
+        .range(0, 9999)
         .order('last_message_date', { ascending: false, nullsFirst: false })
 
       if (fansError) throw fansError
@@ -289,8 +290,8 @@ export default function Dashboard() {
                       setShowActiveOnly(false)
                     }}
                     className={`px-3 py-1.5 rounded-md text-sm font-medium transition ${selectedTier === 1
-                        ? 'bg-white shadow text-blue-600 border border-blue-200'
-                        : 'text-gray-600 hover:text-gray-900'
+                      ? 'bg-white shadow text-blue-600 border border-blue-200'
+                      : 'text-gray-600 hover:text-gray-900'
                       }`}
                   >
                     💎 VIP ({tierCounts.vip})
@@ -302,8 +303,8 @@ export default function Dashboard() {
                       setShowActiveOnly(false)
                     }}
                     className={`px-3 py-1.5 rounded-md text-sm font-medium transition ${selectedTier === 2
-                        ? 'bg-white shadow text-purple-600 border border-purple-200'
-                        : 'text-gray-600 hover:text-gray-900'
+                      ? 'bg-white shadow text-purple-600 border border-purple-200'
+                      : 'text-gray-600 hover:text-gray-900'
                       }`}
                   >
                     🐋 Whale ({tierCounts.whale})
