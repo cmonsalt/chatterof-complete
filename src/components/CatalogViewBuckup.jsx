@@ -102,7 +102,7 @@ export default function CatalogView({ modelId }) {
 
       if (error) throw error
 
-      alert('âœ… Session eliminada. Los medias siguen en Inbox.')
+      alert('✅ Session eliminada. Los medias siguen en Inbox.')
       loadCatalog()
 
     } catch (error) {
@@ -129,7 +129,7 @@ export default function CatalogView({ modelId }) {
 
       if (error) throw error
 
-      alert('âœ… Single desmarcado. El media sigue en Inbox.')
+      alert('✅ Single desmarcado. El media sigue en Inbox.')
       loadCatalog()
 
     } catch (error) {
@@ -292,7 +292,7 @@ export default function CatalogView({ modelId }) {
                         }}
                         className="px-3 py-1 bg-white border border-purple-300 text-purple-600 rounded-lg hover:bg-purple-50 text-sm font-semibold"
                       >
-                        âœï¸ Edit
+                        ❌ï¸ Edit
                       </button>
                       */}
                       <button
@@ -371,7 +371,7 @@ export default function CatalogView({ modelId }) {
                                 />
                               ) : (
                                 <div className="w-full h-full flex items-center justify-center text-gray-400">
-                                  {part.file_type === 'video' ? 'ðŸŽ¥' : 'ðŸ“·'}
+                                  {part.file_type === 'video' ? '🎥' : 'ðŸ“·'}
                                 </div>
                               )}
                             </div>
@@ -467,7 +467,7 @@ export default function CatalogView({ modelId }) {
                         />
                       ) : (
                         <div className="w-full h-full bg-gray-100 flex items-center justify-center text-gray-400 text-4xl">
-                          {single.file_type === 'video' ? 'ðŸŽ¥' : 'ðŸ“·'}
+                          {single.file_type === 'video' ? '🎥' : 'ðŸ“·'}
                         </div>
                       )}
 
@@ -511,7 +511,7 @@ export default function CatalogView({ modelId }) {
                           onClick={() => handleEditSingle(single)}
                           className="flex-1 px-3 py-1 bg-purple-50 text-purple-600 rounded hover:bg-purple-100 text-xs font-semibold"
                         >
-                          âœï¸ {isConfigured ? 'Edit' : 'Configure'}
+                          ❌ï¸ {isConfigured ? 'Edit' : 'Configure'}
                         </button>
                         <button
                           onClick={() => handleDeleteSingle(single)}
@@ -591,7 +591,7 @@ function MediaSelectorModal({ medias, onSelect, onClose }) {
             onClick={onClose}
             className="text-white hover:bg-white/20 rounded-lg p-2"
           >
-            âœ•
+            ❌•
           </button>
         </div>
 
@@ -620,14 +620,14 @@ function MediaSelectorModal({ medias, onSelect, onClose }) {
                       />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center text-gray-400 text-3xl">
-                        {media.file_type === 'video' ? 'ðŸŽ¥' : 'ðŸ“·'}
+                        {media.file_type === 'video' ? '🎥' : 'ðŸ“·'}
                       </div>
                     )}
                   </div>
                   
                   <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-40 transition-all flex items-center justify-center">
                     <span className="text-white text-sm font-semibold opacity-0 group-hover:opacity-100 transition-all">
-                      âœ“ Select
+                      ❌“ Select
                     </span>
                   </div>
 
@@ -636,7 +636,7 @@ function MediaSelectorModal({ medias, onSelect, onClose }) {
                       {media.title || 'Untitled'}
                     </p>
                     <p className="text-xs text-gray-500">
-                      {media.file_type === 'video' ? 'ðŸŽ¥' : 'ðŸ“·'}
+                      {media.file_type === 'video' ? '🎥' : 'ðŸ“·'}
                     </p>
                   </div>
                 </div>
