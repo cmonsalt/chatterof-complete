@@ -45,8 +45,8 @@ export default function Dashboard() {
         .from('fans')
         .select('*')
         .eq('model_id', actualModelId)
-        .range(0, 9999)
-        .order('last_message_date', { ascending: false, nullsFirst: false })
+        .order('last_message_date', { ascending: false })
+        .range(0, 9999) 
 
       if (fansError) throw fansError
 
