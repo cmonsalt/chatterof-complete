@@ -592,7 +592,7 @@ export default function ChatView({ embedded = false }) {
                 <div>
                   <div className="flex items-center gap-3">
                     <h1 className="text-2xl font-bold text-gray-800">
-                      {fan.display_name || fan.of_username || 'Fan'}
+                      {fan.name || fan.display_name || fan.of_username || 'Fan'}
                     </h1>
                     <span className={`px-3 py-1 rounded-full text-sm font-semibold ${tierInfo.color}`}>
                       {tierInfo.emoji} {tierInfo.label}
