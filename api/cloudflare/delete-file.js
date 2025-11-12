@@ -7,6 +7,7 @@ const r2 = new S3Client({
     accessKeyId: process.env.R2_ACCESS_KEY_ID,
     secretAccessKey: process.env.R2_SECRET_ACCESS_KEY,
   },
+  forcePathStyle: true, // ← CRÍTICO: Fuerza usar el endpoint custom
 })
 
 export default async function handler(req, res) {
@@ -22,6 +23,8 @@ export default async function handler(req, res) {
 
   try {
     console.log(`🗑️ Deleting from R2: ${fileKey}`)
+    console.log(`Using bucket: ${process.env.R2_BUCKET_NAME}`)
+    console.log(`Using endpoint: ${process.env.R2_ENDPOINT}`)
 
     await r2.send(new DeleteObjectCommand({
       Bucket: process.env.R2_BUCKET_NAME,
