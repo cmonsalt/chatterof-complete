@@ -223,6 +223,18 @@ async function handleVaultContent(payload, modelId) {
         continue
       }
 
+       const { data: existing } = await supabase
+        .from('catalog')
+        .select('of_media_id, r2_url')
+        .eq('of_media_id', mediaId)
+        .eq('model_id', modelId)
+        .single()
+
+      if (existing) {
+        console.log(`⏭️ SKIP: Media ${mediaId} already exists in catalog`)
+        continue
+      }
+
       console.log(`📥 Downloading media ${mediaId} from CDN...`)
 
       // Descargar desde OnlyFans CDN
