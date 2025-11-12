@@ -21,8 +21,8 @@ export default async function handler(req, res) {
   }
 
   const { accountId, modelId, offset = 0 } = req.body
-  const messagesLimit = 50 // Últimos 50 mensajes por chat
-  const chatsLimit = 20 // 20 chats por request
+  const messagesLimit = 20 // Últimos 20 mensajes por chat
+  const chatsLimit = 5 // 5 chats por request
 
   if (!accountId || !modelId) {
     return res.status(400).json({ error: 'accountId and modelId required' })
