@@ -30,6 +30,7 @@ export default async function handler(req, res) {
     console.log(`Using bucket: ${process.env.R2_BUCKET_NAME}`)
     console.log(`Using endpoint: ${r2Endpoint}`)
 
+    // Eliminar archivo principal
     await r2.send(new DeleteObjectCommand({
       Bucket: process.env.R2_BUCKET_NAME,
       Key: fileKey
@@ -37,10 +38,28 @@ export default async function handler(req, res) {
 
     console.log(`✅ Successfully deleted from R2: ${fileKey}`)
 
+    // También eliminar thumbnail si existe
+    const thumbKey = fileKey.replace(/\.(mp4|jpg|png|gif)$/, '_thumb.jpg')
+    if (thumbKey !== fileKey) {
+      try {
+        await r2.send(new DeleteObjectCommand({
+          Bucket: process.env.R2_BUCKET_NAME,
+          Key: thumbKey
+        }))
+        console.log(`✅ Also deleted thumbnail: ${thumbKey}`)
+      } catch (thumbError) {
+        // Si no existe el thumbnail, no importa
+        if (thumbError.name !== 'NoSuchKey' && thumbError.Code !== 'NoSuchKey') {
+          console.log(`⚠️ Could not delete thumbnail: ${thumbError.message}`)
+        }
+      }
+    }
+
     return res.status(200).json({ 
       success: true,
       deleted: fileKey,
-      message: 'File deleted from Cloudflare R2'
+      deletedThumb: thumbKey !== fileKey ? thumbKey : null,
+      message: 'File and thumbnail deleted from Cloudflare R2'
     })
 
   } catch (error) {
