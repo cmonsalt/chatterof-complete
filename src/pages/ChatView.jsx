@@ -346,12 +346,40 @@ export default function ChatView({ embedded = false }) {
   }
 
   // 🤖 Handle sending AI suggestion with PPV
-  function handleSendAIWithPPV() {
+  async function handleSendAIWithPPV() {
     if (!aiSuggestion?.recommendedPPV) return;
 
-    // Pasar sugerencia completa al modal PPV
-    setSelectedPPVContent([aiSuggestion.recommendedPPV]);
-    setAISuggestionForPPV(aiSuggestion); // Nueva state
+    const recommended = aiSuggestion.recommendedPPV;
+
+    // Si es una session part, cargar TODAS las medias de esa parte
+    if (recommended.session_name && recommended.part_number !== undefined) {
+      try {
+        const { data: partMedias, error } = await supabase
+          .from('catalog')
+          .select('*')
+          .eq('model_id', modelId || user?.user_metadata?.model_id)
+          .eq('session_name', recommended.session_name)
+          .eq('part_number', recommended.part_number)
+          .order('created_at', { ascending: true });
+
+        if (error) throw error;
+
+        if (partMedias && partMedias.length > 0) {
+          setSelectedPPVContent(partMedias);
+        } else {
+          // Fallback si no encuentra medias
+          setSelectedPPVContent([recommended]);
+        }
+      } catch (error) {
+        console.error('Error loading session part medias:', error);
+        setSelectedPPVContent([recommended]);
+      }
+    } else {
+      // Si es single, solo uno
+      setSelectedPPVContent([recommended]);
+    }
+
+    setAISuggestionForPPV(aiSuggestion);
     setShowAISuggestion(false);
     setShowPPVSend(true);
   }
