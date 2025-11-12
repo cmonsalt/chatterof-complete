@@ -1,6 +1,5 @@
 import { useState } from 'react'
 import { useAuth } from '../../contexts/AuthContext'
-import { supabase } from '../../lib/supabase'  
 
 export default function SyncTab({ modelId }) {
   const { user } = useAuth()
@@ -51,6 +50,12 @@ export default function SyncTab({ modelId }) {
 
   async function handleSyncChats() {
     setSyncing(prev => ({ ...prev, chats: true }))
+    
+    let offset = 0
+    let hasMore = true
+    let totalMessages = 0
+    let totalFans = 0
+    
     try {
       // Get account_id from models
       const { data: model } = await supabase
@@ -63,21 +68,37 @@ export default function SyncTab({ modelId }) {
         throw new Error('Account not connected')
       }
 
-      const response = await fetch('/api/onlyfans/sync-chats', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          accountId: model.of_account_id,
-          modelId: modelId
+      // Sync in batches to avoid timeout
+      while (hasMore && offset < 100) {  // Max 100 fans (10 batches)
+        console.log(`Syncing batch at offset ${offset}...`)
+        
+        const response = await fetch('/api/onlyfans/sync-chats', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            accountId: model.of_account_id,
+            modelId: modelId,
+            offset: offset
+          })
         })
-      })
 
-      const data = await response.json()
+        if (!response.ok) {
+          const text = await response.text()
+          throw new Error(text || 'Sync failed')
+        }
+
+        const data = await response.json()
+        
+        totalMessages += data.syncedMessages || 0
+        totalFans += data.syncedFans || 0
+        hasMore = data.hasMore || false
+        offset += 10
+        
+        console.log(`✅ Progress: ${totalFans} fans, ${totalMessages} messages`)
+      }
       
-      if (!response.ok) throw new Error(data.error || 'Sync failed')
-
-      setResults(prev => ({ ...prev, chats: data }))
-      alert(`✅ Synced ${data.syncedMessages} messages from ${data.syncedFans} fans!`)
+      setResults(prev => ({ ...prev, chats: { syncedMessages: totalMessages, syncedFans: totalFans } }))
+      alert(`✅ Synced ${totalMessages} messages from ${totalFans} fans!`)
     } catch (error) {
       console.error('Sync chats error:', error)
       alert('❌ Error: ' + error.message)
