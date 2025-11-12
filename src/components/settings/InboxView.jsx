@@ -31,26 +31,41 @@ export default function InboxView({ modelId }) {
   }
 
   const handleDelete = async (item) => {
-    if (!confirm(`¿Eliminar "${item.title}" permanentemente? Esta acción no se puede deshacer y lo quitará de Sessions/Singles también.`)) {
-      return
-    }
-
-    try {
-      const { error } = await supabase
-        .from('catalog')
-        .delete()
-        .eq('id', item.id)
-
-      if (error) throw error
-
-      alert('✅ Eliminado permanentemente')
-      loadAllContent()
-
-    } catch (error) {
-      console.error('Error deleting:', error)
-      alert('Error: ' + error.message)
-    }
+  if (!confirm(`¿Eliminar "${item.title}" permanentemente? Esta acción no se puede deshacer y lo quitará de Sessions/Singles también.`)) {
+    return
   }
+
+  try {
+    console.log('🗑️ Deleting:', item.id, item.title)
+
+    // PASO 1: Borrar de Cloudflare R2 (si existe)
+    if (item.r2_file_key) {
+      console.log('🗑️ Deleting from R2:', item.r2_file_key)
+      const r2Success = await deleteFromR2(item.r2_file_key)
+      if (r2Success) {
+        console.log('✅ Deleted from R2')
+      } else {
+        console.warn('⚠️ Could not delete from R2, continuing...')
+      }
+    }
+
+    // PASO 2: Borrar de base de datos
+    const { error } = await supabase
+      .from('catalog')
+      .delete()
+      .eq('id', item.id)
+
+    if (error) throw error
+
+    console.log('✅ Deleted from database')
+    alert('✅ Eliminado permanentemente (BD + R2)')
+    loadAllContent()
+
+  } catch (error) {
+    console.error('❌ Error deleting:', error)
+    alert('❌ Error: ' + error.message)
+  }
+}
 
   const getItemBadges = (item) => {
     const badges = []
