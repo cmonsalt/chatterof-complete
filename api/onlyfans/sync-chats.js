@@ -21,8 +21,8 @@ export default async function handler(req, res) {
   }
 
   const { accountId, modelId, offset = 0 } = req.body
-  const messagesLimit = 20 // Últimos 20 mensajes por chat
-  const chatsLimit = 5 // 5 chats por request
+  const messagesLimit = 20
+  const chatsLimit = 5
 
   if (!accountId || !modelId) {
     return res.status(400).json({ error: 'accountId and modelId required' })
@@ -118,44 +118,51 @@ export default async function handler(req, res) {
 
           console.log(`  ✅ Fan ${fanId}: ${messages.length} messages (real conversation)`)
 
+          // Acumular todos los mensajes para batch insert
+          const allChatData = []
+
           for (const msg of messages) {
             // Generate messageId if null
             const messageId = msg.id?.toString() || 
               `generated_${fanId}_${msg.createdAt}_${Math.random().toString(36).substr(2, 9)}`
             
-          const chatData = {
-  fan_id: fanId,
-  message: cleanHTML(msg.text),
-  model_id: modelId,
-  timestamp: msg.createdAt || new Date().toISOString(),
-  from: msg.isSentByMe ? 'model' : 'fan',
-  message_type: msg.mediaCount > 0 ? 'media' : 'text',
-  of_message_id: messageId,
-  media_url: msg.media?.[0]?.files?.full?.url || msg.media?.[0]?.files?.thumb?.url,
-  media_urls: msg.media?.map(m => m.files?.full?.url || m.files?.thumb?.url).filter(Boolean).join(','),
-  amount: parseFloat(msg.price || 0),
-  read: msg.isOpened || false,
-  source: 'api_sync',
-  
-  // Lógica de PPV corregida
-  is_ppv: msg.price > 0,
-  ppv_price: parseFloat(msg.price || 0),
-  is_locked: msg.price > 0 && !msg.isFree,
-  is_purchased: msg.price > 0 
-    ? (msg.canPurchaseReason === 'purchased' || msg.canPurchaseReason === 'opened')
-    : null,
-  ppv_unlocked: msg.price > 0 
-    ? (msg.canPurchaseReason === 'purchased' || msg.canPurchaseReason === 'opened')
-    : false,
-  locked_text: msg.lockedText || false
-}
+            allChatData.push({
+              fan_id: fanId,
+              message: cleanHTML(msg.text),
+              model_id: modelId,
+              timestamp: msg.createdAt || new Date().toISOString(),
+              from: msg.isSentByMe ? 'model' : 'fan',
+              message_type: msg.mediaCount > 0 ? 'media' : 'text',
+              of_message_id: messageId,
+              media_url: msg.media?.[0]?.files?.full?.url || msg.media?.[0]?.files?.thumb?.url,
+              media_urls: msg.media?.map(m => m.files?.full?.url || m.files?.thumb?.url).filter(Boolean).join(','),
+              amount: parseFloat(msg.price || 0),
+              read: msg.isOpened || false,
+              source: 'api_sync',
+              is_ppv: msg.price > 0,
+              ppv_price: parseFloat(msg.price || 0),
+              is_locked: msg.price > 0 && !msg.isFree,
+              is_purchased: msg.price > 0 
+                ? (msg.canPurchaseReason === 'purchased' || msg.canPurchaseReason === 'opened')
+                : null,
+              ppv_unlocked: msg.price > 0 
+                ? (msg.canPurchaseReason === 'purchased' || msg.canPurchaseReason === 'opened')
+                : false,
+              locked_text: msg.lockedText || false
+            })
+          }
 
+          // Bulk insert (1 query en vez de N queries)
+          if (allChatData.length > 0) {
             const { error } = await supabase
               .from('chat')
-              .upsert(chatData, { onConflict: 'of_message_id' })
+              .upsert(allChatData, { onConflict: 'of_message_id' })
 
-            if (!error) syncedMessages++
-            else console.error('❌ Error saving message:', msg.id, error)
+            if (!error) {
+              syncedMessages += allChatData.length
+            } else {
+              console.error('❌ Error bulk insert for fan:', fanId, error)
+            }
           }
         }
       } catch (msgError) {
@@ -168,6 +175,7 @@ export default async function handler(req, res) {
     return res.status(200).json({
       success: true,
       syncedMessages,
+      syncedFans: totalChats - skippedInactive - skippedNoConversation,
       totalChats,
       skippedInactive,
       skippedNoConversation,
