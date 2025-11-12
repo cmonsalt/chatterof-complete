@@ -598,7 +598,7 @@ function MediaSelectorModal({ medias, onSelect, onClose }) {
         <div className="flex-1 overflow-auto p-6">
           {medias.length === 0 ? (
             <div className="text-center py-12">
-              <p className="text-gray-500 text-lg">ðŸ“­ No available content</p>
+              <p className="text-gray-500 text-lg">📭­ No available content</p>
               <p className="text-gray-400 text-sm mt-2">
                 All content is already organized in Sessions or Singles
               </p>
