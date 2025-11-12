@@ -10,9 +10,9 @@ export async function deleteFromR2(fileKey) {
   }
 
   try {
-    console.log(`🗑️ Deleting fr.om R2: ${fileKey}`)
+    console.log(`🗑️ Deleting from R2: ${fileKey}`)
 
-    const response = await fetch('/api/delete-file', {
+    const response = await fetch('/api/cloudflare/delete-file', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ fileKey })
@@ -25,7 +25,7 @@ export async function deleteFromR2(fileKey) {
 
     const data = await response.json()
     console.log(`✅ R2 delete successful:`, data.message)
-
+    
     return true
 
   } catch (error) {
