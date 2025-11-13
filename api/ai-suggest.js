@@ -33,7 +33,7 @@ export default async function handler(req, res) {
         .insert({ model_id, messages_limit: 500, messages_today: 0 })
         .select()
         .single()
-      
+
       if (insertError) throw insertError
       limit = newLimit
     }
@@ -48,14 +48,14 @@ export default async function handler(req, res) {
         .from('usage_limits')
         .update({ messages_today: 0, last_reset: now.toISOString() })
         .eq('model_id', model_id)
-      
+
       if (resetError) throw resetError
       limit.messages_today = 0
     }
 
     // Verificar si alcanzó el límite
     if (limit.messages_today >= limit.messages_limit) {
-      return res.status(429).json({ 
+      return res.status(429).json({
         error: 'Daily AI limit reached',
         limit: limit.messages_limit,
         used: limit.messages_today,
@@ -175,7 +175,7 @@ export default async function handler(req, res) {
 
     // 11.5. Calcular tiempo desde último mensaje
     const lastMsgDate = messages.length > 0 ? messages[0]?.ts : null
-    const daysSinceLastMsg = lastMsgDate 
+    const daysSinceLastMsg = lastMsgDate
       ? Math.floor((Date.now() - new Date(lastMsgDate)) / (1000 * 60 * 60 * 24))
       : 999
 
@@ -184,20 +184,20 @@ export default async function handler(req, res) {
       .reverse()
       .map(m => {
         let text = `${m.from === 'fan' ? 'Fan' : 'Model'}: ${m.message}`
-        
+
         if (m.is_ppv && m.is_purchased) {
           text += ` [PPV $${m.ppv_price} - PURCHASED ✅]`
         } else if (m.is_ppv && !m.is_purchased) {
           text += ` [PPV $${m.ppv_price} - NOT PURCHASED YET]`
         }
-        
+
         return text
       })
       .join('\n')
 
     // 13. Crear prompt ÉPICO para Claude
-    const extraContext = extra_instructions && extra_instructions.trim() 
-      ? `\n🎯 CHATTER'S ADDITIONAL CONTEXT:\n${extra_instructions}\n` 
+    const extraContext = extra_instructions && extra_instructions.trim()
+      ? `\n🎯 CHATTER'S ADDITIONAL CONTEXT:\n${extra_instructions}\n`
       : '';
 
     const prompt = `You are ${model.name}${model.age ? `, a ${model.age} year old` : ''}${model.niche ? ` ${model.niche}` : ''} creator on OnlyFans. You're helping a chatter respond to your fans and maximize revenue through intelligent, authentic conversation.${extraContext}
@@ -263,16 +263,16 @@ ${chatHistory || 'No previous messages - this is the first interaction'}
 ═══════════════════════════════════════════════════
 
 📁 SESSIONS (Multi-part drip content):
-${sessions.length > 0 ? sessions.map(s => 
-  `\n"${s.session_name}":\n${s.parts.map(p => 
-    `   ${purchasedIds.includes(p.id) ? '✅' : '🔒'} Part ${p.step_number}: ${p.title}\n      Base Price: $${p.base_price} | Level: ${p.nivel}/10${purchasedIds.includes(p.id) ? ' [ALREADY PURCHASED]' : ''}`
-  ).join('\n')}`
-).join('\n') : 'No sessions available'}
+${sessions.length > 0 ? sessions.map(s =>
+      `\n"${s.session_name}":\n${s.parts.map(p =>
+        `   ${purchasedIds.includes(p.id) ? '✅' : '🔒'} Part ${p.step_number}: ${p.title}\n      Base Price: $${p.base_price} | Level: ${p.nivel}/10${purchasedIds.includes(p.id) ? ' [ALREADY PURCHASED]' : ''}`
+      ).join('\n')}`
+    ).join('\n') : 'No sessions available'}
 
 💎 SINGLES (Direct sale items):
-${singles.length > 0 ? singles.map(s => 
-  `${purchasedIds.includes(s.id) ? '✅' : '🔒'} ${s.title} - $${s.base_price} | Level: ${s.nivel}/10${purchasedIds.includes(s.id) ? ' [ALREADY PURCHASED]' : ''}`
-).join('\n') : 'No singles available'}
+${singles.length > 0 ? singles.map(s =>
+      `${purchasedIds.includes(s.id) ? '✅' : '🔒'} ${s.title} - $${s.base_price} | Level: ${s.nivel}/10${purchasedIds.includes(s.id) ? ' [ALREADY PURCHASED]' : ''}`
+    ).join('\n') : 'No singles available'}
 
 ${config.does_customs ? `
 ═══════════════════════════════════════════════════
@@ -692,7 +692,8 @@ REMEMBER:
 
     // 14. Llamar a Claude
     const completion = await anthropic.messages.create({
-      model: 'claude-sonnet-4-20250514',
+      //model: 'claude-sonnet-4-20250514',
+      model: "claude-haiku-4-20250514",
       max_tokens: 2000,
       temperature: config.temperature || 0.8,
       messages: [{
@@ -702,7 +703,7 @@ REMEMBER:
     })
 
     const responseText = completion.content[0].text
-    
+
     // 15. Parsear respuesta JSON
     let suggestion
     try {
@@ -720,7 +721,7 @@ REMEMBER:
         .update(suggestion.extracted_fan_info)
         .eq('fan_id', fan_id)
         .eq('model_id', model_id)
-      
+
       if (updateFanError) {
         console.warn('Could not update fan info:', updateFanError)
       }
@@ -733,7 +734,7 @@ REMEMBER:
           .from('catalog')
           .select('*')
           .eq('model_id', model_id)
-        
+
         if (suggestion.recommended_ppv.session_name) {
           // Es un session part
           query = query
@@ -745,9 +746,9 @@ REMEMBER:
             .eq('title', suggestion.recommended_ppv.title)
             .eq('parent_type', 'single')
         }
-        
+
         const { data: fullPPV } = await query.single()
-        
+
         if (fullPPV) {
           suggestion.recommended_ppv = fullPPV
         }
@@ -775,7 +776,7 @@ REMEMBER:
 
   } catch (error) {
     console.error('Error generating AI suggestion:', error)
-    return res.status(500).json({ 
+    return res.status(500).json({
       error: error.message || 'Failed to generate suggestion',
       details: process.env.NODE_ENV === 'development' ? error.stack : undefined
     })
