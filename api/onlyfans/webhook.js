@@ -439,7 +439,7 @@ async function handlePPVUnlocked(payload, modelId) {
   const { data: fanData } = await supabase
     .from('fans')
     .select('of_username, display_name, name')
-    .eq('fan_id', actualFanId) 
+    .eq('fan_id', actualFanId)
     .eq('model_id', modelId)
     .single()
 
@@ -612,6 +612,12 @@ export default async function handler(req, res) {
   try {
     const { event, account_id, payload } = req.body
 
+    res.status(200).json({
+      success: true,
+      received: true,
+      event: event
+    })
+
     if (!event || !payload) {
       console.log('❌ Invalid payload:', JSON.stringify(req.body))
       return res.status(400).json({ error: 'Invalid webhook payload' })
@@ -620,7 +626,7 @@ export default async function handler(req, res) {
     // Ignorar eventos de test
     if (event === 'test-event') {
       console.log('✅ Test event received')
-      return res.status(200).json({ success: true })
+    return
     }
 
     console.log(`🔔 Webhook event: ${event}`)
@@ -683,7 +689,7 @@ export default async function handler(req, res) {
         console.log(`⚠️ Unhandled event: ${event}`)
     }
 
-    return res.status(200).json({ success: true })
+  return
 
   } catch (error) {
     console.error('❌ Webhook error:', error)
