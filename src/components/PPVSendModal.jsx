@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 
-export default function PPVSendModal({ 
-  isOpen, 
-  onClose, 
+export default function PPVSendModal({
+  isOpen,
+  onClose,
   selectedContent,
   fanTier = 0,
   fanId,
@@ -17,6 +17,7 @@ export default function PPVSendModal({
   const [previewMediaIds, setPreviewMediaIds] = useState([]);
   const [sending, setSending] = useState(false);
   const [customPrice, setCustomPrice] = useState(null);
+  const [purchasedCatalogIds, setPurchasedCatalogIds] = useState(new Set());
 
   // ← NUEVO: Auto-rellenar cuando viene de IA
   useEffect(() => {
@@ -37,8 +38,11 @@ export default function PPVSendModal({
   useEffect(() => {
     if (isOpen && modelId) {
       loadTiers();
+      if (fanId) {
+        loadFanPurchases();
+      }
     }
-  }, [isOpen, modelId]);
+  }, [isOpen, modelId, fanId]);
 
   async function loadTiers() {
     try {
@@ -47,7 +51,7 @@ export default function PPVSendModal({
         .select('*')
         .eq('model_id', modelId)
         .order('min_spent', { ascending: true });
-      
+
       if (error) throw error;
       setTiers(data || []);
     } catch (error) {
@@ -61,47 +65,65 @@ export default function PPVSendModal({
     }
   }
 
+  async function loadFanPurchases() {
+    try {
+      const { data, error } = await supabase
+        .from('chat')
+        .select('ppv_catalog_id')
+        .eq('fan_id', fanId)
+        .eq('is_purchased', true)
+        .not('ppv_catalog_id', 'is', null);
+
+      if (error) throw error;
+
+      const purchasedIds = new Set(data.map(d => d.ppv_catalog_id));
+      setPurchasedCatalogIds(purchasedIds);
+    } catch (error) {
+      console.error('Error loading fan purchases:', error);
+    }
+  }
+
   function calculatePrice() {
     if (!selectedContent || selectedContent.length === 0) return 0;
-    
+
     const basePrice = selectedContent.reduce((sum, item) => sum + (item.base_price || 0), 0);
     const currentTier = tiers.find(t => t.tier_number === fanTier) || tiers[0];
     const multiplier = currentTier?.multiplier || 1.0;
-    
+
     return customPrice !== null ? customPrice : Math.round(basePrice * multiplier);
   }
 
-async function handleSend() {
-  if (!message.trim()) {
-    alert('Please write a message to send with the PPV');
-    return;
+  async function handleSend() {
+    if (!message.trim()) {
+      alert('Please write a message to send with the PPV');
+      return;
+    }
+
+    setSending(true);
+    try {
+      const price = calculatePrice();
+      const mediaFiles = selectedContent.map(item => item.of_media_id);
+
+      const ppvData = {
+        text: message,
+        mediaFiles,
+        price,
+        lockedText: lockedText.trim() || undefined,
+        previewMediaIds: previewMediaIds.length > 0 ? previewMediaIds : undefined,
+        catalogIds: selectedContent.map(item => item.id)
+      };
+
+      console.log('📤 Sending PPV data:', ppvData);  // ← DEBUG
+
+      await onSendPPV(ppvData);
+      onClose();
+    } catch (error) {
+      console.error('Error sending PPV:', error);
+      alert('Error sending PPV: ' + error.message);
+    } finally {
+      setSending(false);
+    }
   }
-
-  setSending(true);
-  try {
-    const price = calculatePrice();
-    const mediaFiles = selectedContent.map(item => item.of_media_id);
-
-    const ppvData = {
-      text: message,
-      mediaFiles,
-      price,
-      lockedText: lockedText.trim() || undefined,
-      previewMediaIds: previewMediaIds.length > 0 ? previewMediaIds : undefined,
-      catalogIds: selectedContent.map(item => item.id)
-    };
-
-    console.log('📤 Sending PPV data:', ppvData);  // ← DEBUG
-
-    await onSendPPV(ppvData);
-    onClose();
-  } catch (error) {
-    console.error('Error sending PPV:', error);
-    alert('Error sending PPV: ' + error.message);
-  } finally {
-    setSending(false);
-  }
-}
 
   function togglePreview(mediaId) {
     setPreviewMediaIds(prev => {
@@ -122,7 +144,7 @@ async function handleSend() {
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-xl shadow-2xl max-w-3xl w-full max-h-[90vh] overflow-hidden flex flex-col">
-        
+
         {/* Header */}
         <div className="px-6 py-4 border-b border-gray-200 bg-gradient-to-r from-green-500 to-emerald-500">
           <div className="flex items-center justify-between">
@@ -143,7 +165,7 @@ async function handleSend() {
 
         {/* Content */}
         <div className="flex-1 overflow-y-auto p-6 space-y-6">
-          
+
           {/* Selected Content Preview */}
           <div>
             <h3 className="text-lg font-bold text-gray-800 mb-3">
@@ -152,12 +174,14 @@ async function handleSend() {
             <div className="grid grid-cols-3 gap-3">
               {selectedContent.map((item) => {
                 const isPreview = previewMediaIds.includes(item.of_media_id);
+                const isPurchased = purchasedCatalogIds.has(item.id);
                 return (
                   <div
                     key={item.id}
-                    className={`relative rounded-lg overflow-hidden border-2 ${
-                      isPreview ? 'border-blue-500 ring-2 ring-blue-300' : 'border-gray-200'
-                    }`}
+                    className={`relative rounded-lg overflow-hidden border-2 ${isPreview ? 'border-blue-500 ring-2 ring-blue-300' :
+                      isPurchased ? 'border-green-500 ring-2 ring-green-300' :
+                        'border-gray-200'
+                      }`}
                   >
                     <div className="aspect-square bg-gray-200">
                       {item.media_thumb ? (
@@ -173,9 +197,16 @@ async function handleSend() {
                           </span>
                         </div>
                       )}
-                      
+
+                      {/* Purchased Badge */}
+                      {isPurchased && (
+                        <div className="absolute top-2 right-2 bg-green-500 text-white px-2 py-1 rounded-full text-xs font-bold">
+                          ✅ PURCHASED
+                        </div>
+                      )}
+
                       {/* Preview Badge */}
-                      {isPreview && (
+                      {isPreview && !isPurchased && (
                         <div className="absolute top-2 right-2 bg-blue-500 text-white px-2 py-1 rounded-full text-xs font-bold">
                           FREE
                         </div>
@@ -188,7 +219,7 @@ async function handleSend() {
                       <p className="text-xs text-gray-500">
                         Base: ${item.base_price}
                       </p>
-                      
+
                       {/* Checkbox para marcar como preview */}
                       <label className="flex items-center gap-2 mt-2 cursor-pointer">
                         <input
@@ -209,20 +240,20 @@ async function handleSend() {
           {/* Pricing Breakdown */}
           <div className="bg-gradient-to-br from-green-50 to-emerald-50 border-2 border-green-200 rounded-xl p-4">
             <h3 className="text-lg font-bold text-gray-800 mb-3">💵 Pricing</h3>
-            
+
             <div className="space-y-2 mb-4">
               <div className="flex items-center justify-between text-sm">
                 <span className="text-gray-600">Base Price Total:</span>
                 <span className="font-bold text-gray-800">${baseTotal}</span>
               </div>
-              
+
               <div className="flex items-center justify-between text-sm">
                 <span className="text-gray-600">Fan Tier:</span>
                 <span className="font-semibold">
                   {currentTier?.emoji} {currentTier?.tier_name} (x{currentTier?.multiplier})
                 </span>
               </div>
-              
+
               <div className="pt-2 border-t border-green-300 flex items-center justify-between">
                 <span className="font-bold text-gray-800">Final Price:</span>
                 <span className="text-2xl font-bold text-green-600">${finalPrice}</span>
