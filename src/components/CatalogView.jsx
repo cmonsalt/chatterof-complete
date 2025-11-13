@@ -16,6 +16,7 @@ export default function CatalogView({ modelId }) {
   const [editingSingle, setEditingSingle] = useState(null)
   const [showAddSingleSelector, setShowAddSingleSelector] = useState(false)
   const [availableMedias, setAvailableMedias] = useState([])
+  const [salesStats, setSalesStats] = useState(new Map())
 
 
 
@@ -23,11 +24,39 @@ export default function CatalogView({ modelId }) {
     loadCatalog()
   }, [modelId])
 
+  const loadSalesStats = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('chat')
+        .select('ppv_catalog_id, ppv_price')
+        .eq('model_id', modelId)
+        .eq('is_purchased', true)
+        .not('ppv_catalog_id', 'is', null)
+
+      if (error) throw error
+
+      const statsMap = new Map()
+      data.forEach(purchase => {
+        const catalogId = purchase.ppv_catalog_id
+        if (!statsMap.has(catalogId)) {
+          statsMap.set(catalogId, { count: 0, revenue: 0 })
+        }
+        const stats = statsMap.get(catalogId)
+        stats.count++
+        stats.revenue += purchase.ppv_price
+      })
+
+      setSalesStats(statsMap)
+    } catch (error) {
+      console.error('Error loading sales stats:', error)
+    }
+  }
+
   const loadCatalog = async () => {
     setLoading(true)
     try {
       // Cargar todo el contenido
-      const { data, error} = await supabase
+      const { data, error } = await supabase
         .from('catalog')
         .select('*')
         .eq('model_id', modelId)
@@ -35,9 +64,12 @@ export default function CatalogView({ modelId }) {
 
       if (error) throw error
 
+      // Cargar estadísticas de ventas
+      await loadSalesStats()
+
       const sessionsMap = new Map()
       const singlesArray = []
-      
+
       // Crear un mapa de todos los medias por of_media_id para acceso rápido
       const allMediasMap = new Map()
       data.forEach(item => {
@@ -57,7 +89,7 @@ export default function CatalogView({ modelId }) {
               parts: []
             })
           }
-          
+
           // Agregar info de todos los medias del bundle
           const mediasInfo = []
           if (item.of_media_ids && item.of_media_ids.length > 0) {
@@ -74,14 +106,14 @@ export default function CatalogView({ modelId }) {
               }
             })
           }
-          
+
           // Agregar el part con la info de sus medias
           sessionsMap.get(item.session_id).parts.push({
             ...item,
             medias_info: mediasInfo // Array con info de cada media
           })
         }
-        
+
         // Singles: items marcados como single
         if (item.is_single) {
           singlesArray.push(item)
@@ -118,23 +150,23 @@ export default function CatalogView({ modelId }) {
     }
 
     try {
-      
+
       const { error } = await supabase
         .from('catalog')
-        .update({ 
-  session_id: null,
-  session_name: null,
-  session_description: null,
-  step_number: null,
-  parent_type: null,        
-  offer_id: null,           
-  keywords: null,  
-  of_media_ids: null, 
-  base_price: 0,         
-  nivel: 1,               
-  title: 'Unorganized',          
-  status: 'inbox'    
-})
+        .update({
+          session_id: null,
+          session_name: null,
+          session_description: null,
+          step_number: null,
+          parent_type: null,
+          offer_id: null,
+          keywords: null,
+          of_media_ids: null,
+          base_price: 0,
+          nivel: 1,
+          title: 'Unorganized',
+          status: 'inbox'
+        })
         .eq('session_id', session.session_id)
 
       if (error) throw error
@@ -161,17 +193,17 @@ export default function CatalogView({ modelId }) {
     try {
       const { error } = await supabase
         .from('catalog')
-        .update({ 
-  is_single: false,
-  parent_type: null,   
-  offer_id: null,
-  of_media_ids: null,
-  description: null,   
-  keywords: null,
-  base_price: 0,         
-  nivel: 1,                
-  title: 'Unorganized'              
-})
+        .update({
+          is_single: false,
+          parent_type: null,
+          offer_id: null,
+          of_media_ids: null,
+          description: null,
+          keywords: null,
+          base_price: 0,
+          nivel: 1,
+          title: 'Unorganized'
+        })
         .eq('id', single.id)
 
       if (error) throw error
@@ -246,26 +278,24 @@ export default function CatalogView({ modelId }) {
 
   return (
     <div className="space-y-6">
-      
+
       <div className="flex items-center justify-between">
         <div className="flex gap-4 border-b border-gray-200">
           <button
             onClick={() => setActiveTab('sessions')}
-            className={`pb-3 px-4 font-semibold border-b-2 transition-colors ${
-              activeTab === 'sessions'
-                ? 'border-purple-600 text-purple-600'
-                : 'border-transparent text-gray-500 hover:text-gray-700'
-            }`}
+            className={`pb-3 px-4 font-semibold border-b-2 transition-colors ${activeTab === 'sessions'
+              ? 'border-purple-600 text-purple-600'
+              : 'border-transparent text-gray-500 hover:text-gray-700'
+              }`}
           >
             📁 Sessions ({sessions.length})
           </button>
           <button
             onClick={() => setActiveTab('singles')}
-            className={`pb-3 px-4 font-semibold border-b-2 transition-colors ${
-              activeTab === 'singles'
-                ? 'border-purple-600 text-purple-600'
-                : 'border-transparent text-gray-500 hover:text-gray-700'
-            }`}
+            className={`pb-3 px-4 font-semibold border-b-2 transition-colors ${activeTab === 'singles'
+              ? 'border-purple-600 text-purple-600'
+              : 'border-transparent text-gray-500 hover:text-gray-700'
+              }`}
           >
             1️⃣ Singles ({singles.length})
           </button>
@@ -331,7 +361,7 @@ export default function CatalogView({ modelId }) {
                     </div>
 
                     <div className="flex items-center gap-2">
-                    {/*
+                      {/*
                       <button
                         onClick={(e) => {
                           e.stopPropagation()
@@ -426,6 +456,17 @@ export default function CatalogView({ modelId }) {
                                     <span className="px-2 py-1 bg-blue-100 text-blue-800 rounded-full text-xs font-semibold">
                                       {part.of_media_ids?.length || 1} media(s)
                                     </span>
+                                    {salesStats.has(part.id) && (
+                                      <>
+                                        <span className="px-2 py-1 bg-emerald-100 text-emerald-800 rounded-full text-xs font-semibold">
+                                          ✅ Sold {salesStats.get(part.id).count}x
+                                        </span>
+                                        <span className="px-2 py-1 bg-emerald-100 text-emerald-800 rounded-full text-xs font-semibold">
+                                          💰 ${salesStats.get(part.id).revenue}
+                                        </span>
+                                      </>
+                                    )}
+
                                   </div>
                                   {part.keywords && part.keywords.length > 0 && (
                                     <div className="flex flex-wrap gap-1">
@@ -481,13 +522,12 @@ export default function CatalogView({ modelId }) {
               {singles.map(single => {
                 const nivelBadge = getNivelBadge(single.nivel || 1)
                 const isConfigured = single.base_price > 0 && single.keywords?.length > 0
-                
+
                 return (
                   <div
                     key={single.id}
-                    className={`border-2 rounded-lg overflow-hidden hover:shadow-lg transition-all bg-white group ${
-                      isConfigured ? 'border-green-200' : 'border-yellow-300'
-                    }`}
+                    className={`border-2 rounded-lg overflow-hidden hover:shadow-lg transition-all bg-white group ${isConfigured ? 'border-green-200' : 'border-yellow-300'
+                      }`}
                   >
                     <div
                       className="relative aspect-square cursor-pointer"
@@ -522,7 +562,7 @@ export default function CatalogView({ modelId }) {
                       <h4 className="font-semibold text-gray-900 text-sm mb-2 truncate">
                         {single.title || 'Untitled'}
                       </h4>
-                      
+
                       <div className="flex flex-wrap gap-1 mb-2">
                         {single.base_price > 0 ? (
                           <span className="px-2 py-0.5 bg-green-100 text-green-800 rounded-full text-xs font-semibold">
@@ -538,7 +578,7 @@ export default function CatalogView({ modelId }) {
                         </span>
                       </div>
 
-                
+
 
                       <div className="flex gap-1">
                         <button
@@ -613,7 +653,7 @@ function MediaSelectorModal({ medias, onSelect, onClose }) {
   return (
     <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-xl shadow-2xl w-full max-w-5xl max-h-[90vh] overflow-hidden flex flex-col">
-        
+
         <div className="bg-gradient-to-r from-green-600 to-emerald-600 text-white p-4 flex items-center justify-between">
           <div>
             <h3 className="text-lg font-bold">1️⃣ Select Media for Single</h3>
@@ -658,7 +698,7 @@ function MediaSelectorModal({ medias, onSelect, onClose }) {
                       </div>
                     )}
                   </div>
-                  
+
                   <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-40 transition-all flex items-center justify-center">
                     <span className="text-white text-sm font-semibold opacity-0 group-hover:opacity-100 transition-all">
                       ❌“ Select
@@ -697,7 +737,7 @@ function MediaPreviewModal({ media, onClose }) {
   return (
     <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-xl shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-hidden">
-        
+
         <div className="bg-gradient-to-r from-purple-600 to-pink-600 text-white p-4 flex items-center justify-between">
           <div>
             <h3 className="text-lg font-bold">{media.title || 'Preview'}</h3>
