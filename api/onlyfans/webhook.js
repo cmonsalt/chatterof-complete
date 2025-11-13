@@ -424,7 +424,8 @@ async function handlePPVUnlocked(payload, modelId) {
       detected_by: 'webhook',
       purchase_metadata: {
         message_id: messageId,
-        event_type: 'ppv_unlock'
+        event_type: 'ppv_unlock',
+        subscriber_id: subscriberId
       }
     })
 
@@ -438,7 +439,7 @@ async function handlePPVUnlocked(payload, modelId) {
   const { data: fanData } = await supabase
     .from('fans')
     .select('of_username, display_name, name')
-    .eq('fan_id', fanId)
+    .eq('fan_id', actualFanId) 
     .eq('model_id', modelId)
     .single()
 
