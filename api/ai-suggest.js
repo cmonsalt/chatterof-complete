@@ -257,7 +257,7 @@ If conversation is OLD (7+ days):
 💬 RECENT CHAT HISTORY
 ═══════════════════════════════════════════════════
 ${chatHistory || 'No previous messages - this is the first interaction'}
-
+🚨 CRITICAL: The LAST message in the conversation history above is the fan's CURRENT message that you MUST respond to. Respond to THAT specific message, not older ones. Pay attention to what they're saying RIGHT NOW.
 ═══════════════════════════════════════════════════
 🎬 AVAILABLE CONTENT
 ═══════════════════════════════════════════════════
