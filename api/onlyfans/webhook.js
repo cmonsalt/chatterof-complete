@@ -132,7 +132,7 @@ async function handleMessageReceived(payload, modelId) {
 
   // Si es tip
   if (isTip) {
-  const amount = payload.price
+    const amount = payload.price
 
     const { data: fanData } = await supabase
       .from('fans')
@@ -219,7 +219,7 @@ async function handleVaultContent(payload, modelId) {
         continue
       }
 
-       const { data: existing } = await supabase
+      const { data: existing } = await supabase
         .from('catalog')
         .select('of_media_id, r2_url')
         .eq('of_media_id', mediaId)
@@ -372,7 +372,7 @@ async function handleMessageSent(payload, modelId) {
 async function handlePPVUnlocked(payload, modelId) {
   const fanId = payload.user_id?.toString()
   const messageId = payload.id?.toString()
-  
+
   // Extraer precio de replacePairs
   let price = 0
   if (payload.replacePairs && payload.replacePairs["{AMOUNT}"]) {
@@ -388,6 +388,15 @@ async function handlePPVUnlocked(payload, modelId) {
   console.log(`💰 PPV unlocked by fan ${fanId}, message ${messageId}, price $${price}`)
 
   // 1. Actualizar mensaje en chat
+  const { data: fanMapping } = await supabase
+    .from('fans')
+    .select('fan_id')
+    .eq('subscriber_id', fanId)
+    .eq('model_id', modelId)
+    .single()
+
+  const actualFanId = fanMapping?.fan_id || fanId
+
   const { error: chatError } = await supabase
     .from('chat')
     .update({
