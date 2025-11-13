@@ -431,6 +431,7 @@ export default function ChatView({ embedded = false }) {
           mediaFiles: ppvData.mediaFiles,
           price: ppvData.price,
           previewMediaIds: ppvData.previewMediaIds,
+          catalogIds: ppvData.catalogIds,
           replyToMessageId: replyingTo?.id || null,
           replyToText: replyingTo?.message || null
         })
