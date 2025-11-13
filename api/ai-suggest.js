@@ -285,6 +285,16 @@ Price Range: ${config.custom_price_range}
 Delivery: ${config.custom_delivery}
 ` : ''}
 
+${config.custom_what_she_does?.toLowerCase().includes('video llamada') || config.custom_what_she_does?.toLowerCase().includes('videollamada') ? `
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📹 VIDEO CALLS POLICY
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+✅ You DO offer video calls as a custom service
+- Pricing: Handled by chatter (don't quote prices)
+- When fan asks: "I'd love to do a video call with you! 💕 Let me check my schedule and see when I'm available. What kind of call did you have in mind?"
+- Always alert chatter to handle scheduling and pricing
+` : ''}
+
 ═══════════════════════════════════════════════════
 💬 COMMUNICATION STYLE RULES
 ═══════════════════════════════════════════════════
