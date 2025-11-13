@@ -448,7 +448,7 @@ export default function CatalogView({ modelId }) {
                                   </h4>
                                   <div className="flex flex-wrap items-center gap-2 mb-2">
                                     <span className="px-2 py-1 bg-green-100 text-green-800 rounded-full text-xs font-semibold">
-                                      ðŸ’° ${part.base_price}
+                                    💵 ${part.base_price}
                                     </span>
                                     <span className={`px-2 py-1 rounded-full text-xs font-semibold ${nivelBadge.color}`}>
                                       {nivelBadge.label}
