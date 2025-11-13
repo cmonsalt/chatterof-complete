@@ -176,6 +176,7 @@ export default function PPVSendModal({
               {selectedContent.map((item) => {
                 const isPreview = previewMediaIds.includes(item.of_media_id);
                 const isPurchased = purchasedCatalogIds.has(item.id);
+                console.log('🔍 Item:', item.id, 'isPurchased:', isPurchased);
                 return (
                   <div
                     key={item.id}
