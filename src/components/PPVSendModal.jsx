@@ -77,6 +77,7 @@ export default function PPVSendModal({
       if (error) throw error;
 
       const purchasedIds = new Set(data.map(d => d.ppv_catalog_id));
+      console.log('🔍 Purchased IDs:', Array.from(purchasedIds));
       setPurchasedCatalogIds(purchasedIds);
     } catch (error) {
       console.error('Error loading fan purchases:', error);
