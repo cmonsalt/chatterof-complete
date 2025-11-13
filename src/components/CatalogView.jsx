@@ -250,20 +250,20 @@ export default function CatalogView({ modelId }) {
   }
 
   const getNivelBadge = (nivel) => {
-    const badges = {
-      1: { label: 'ðŸŸ¢ Tease', color: 'bg-green-100 text-green-800' },
-      2: { label: 'ðŸŸ¢ Soft', color: 'bg-green-100 text-green-800' },
-      3: { label: 'ðŸŸ¢ Innocent', color: 'bg-green-100 text-green-800' },
-      4: { label: 'ðŸŸ¡ Bikini', color: 'bg-yellow-100 text-yellow-800' },
-      5: { label: 'ðŸŸ¡ Lingerie', color: 'bg-yellow-100 text-yellow-800' },
-      6: { label: 'ðŸŸ¡ Topless', color: 'bg-yellow-100 text-yellow-800' },
-      7: { label: 'ðŸŸ  Nude', color: 'bg-orange-100 text-orange-800' },
-      8: { label: 'ðŸŸ  Solo Play', color: 'bg-orange-100 text-orange-800' },
-      9: { label: 'ðŸ”´ Explicit', color: 'bg-red-100 text-red-800' },
-      10: { label: 'âš« Hardcore', color: 'bg-gray-900 text-white' }
-    }
-    return badges[nivel] || badges[1]
+  const badges = {
+    1: { label: '🟢 Tease', color: 'bg-green-100 text-green-800' },
+    2: { label: '🟢 Soft', color: 'bg-green-100 text-green-800' },
+    3: { label: '🟢 Innocent', color: 'bg-green-100 text-green-800' },
+    4: { label: '🟡 Bikini', color: 'bg-yellow-100 text-yellow-800' },
+    5: { label: '🟡 Lingerie', color: 'bg-yellow-100 text-yellow-800' },
+    6: { label: '🟡 Topless', color: 'bg-yellow-100 text-yellow-800' },
+    7: { label: '🟠 Nude', color: 'bg-orange-100 text-orange-800' },
+    8: { label: '🟠 Solo Play', color: 'bg-orange-100 text-orange-800' },
+    9: { label: '🔴 Explicit', color: 'bg-red-100 text-red-800' },
+    10: { label: '⚫ Hardcore', color: 'bg-gray-900 text-white' }
   }
+  return badges[nivel] || badges[1]
+}
 
   if (loading) {
     return (
@@ -347,14 +347,14 @@ export default function CatalogView({ modelId }) {
                     <div className="flex-1">
                       <div className="flex items-center gap-3">
                         <span className="text-2xl">
-                          {expandedSessions.has(session.session_id) ? 'ðŸ“‚' : '📝'}
+                          {expandedSessions.has(session.session_id) ? '📂‚' : '📝'}
                         </span>
                         <div>
                           <h3 className="text-lg font-bold text-gray-900">
                             {session.session_name}
                           </h3>
                           <p className="text-sm text-gray-600">
-                            {session.parts.length} parts â€¢ {session.session_description}
+                            {session.parts.length} parts • {session.session_description}
                           </p>
                         </div>
                       </div>
@@ -379,7 +379,7 @@ export default function CatalogView({ modelId }) {
                         }}
                         className="px-3 py-1 bg-white border border-red-300 text-red-600 rounded-lg hover:bg-red-50 text-sm font-semibold"
                       >
-                        ðŸ—‘ï¸
+                        🗑️
                       </button>
                     </div>
                   </div>
@@ -547,13 +547,13 @@ export default function CatalogView({ modelId }) {
 
                       <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-40 transition-all flex items-center justify-center">
                         <span className="text-white text-sm font-semibold opacity-0 group-hover:opacity-100 transition-all">
-                          ðŸ‘ï¸ Preview
+                          👁️ Preview
                         </span>
                       </div>
 
                       {!isConfigured && (
                         <div className="absolute top-2 left-2 px-2 py-1 bg-yellow-500 text-white text-xs font-bold rounded">
-                          âš ï¸ Configure
+                          ⚠️ Configure
                         </div>
                       )}
                     </div>
@@ -585,13 +585,13 @@ export default function CatalogView({ modelId }) {
                           onClick={() => handleEditSingle(single)}
                           className="flex-1 px-3 py-1 bg-purple-50 text-purple-600 rounded hover:bg-purple-100 text-xs font-semibold"
                         >
-                          ❌ï¸ {isConfigured ? 'Edit' : 'Configure'}
+                          ❌✏️ {isConfigured ? 'Edit' : 'Configure'}
                         </button>
                         <button
                           onClick={() => handleDeleteSingle(single)}
                           className="px-3 py-1 bg-red-50 text-red-600 rounded hover:bg-red-100 text-xs font-semibold"
                         >
-                          ðŸ—‘ï¸
+                           🗑️
                         </button>
                       </div>
                     </div>
@@ -672,7 +672,7 @@ function MediaSelectorModal({ medias, onSelect, onClose }) {
         <div className="flex-1 overflow-auto p-6">
           {medias.length === 0 ? (
             <div className="text-center py-12">
-              <p className="text-gray-500 text-lg">ðŸ“­ No available content</p>
+              <p className="text-gray-500 text-lg">🔭­ No available content</p>
               <p className="text-gray-400 text-sm mt-2">
                 All content is already organized in Sessions or Singles
               </p>
