@@ -32,68 +32,27 @@ export default function Navbar() {
   const handleModelSwitch = (modelId) => {
     switchModel(modelId)
     setShowModelSelector(false)
-    
-    // Navegar a dashboard en lugar de reload
-    // Esto resetea el estado limpiamente
     navigate('/dashboard')
   }
 
   return (
-    <nav style={{
-      background: 'white',
-      borderBottom: '1px solid #e5e7eb',
-      padding: '1rem 2rem',
-      marginBottom: '2rem'
-    }}>
-      <div style={{
-        maxWidth: '1200px',
-        margin: '0 auto',
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center'
-      }}>
-        <h1 
+    <nav className="bg-white border-b border-gray-200 px-3 md:px-8 py-3 mb-4 md:mb-8">
+      <div className="max-w-7xl mx-auto flex justify-between items-center gap-2">
+        <h1
           onClick={() => navigate('/dashboard')}
-          style={{ 
-            fontSize: '1.5rem', 
-            fontWeight: 'bold',
-            cursor: 'pointer',
-            color: '#3b82f6'
-          }}
+          className="text-lg md:text-2xl font-bold cursor-pointer text-blue-500"
         >
-          ChatterOF
+          ChatterOF 🔔
         </h1>
-        
-        <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+
+        <div className="flex gap-1 md:gap-3 items-center">
           {/* Notification Bell */}
           <NotificationBell />
 
-          {/* Chatter Mode Button - NUEVO */}
+          {/* Chatter Mode Button */}
           <button
             onClick={() => navigate('/chatter')}
-            style={{
-              padding: '0.5rem 1rem',
-              background: 'linear-gradient(to right, #8b5cf6, #ec4899)',
-              color: 'white',
-              borderRadius: '0.375rem',
-              fontSize: '0.875rem',
-              fontWeight: 600,
-              border: 'none',
-              cursor: 'pointer',
-              boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.5rem',
-              transition: 'all 0.2s'
-            }}
-            onMouseEnter={(e) => {
-              e.target.style.transform = 'translateY(-1px)'
-              e.target.style.boxShadow = '0 4px 8px rgba(0,0,0,0.15)'
-            }}
-            onMouseLeave={(e) => {
-              e.target.style.transform = 'translateY(0)'
-              e.target.style.boxShadow = '0 2px 4px rgba(0,0,0,0.1)'
-            }}
+            className="hidden md:flex px-3 md:px-4 py-2 bg-gradient-to-r from-purple-600 to-pink-500 text-white rounded-lg text-sm font-semibold items-center gap-2 shadow-md hover:shadow-lg hover:-translate-y-0.5 transition-all"
           >
             <span>💬</span>
             <span>Chatter Mode</span>
@@ -101,83 +60,41 @@ export default function Navbar() {
 
           {/* Model Selector */}
           {models.length > 0 && (
-            <div ref={dropdownRef} style={{ position: 'relative' }}>
+            <div ref={dropdownRef} className="relative">
               <button
                 onClick={() => setShowModelSelector(!showModelSelector)}
-                style={{
-                  padding: '0.5rem 1rem',
-                  background: '#8b5cf6',
-                  color: 'white',
-                  borderRadius: '0.375rem',
-                  fontSize: '0.875rem',
-                  fontWeight: 600,
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.5rem',
-                  border: '2px solid #7c3aed'
-                }}
+                className="flex items-center gap-2 px-2 md:px-4 py-2 bg-indigo-500 text-white rounded-lg hover:bg-indigo-600 transition-colors text-sm"
               >
-                <span>💎</span>
-                <span>{currentModel?.name || 'Select Model'}</span>
-                <span style={{ fontSize: '0.75rem' }}>▼</span>
+                <span className="hidden md:inline">💎</span>
+                <span className="truncate max-w-[80px] md:max-w-none">
+                  {currentModel?.name || 'Select Model'}
+                </span>
+                <span className="text-xs">▼</span>
               </button>
 
               {/* Dropdown */}
               {showModelSelector && (
-                <div style={{
-                  position: 'absolute',
-                  top: '100%',
-                  right: 0,
-                  marginTop: '0.5rem',
-                  background: 'white',
-                  border: '1px solid #e5e7eb',
-                  borderRadius: '0.5rem',
-                  boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)',
-                  minWidth: '200px',
-                  zIndex: 50
-                }}>
-                  <div style={{ padding: '0.5rem' }}>
-                    <div style={{ 
-                      padding: '0.5rem', 
-                      fontSize: '0.75rem', 
-                      fontWeight: 600,
-                      color: '#6b7280',
-                      borderBottom: '1px solid #e5e7eb'
-                    }}>
+                <div className="absolute top-full right-0 mt-2 bg-white border border-gray-200 rounded-lg shadow-xl min-w-[200px] z-50">
+                  <div className="p-2">
+                    <div className="px-2 py-1 text-xs font-semibold text-gray-600 border-b border-gray-200">
                       SELECT MODEL
                     </div>
                     {models.map((model) => (
                       <button
                         key={model.model_id}
                         onClick={() => handleModelSwitch(model.model_id)}
-                        style={{
-                          width: '100%',
-                          textAlign: 'left',
-                          padding: '0.75rem',
-                          borderRadius: '0.375rem',
-                          fontSize: '0.875rem',
-                          background: currentModel?.model_id === model.model_id ? '#f3f4f6' : 'transparent',
-                          fontWeight: currentModel?.model_id === model.model_id ? 600 : 400,
-                          color: currentModel?.model_id === model.model_id ? '#3b82f6' : '#374151',
-                          marginTop: '0.25rem'
-                        }}
-                        onMouseEnter={(e) => {
-                          if (currentModel?.model_id !== model.model_id) {
-                            e.target.style.background = '#f9fafb'
-                          }
-                        }}
-                        onMouseLeave={(e) => {
-                          if (currentModel?.model_id !== model.model_id) {
-                            e.target.style.background = 'transparent'
-                          }
-                        }}
+                        className={`w-full text-left px-3 py-2 rounded-lg text-sm mt-1 transition-colors ${
+                          currentModel?.model_id === model.model_id
+                            ? 'bg-gray-100 font-semibold text-blue-500'
+                            : 'hover:bg-gray-50 text-gray-700'
+                        }`}
                       >
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                        <div className="flex items-center gap-2">
                           {currentModel?.model_id === model.model_id && <span>✓</span>}
                           <div>
                             <div>{model.name}</div>
                             {model.niche && (
-                              <div style={{ fontSize: '0.75rem', color: '#9ca3af' }}>
+                              <div className="text-xs text-gray-400">
                                 {model.niche}
                               </div>
                             )}
@@ -191,33 +108,26 @@ export default function Navbar() {
             </div>
           )}
 
-          <span style={{ fontSize: '0.875rem', color: '#6b7280' }}>
+          {/* Email - solo desktop */}
+          <span className="hidden lg:inline text-gray-600 text-sm">
             {user?.email}
           </span>
+
+          {/* Settings - solo desktop */}
           <button
             onClick={() => navigate('/settings')}
-            style={{
-              padding: '0.5rem 1rem',
-              background: '#f3f4f6',
-              borderRadius: '0.375rem',
-              fontSize: '0.875rem',
-              fontWeight: 500
-            }}
+            className="hidden md:block px-3 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors text-sm"
           >
             Settings
           </button>
+
+          {/* Sign Out */}
           <button
             onClick={handleSignOut}
-            style={{
-              padding: '0.5rem 1rem',
-              background: '#ef4444',
-              color: 'white',
-              borderRadius: '0.375rem',
-              fontSize: '0.875rem',
-              fontWeight: 500
-            }}
+            className="px-3 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors text-sm font-semibold"
           >
-            Sign Out
+            <span className="hidden md:inline">Sign Out</span>
+            <span className="md:hidden">🚪</span>
           </button>
         </div>
       </div>
