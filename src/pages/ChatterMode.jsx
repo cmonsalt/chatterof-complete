@@ -188,34 +188,37 @@ export default function ChatterMode() {
           </div>
 
           {/* Stats */}
-          {/* Card 1 - Messages Today */}
-          <div className="bg-white rounded-xl shadow p-3 md:p-4">
-            <p className="text-xs md:text-sm text-gray-600">Messages Today</p>
-            <p className="text-xl md:text-2xl font-bold text-blue-600">{todayStats.messagesSent}</p>
-          </div>
+          {/* Stats */}
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-3 md:gap-4 mb-4 md:mb-6">
+            {/* Card 1 - Messages Today */}
+            <div className="bg-white rounded-lg md:rounded-xl shadow-sm p-4">
+              <p className="text-xs md:text-sm text-gray-600">Messages Today</p>
+              <p className="text-xl md:text-2xl font-bold text-blue-600">{todayStats.messagesSent}</p>
+            </div>
 
-          {/* Card 2 - Sales Today */}
-          <div className="bg-white rounded-xl shadow p-3 md:p-4">
-            <p className="text-xs md:text-sm text-gray-600">Sales Today</p>
-            <p className="text-xl md:text-2xl font-bold text-green-600">{todayStats.sales}</p>
-          </div>
+            {/* Card 2 - Sales Today */}
+            <div className="bg-white rounded-lg md:rounded-xl shadow-sm p-4">
+              <p className="text-xs md:text-sm text-gray-600">Sales Today</p>
+              <p className="text-xl md:text-2xl font-bold text-green-600">{todayStats.sales}</p>
+            </div>
 
-          {/* Card 3 - Revenue Today */}
-          <div className="bg-white rounded-xl shadow p-3 md:p-4">
-            <p className="text-xs md:text-sm text-gray-600">Revenue Today</p>
-            <p className="text-xl md:text-2xl font-bold text-green-600">${todayStats.revenue}</p>
-          </div>
+            {/* Card 3 - Revenue Today */}
+            <div className="bg-white rounded-lg md:rounded-xl shadow-sm p-4">
+              <p className="text-xs md:text-sm text-gray-600">Revenue Today</p>
+              <p className="text-xl md:text-2xl font-bold text-green-600">${todayStats.revenue}</p>
+            </div>
 
-          {/* Card 4 - Active Chats */}
-          <div className="bg-white rounded-xl shadow p-3 md:p-4">
-            <p className="text-xs md:text-sm text-gray-600">Active Chats</p>
-            <p className="text-xl md:text-2xl font-bold text-orange-600">{todayStats.activeFans}</p>
-          </div>
+            {/* Card 4 - Active Chats */}
+            <div className="bg-white rounded-lg md:rounded-xl shadow-sm p-4">
+              <p className="text-xs md:text-sm text-gray-600">Active Chats</p>
+              <p className="text-xl md:text-2xl font-bold text-orange-600">{todayStats.activeFans}</p>
+            </div>
 
-          {/* Card 5 - Avg Response */}
-          <div className="bg-white rounded-xl shadow p-3 md:p-4">
-            <p className="text-xs md:text-sm text-gray-600">Avg Response</p>
-            <p className="text-xl md:text-2xl font-bold text-purple-600">{todayStats.avgResponseTime}m</p>
+            {/* Card 5 - Avg Response */}
+            <div className="bg-white rounded-lg md:rounded-xl shadow-sm p-4">
+              <p className="text-xs md:text-sm text-gray-600">Avg Response</p>
+              <p className="text-xl md:text-2xl font-bold text-purple-600">{todayStats.avgResponseTime}m</p>
+            </div>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-12 gap-4 md:gap-6">
