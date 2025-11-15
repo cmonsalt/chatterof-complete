@@ -211,17 +211,16 @@ export default function ChatView({ embedded = false }) {
 `)
         .eq('fan_id', fanId)
         .eq('model_id', currentModelId)
-        .order('ts', { ascending: true })  // ← DESC
+        .order('ts', { ascending: false })  // ← DESC
         .limit(100);
 
 
       if (messagesError) {
         console.error('❌ Messages error:', messagesError);
       } else {
-        console.log('✅ SETEANDO:', messagesData?.length, messagesData);
-        setMessages(messagesData || []);
+        const sortedMessages = (messagesData || []).reverse(); 
+        setMessages(sortedMessages);  
       }
-
       calculateFanStats(messagesData || []);
       setLoading(false);
     } catch (error) {
