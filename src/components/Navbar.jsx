@@ -84,8 +84,8 @@ export default function Navbar() {
                         key={model.model_id}
                         onClick={() => handleModelSwitch(model.model_id)}
                         className={`w-full text-left px-3 py-2 rounded-lg text-sm mt-1 transition-colors ${currentModel?.model_id === model.model_id
-                            ? 'bg-gray-100 font-semibold text-blue-500'
-                            : 'hover:bg-gray-50 text-gray-700'
+                          ? 'bg-gray-100 font-semibold text-blue-500'
+                          : 'hover:bg-gray-50 text-gray-700'
                           }`}
                       >
                         <div className="flex items-center gap-2">
@@ -115,9 +115,10 @@ export default function Navbar() {
           {/* Settings - solo desktop */}
           <button
             onClick={() => navigate('/settings')}
-            className="hidden md:block px-3 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors text-sm"
+            className="px-2 md:px-3 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors text-sm"
           >
-            Settings
+            <span className="hidden md:inline">Settings</span>
+            <span className="md:hidden">⚙️</span>
           </button>
 
           {/* Sign Out */}
