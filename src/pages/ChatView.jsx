@@ -218,8 +218,8 @@ export default function ChatView({ embedded = false }) {
       if (messagesError) {
         console.error('❌ Messages error:', messagesError);
       } else {
-        const sortedMessages = (messagesData || []).reverse(); 
-        setMessages(sortedMessages);  
+        const sortedMessages = (messagesData || []).reverse();
+        setMessages(sortedMessages);
       }
       calculateFanStats(messagesData || []);
       setLoading(false);
@@ -651,7 +651,7 @@ export default function ChatView({ embedded = false }) {
             </div>
 
             {/* Stats */}
-            <div className="grid grid-cols-4 gap-4 mt-4">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-2 md:gap-4 mt-4">
               <div className="bg-green-50 rounded-lg p-3 border border-green-200">
                 <div className="text-2xl font-bold text-green-600">
                   ${fanStats.totalTips.toFixed(2)}
@@ -681,16 +681,16 @@ export default function ChatView({ embedded = false }) {
             </div>
           </div>
 
-          <div className="flex-1 flex gap-4 p-6">
+          <div className="flex-1 flex flex-col md:flex-row gap-4 p-4 md:p-6">
             {/* Chat */}
-            <div className="flex-1 bg-white rounded-xl shadow-lg flex flex-col relative">
+            <div className="w-full md:flex-1 bg-white rounded-xl shadow-lg flex flex-col relative">
               {/* Fecha flotante */}
               {floatingDate && (
                 <div className="absolute top-4 left-1/2 transform -translate-x-1/2 bg-black/80 text-white px-4 py-2 rounded-full text-sm font-medium z-50 shadow-lg">
                   {floatingDate}
                 </div>
               )}
-              <div className="flex-1 overflow-y-auto p-6 space-y-4 max-h-[calc(100vh-200px)]"
+              <div className="flex-1 overflow-y-auto p-3 md:p-6 space-y-4 max-h-[calc(100vh-200px)]"
                 onScroll={handleScroll}
               >
                 {messages.map((msg) => {
@@ -802,14 +802,14 @@ export default function ChatView({ embedded = false }) {
                       onKeyPress={(e) => e.key === 'Enter' && !sending && enviarMensaje()}
                       placeholder={replyingTo ? "Write your reply..." : "Type your message..."}
                       disabled={sending}
-                      className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
+                      className="flex-1 px-3 md:px-4 py-3 md:py-2 text-base md:text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
                     />
 
                     {/* 🤖 AI BUTTON */}
                     <button
                       onClick={handleConsultarIA}
                       disabled={aiGenerating}
-                      className="px-4 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600 font-semibold transition-all disabled:opacity-50"
+                      className="px-3 md:px-4 py-3 md:py-2 text-sm md:text-base bg-purple-500 text-white rounded-lg hover:bg-purple-600 font-semibold transition-all disabled:opacity-50"
                     >
                       {aiGenerating ? '⏳' : '🤖 AI'}
                     </button>
@@ -817,7 +817,7 @@ export default function ChatView({ embedded = false }) {
                     {/* 🔥 PPV BUTTON */}
                     <button
                       onClick={() => setShowPPVSelector(true)}
-                      className="px-4 py-2 bg-gradient-to-r from-green-500 to-emerald-500 text-white rounded-lg hover:from-green-600 hover:to-emerald-600 font-semibold transition-all"
+                      className="px-3 md:px-4 py-3 md:py-2 text-sm md:text-base bg-gradient-to-r from-green-500 to-emerald-500 text-white rounded-lg hover:from-green-600 hover:to-emerald-600 font-semibold transition-all"
                     >
                       💰 PPV
                     </button>
@@ -825,7 +825,7 @@ export default function ChatView({ embedded = false }) {
                     <button
                       onClick={enviarMensaje}
                       disabled={sending || !newMessage.trim()}
-                      className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 font-semibold transition-all disabled:opacity-50"
+                      className="px-3 md:px-4 py-3 md:py-2 text-sm md:text-base bg-blue-500 text-white rounded-lg hover:bg-blue-600 font-semibold transition-all disabled:opacity-50"
                     >
                       {sending ? 'Enviando...' : 'Enviar'}
                     </button>
@@ -848,7 +848,7 @@ export default function ChatView({ embedded = false }) {
 
             {/* Notes Sidebar */}
             {showNotesSidebar && (
-              <div className="bg-white rounded-xl shadow-lg p-6 max-h-[700px] overflow-y-auto" style={{ width: '320px' }}>
+              <div className="hidden md:block bg-white rounded-xl shadow-lg p-6 max-h-[700px] overflow-y-auto md:w-[320px]">
                 <div className="flex items-center justify-between mb-4">
                   <h2 className="text-xl font-bold text-gray-800">📝 Notes</h2>
                   <button
