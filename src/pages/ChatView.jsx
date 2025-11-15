@@ -201,12 +201,6 @@ export default function ChatView({ embedded = false }) {
       setNotesValue(fanData.notes || '');
       setChatterNotesValue(fanData.chatter_notes || '');
 
-      console.log('🔍 CONSULTANDO:', {
-  fanId,
-  currentModelId,
-  userModelId: user?.user_metadata?.model_id
-});
-
       const { data: messagesData, error: messagesError } = await supabase
         .from('chat')
         .select(`
@@ -280,7 +274,7 @@ export default function ChatView({ embedded = false }) {
 
   // 🤖 NEW: AI Suggestion Handler
   async function handleConsultarIA() {
-    const currentModelId = modelId || user?.user_metadata?.model_id;
+    const currentModelId = modelId;
     if (!currentModelId || !fan) return;
 
     setAiGenerating(true);
