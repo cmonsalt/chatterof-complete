@@ -41,7 +41,6 @@ export default function Dashboard() {
     }
 
     try {
-      // PAGINACIÓN: Cargar todos los fans en batches de 1000
       let allFansData = []
       let from = 0
       const pageSize = 1000
@@ -63,20 +62,19 @@ export default function Dashboard() {
 
         allFansData = [...allFansData, ...batch]
 
-        console.log(`📦 Loaded batch: ${batch.length} fans (total so far: ${allFansData.length})`)
+        console.log(`Loaded batch: ${batch.length} fans (total so far: ${allFansData.length})`)
 
         if (batch.length < pageSize) break
         from += pageSize
       }
 
-      console.log(`✅ Total fans loaded: ${allFansData.length}`)
+      console.log(`Total fans loaded: ${allFansData.length}`)
 
       const fanIds = allFansData?.map(f => f.fan_id) || []
 
       let lastMessagesMap = {}
 
       if (fanIds.length > 0) {
-        // Cargar mensajes también en batches
         const batchSize = 1000
         for (let i = 0; i < fanIds.length; i += batchSize) {
           const fanIdBatch = fanIds.slice(i, i + batchSize)
@@ -121,7 +119,7 @@ export default function Dashboard() {
 
       const activeFans = fansWithLastMessage.filter(f => f.isActive)
 
-      console.log('📊 FANS CARGADOS:', fansWithLastMessage.length)
+      console.log('FANS CARGADOS:', fansWithLastMessage.length)
 
       setStats({
         hoy: 0,
@@ -139,11 +137,9 @@ export default function Dashboard() {
 
   const filteredFans = fans
     .filter(fan => {
-      // Si hay un tier seleccionado, ignorar el filtro de "Active"
       if (selectedTier !== null) {
         return fan.tier === selectedTier
       }
-      // Si no hay tier seleccionado, aplicar filtro Active/All
       return showActiveOnly ? fan.isActive : true
     })
     .filter(fan =>
@@ -153,7 +149,6 @@ export default function Dashboard() {
       fan.display_name?.toLowerCase().includes(searchQuery.toLowerCase())
     )
 
-  // Contar fans por tier (todos, no filtrados)
   const tierCounts = {
     new: fans.filter(f => f.tier === 0).length,
     vip: fans.filter(f => f.tier === 1).length,
@@ -205,70 +200,43 @@ export default function Dashboard() {
     <>
       <Navbar />
       <div className="max-w-7xl mx-auto px-3 md:px-6 py-4 md:py-8">
-        <div style={{ marginBottom: '2rem' }}>
-          <h1 style={{ fontSize: '2rem', fontWeight: 'bold', marginBottom: '0.5rem' }}>
-            📊 Dashboard
-          </h1>
-          <p style={{ color: '#6b7280' }}>Overview of all fans and activity</p>
+        <div className="mb-8">
+          <h1 className="text-2xl md:text-3xl font-bold mb-2">📊 Dashboard</h1>
+          <p className="text-gray-600">Overview of all fans and activity</p>
         </div>
 
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-6 mb-6">
-          <div style={{
-            background: 'white',
-            padding: '1.5rem',
-            borderRadius: '12px',
-            borderLeft: '4px solid #10b981',
-            boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
-          }}>
-            <p style={{ fontSize: '0.875rem', color: '#6b7280', marginBottom: '0.5rem' }}>Today's Revenue</p>
-            <p style={{ fontSize: '2rem', fontWeight: 'bold', color: '#10b981' }}>${stats.hoy.toFixed(2)}</p>
+          <div className="bg-white p-3 md:p-6 rounded-xl border-l-4 border-green-500 shadow-sm">
+            <p className="text-xs md:text-sm text-gray-600 mb-1">Today's Revenue</p>
+            <p className="text-xl md:text-2xl font-bold text-green-600">${stats.hoy.toFixed(2)}</p>
           </div>
 
-          <div style={{
-            background: 'white',
-            padding: '1.5rem',
-            borderRadius: '12px',
-            borderLeft: '4px solid #3b82f6',
-            boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
-          }}>
-            <p style={{ fontSize: '0.875rem', color: '#6b7280', marginBottom: '0.5rem' }}>Active Fans</p>
-            <p style={{ fontSize: '2rem', fontWeight: 'bold', color: '#3b82f6' }}>{stats.chats}</p>
+          <div className="bg-white p-3 md:p-6 rounded-xl border-l-4 border-blue-500 shadow-sm">
+            <p className="text-xs md:text-sm text-gray-600 mb-1">Active Fans</p>
+            <p className="text-xl md:text-2xl font-bold text-blue-600">{stats.chats}</p>
           </div>
 
-          <div style={{
-            background: 'white',
-            padding: '1.5rem',
-            borderRadius: '12px',
-            borderLeft: '4px solid #a855f7',
-            boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
-          }}>
-            <p style={{ fontSize: '0.875rem', color: '#6b7280', marginBottom: '0.5rem' }}>Total Messages</p>
-            <p style={{ fontSize: '2rem', fontWeight: 'bold', color: '#a855f7' }}>{stats.mensajes}</p>
+          <div className="bg-white p-3 md:p-6 rounded-xl border-l-4 border-purple-500 shadow-sm">
+            <p className="text-xs md:text-sm text-gray-600 mb-1">Total Messages</p>
+            <p className="text-xl md:text-2xl font-bold text-purple-600">{stats.mensajes}</p>
           </div>
 
-          <div style={{
-            background: 'white',
-            padding: '1.5rem',
-            borderRadius: '12px',
-            borderLeft: '4px solid #ec4899',
-            boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
-          }}>
-            <p style={{ fontSize: '0.875rem', color: '#6b7280', marginBottom: '0.5rem' }}>Total Fans</p>
-            <p style={{ fontSize: '2rem', fontWeight: 'bold', color: '#ec4899' }}>{stats.totalFans}</p>
+          <div className="bg-white p-3 md:p-6 rounded-xl border-l-4 border-pink-500 shadow-sm">
+            <p className="text-xs md:text-sm text-gray-600 mb-1">Total Fans</p>
+            <p className="text-xl md:text-2xl font-bold text-pink-600">{stats.totalFans}</p>
           </div>
         </div>
 
         <div className="bg-white rounded-xl p-3 md:p-6 shadow-sm">
-          <div style={{ marginBottom: '1.5rem' }}>
+          <div className="mb-6">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 mb-4">
-              <h2 style={{ fontSize: '1.25rem', fontWeight: 'bold' }}>All Fans</h2>
+              <h2 className="text-lg md:text-xl font-bold">All Fans</h2>
 
               <div className="flex flex-col md:flex-row gap-2 md:gap-4 w-full md:w-auto">
-
-                <div className="flex gap-2 bg-gray-100 rounded-lg p-1">
+                <div className="flex gap-2 bg-gray-100 rounded-lg p-1 w-full md:w-auto">
                   <button
                     onClick={() => setShowActiveOnly(true)}
-                    className={`px-4 py-1.5 rounded-md text-sm font-medium transition ${showActiveOnly
+                    className={`flex-1 md:flex-none px-3 md:px-4 py-1.5 rounded-md text-xs md:text-sm font-medium transition ${showActiveOnly
                       ? 'bg-white shadow text-blue-600'
                       : 'text-gray-600 hover:text-gray-900'
                       }`}
@@ -277,7 +245,7 @@ export default function Dashboard() {
                   </button>
                   <button
                     onClick={() => setShowActiveOnly(false)}
-                    className={`px-4 py-1.5 rounded-md text-sm font-medium transition ${!showActiveOnly
+                    className={`flex-1 md:flex-none px-3 md:px-4 py-1.5 rounded-md text-xs md:text-sm font-medium transition ${!showActiveOnly
                       ? 'bg-white shadow text-blue-600'
                       : 'text-gray-600 hover:text-gray-900'
                       }`}
@@ -286,10 +254,10 @@ export default function Dashboard() {
                   </button>
                 </div>
 
-                <div className="flex gap-2 bg-gray-50 rounded-lg p-1 border">
+                <div className="flex gap-1 md:gap-2 bg-gray-50 rounded-lg p-1 border overflow-x-auto">
                   <button
                     onClick={() => setSelectedTier(null)}
-                    className={`px-3 py-1.5 rounded-md text-sm font-medium transition ${selectedTier === null
+                    className={`px-2 md:px-3 py-1.5 rounded-md text-xs font-medium transition whitespace-nowrap ${selectedTier === null
                       ? 'bg-white shadow text-blue-600 border border-blue-200'
                       : 'text-gray-600 hover:text-gray-900'
                       }`}
@@ -301,7 +269,7 @@ export default function Dashboard() {
                       setSelectedTier(0)
                       setShowActiveOnly(false)
                     }}
-                    className={`px-3 py-1.5 rounded-md text-sm font-medium transition ${selectedTier === 0
+                    className={`px-2 md:px-3 py-1.5 rounded-md text-xs font-medium transition whitespace-nowrap ${selectedTier === 0
                       ? 'bg-white shadow text-gray-600 border border-gray-200'
                       : 'text-gray-600 hover:text-gray-900'
                       }`}
@@ -313,20 +281,19 @@ export default function Dashboard() {
                       setSelectedTier(1)
                       setShowActiveOnly(false)
                     }}
-                    className={`px-3 py-1.5 rounded-md text-sm font-medium transition ${selectedTier === 1
+                    className={`px-2 md:px-3 py-1.5 rounded-md text-xs font-medium transition whitespace-nowrap ${selectedTier === 1
                       ? 'bg-white shadow text-blue-600 border border-blue-200'
                       : 'text-gray-600 hover:text-gray-900'
                       }`}
                   >
                     💎 VIP ({tierCounts.vip})
                   </button>
-
                   <button
                     onClick={() => {
                       setSelectedTier(2)
                       setShowActiveOnly(false)
                     }}
-                    className={`px-3 py-1.5 rounded-md text-sm font-medium transition ${selectedTier === 2
+                    className={`px-2 md:px-3 py-1.5 rounded-md text-xs font-medium transition whitespace-nowrap ${selectedTier === 2
                       ? 'bg-white shadow text-purple-600 border border-purple-200'
                       : 'text-gray-600 hover:text-gray-900'
                       }`}
@@ -342,27 +309,15 @@ export default function Dashboard() {
               placeholder="🔍 Search fans..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              style={{
-                width: '100%',
-                padding: '0.75rem',
-                border: '1px solid #e5e7eb',
-                borderRadius: '8px',
-                fontSize: '0.875rem'
-              }}
+              className="w-full px-3 md:px-4 py-2 md:py-3 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
 
           {filteredFans.length === 0 ? (
-            <div style={{
-              textAlign: 'center',
-              padding: '3rem',
-              color: '#9ca3af'
-            }}>
-              <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>👥</div>
-              <p style={{ fontSize: '1.125rem', fontWeight: '600', marginBottom: '0.5rem' }}>
-                No fans found
-              </p>
-              <p style={{ fontSize: '0.875rem' }}>
+            <div className="text-center py-12 text-gray-400">
+              <div className="text-5xl mb-4">👥</div>
+              <p className="text-lg font-semibold mb-2">No fans found</p>
+              <p className="text-sm">
                 {showActiveOnly
                   ? 'No active fans in the last 48 hours'
                   : 'Fans will appear automatically when they send messages'}
@@ -373,25 +328,25 @@ export default function Dashboard() {
               {filteredFans.map(fan => (
                 <div
                   key={fan.fan_id}
-                  className="border rounded-lg p-4 hover:shadow-lg hover:border-blue-300 transition cursor-pointer bg-gray-50"
+                  className="border rounded-lg p-3 md:p-4 hover:shadow-lg hover:border-blue-300 transition cursor-pointer bg-gray-50"
                   onClick={() => navigate(`/chat/${fan.fan_id}`)}
                 >
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
+                  <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-3">
+                    <div className="flex items-center gap-3 w-full md:w-auto">
                       {fan.of_avatar_url ? (
                         <img
                           src={fan.of_avatar_url}
                           alt={fan.name}
-                          className="w-12 h-12 rounded-full object-cover"
+                          className="w-10 h-10 md:w-12 md:h-12 rounded-full object-cover flex-shrink-0"
                         />
                       ) : (
-                        <div className="w-12 h-12 rounded-full bg-gradient-to-br from-purple-400 to-pink-400 flex items-center justify-center text-white text-xl font-bold">
+                        <div className="w-10 h-10 md:w-12 md:h-12 rounded-full bg-gradient-to-br from-purple-400 to-pink-400 flex items-center justify-center text-white text-lg md:text-xl font-bold flex-shrink-0">
                           {fan.name?.[0]?.toUpperCase() || '👤'}
                         </div>
                       )}
 
-                      <div>
-                        <h3 className="font-bold text-gray-800">
+                      <div className="min-w-0 flex-1">
+                        <h3 className="font-bold text-sm md:text-base text-gray-800 truncate">
                           {fan.display_name || fan.name || fan.of_username || 'Unknown'}
                           {fan.display_name && (
                             <span className="text-xs font-normal text-gray-500 ml-2">
@@ -399,7 +354,7 @@ export default function Dashboard() {
                             </span>
                           )}
                         </h3>
-                        <div className="flex items-center gap-2 text-sm text-gray-600">
+                        <div className="flex items-center gap-2 text-xs md:text-sm text-gray-600 flex-wrap">
                           {(() => {
                             const tierBadge = getTierBadge(fan.tier || 0)
                             return (
@@ -412,17 +367,17 @@ export default function Dashboard() {
                             ${(fan.spent_total || 0).toFixed(2)}
                           </span>
                           <span className="text-gray-400">•</span>
-                          <span>{getTimeText(fan)}</span>
+                          <span className="text-xs">{getTimeText(fan)}</span>
                         </div>
                       </div>
                     </div>
 
-                    <div className="text-right">
+                    <div className="text-left md:text-right w-full md:w-auto">
                       <div className="text-xs text-gray-500 mb-1">
                         {fan.lastMessageFrom === 'fan' && '👤 Fan'}
                         {fan.lastMessageFrom === 'model' && '💙 You'}
                       </div>
-                      <div className="text-sm text-gray-700 max-w-xs truncate">
+                      <div className="text-xs md:text-sm text-gray-700 max-w-full md:max-w-xs truncate">
                         {fan.lastMessage}
                       </div>
                     </div>
