@@ -201,6 +201,12 @@ export default function ChatView({ embedded = false }) {
       setNotesValue(fanData.notes || '');
       setChatterNotesValue(fanData.chatter_notes || '');
 
+      console.log('🔍 CONSULTANDO:', {
+  fanId,
+  currentModelId,
+  userModelId: user?.user_metadata?.model_id
+});
+
       const { data: messagesData, error: messagesError } = await supabase
         .from('chat')
         .select(`
@@ -214,9 +220,6 @@ export default function ChatView({ embedded = false }) {
         .order('ts', { ascending: true })  // ← DESC
         .limit(100);
 
-      console.log('🔍 QUERY PARAMS:', { fanId, currentModelId });
-      console.log('📨 MENSAJES TRAÍDOS:', messagesData?.length);
-      console.log('📋 ÚLTIMOS 3:', messagesData?.slice(-3));
 
       if (messagesError) {
         console.error('❌ Messages error:', messagesError);
