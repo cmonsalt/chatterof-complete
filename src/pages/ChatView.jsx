@@ -218,9 +218,8 @@ export default function ChatView({ embedded = false }) {
       if (messagesError) {
         console.error('❌ Messages error:', messagesError);
       } else {
+        console.log('✅ SETEANDO:', messagesData?.length, messagesData);
         setMessages(messagesData || []);
-          console.log('✅ MENSAJES SETEADOS:', messagesData?.length);
-  console.log('📋 Estado messages:', messages.length);
       }
 
       calculateFanStats(messagesData || []);
