@@ -52,10 +52,10 @@ export default function Navbar() {
           {/* Chatter Mode Button */}
           <button
             onClick={() => navigate('/chatter')}
-            className="hidden md:flex px-3 md:px-4 py-2 bg-gradient-to-r from-purple-600 to-pink-500 text-white rounded-lg text-sm font-semibold items-center gap-2 shadow-md hover:shadow-lg hover:-translate-y-0.5 transition-all"
+            className="flex px-2 md:px-4 py-2 bg-gradient-to-r from-purple-600 to-pink-500 text-white rounded-lg text-sm font-semibold items-center gap-2 shadow-md hover:shadow-lg hover:-translate-y-0.5 transition-all"
           >
             <span>💬</span>
-            <span>Chatter Mode</span>
+            <span className="hidden md:inline">Chatter Mode</span>
           </button>
 
           {/* Model Selector */}
@@ -83,11 +83,10 @@ export default function Navbar() {
                       <button
                         key={model.model_id}
                         onClick={() => handleModelSwitch(model.model_id)}
-                        className={`w-full text-left px-3 py-2 rounded-lg text-sm mt-1 transition-colors ${
-                          currentModel?.model_id === model.model_id
+                        className={`w-full text-left px-3 py-2 rounded-lg text-sm mt-1 transition-colors ${currentModel?.model_id === model.model_id
                             ? 'bg-gray-100 font-semibold text-blue-500'
                             : 'hover:bg-gray-50 text-gray-700'
-                        }`}
+                          }`}
                       >
                         <div className="flex items-center gap-2">
                           {currentModel?.model_id === model.model_id && <span>✓</span>}

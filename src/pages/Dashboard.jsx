@@ -377,7 +377,7 @@ export default function Dashboard() {
                         {fan.lastMessageFrom === 'fan' && '👤 Fan'}
                         {fan.lastMessageFrom === 'model' && '💙 You'}
                       </div>
-                      <div className="text-xs md:text-sm text-gray-700 max-w-full md:max-w-xs truncate">
+                      <div className="text-xs md:text-sm text-gray-700 max-w-[200px] md:max-w-xs truncate">
                         {fan.lastMessage}
                       </div>
                     </div>
