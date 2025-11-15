@@ -98,11 +98,10 @@ export default function ConfigTab({ modelId }) {
       <h2 className="text-2xl font-bold text-gray-900 mb-6">🧠 Model Configuration</h2>
 
       {message && (
-        <div className={`mb-6 p-4 rounded-lg ${
-          message.type === 'success' 
-            ? 'bg-green-50 text-green-800 border border-green-200' 
+        <div className={`mb-6 p-4 rounded-lg ${message.type === 'success'
+            ? 'bg-green-50 text-green-800 border border-green-200'
             : 'bg-red-50 text-red-800 border border-red-200'
-        }`}>
+          }`}>
           {message.text}
         </div>
       )}
@@ -164,7 +163,7 @@ export default function ConfigTab({ modelId }) {
         {/* AI Settings */}
         <div className="border-t pt-6">
           <h3 className="text-lg font-semibold text-gray-900 mb-4">AI Personality</h3>
-          
+
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Personality
@@ -252,87 +251,131 @@ export default function ConfigTab({ modelId }) {
           <h3 className="text-lg font-semibold text-gray-900 mb-4">Claude API</h3>
 
           {/* Custom Content Policy */}
-        <div className="border-t pt-6">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">🎥 Custom Content Policy</h3>
-          
-          <div className="mb-4">
-            <label className="flex items-center cursor-pointer">
-              <input
-                type="checkbox"
-                checked={config.does_customs || false}
-                onChange={(e) => setConfig({ ...config, does_customs: e.target.checked })}
-                className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
-              />
-              <span className="ml-2 text-sm font-medium text-gray-700">Offers custom content</span>
-            </label>
+          <div className="border-t pt-6">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">🎥 Custom Content Policy</h3>
+
+            <div className="mb-4">
+              <label className="flex items-center cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={config.does_customs || false}
+                  onChange={(e) => setConfig({ ...config, does_customs: e.target.checked })}
+                  className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
+                />
+                <span className="ml-2 text-sm font-medium text-gray-700">Offers custom content</span>
+              </label>
+            </div>
+
+            {config.does_customs && (
+              <div className="space-y-4 pl-6 border-l-2 border-indigo-200">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    What customs she does
+                  </label>
+                  <textarea
+                    value={config.custom_what_she_does || ''}
+                    onChange={(e) => setConfig({ ...config, custom_what_she_does: e.target.value })}
+                    rows={3}
+                    placeholder="e.g., Solo, B/G, roleplay, fetish-friendly, specific requests..."
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-vertical"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    What she DOESN'T do
+                  </label>
+                  <textarea
+                    value={config.custom_what_she_doesnt || ''}
+                    onChange={(e) => setConfig({ ...config, custom_what_she_doesnt: e.target.value })}
+                    rows={3}
+                    placeholder="e.g., No face, no extreme, no bodily fluids, no..."
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-vertical"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Price Range
+                    </label>
+                    <input
+                      type="text"
+                      value={config.custom_price_range || ''}
+                      onChange={(e) => setConfig({ ...config, custom_price_range: e.target.value })}
+                      placeholder="$50-200"
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Typical Delivery Time
+                    </label>
+                    <input
+                      type="text"
+                      value={config.custom_delivery || ''}
+                      onChange={(e) => setConfig({ ...config, custom_delivery: e.target.value })}
+                      placeholder="3-7 days"
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    />
+                  </div>
+                </div>
+
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                  <p className="text-xs text-blue-800">
+                    💡 <strong>Tip:</strong> When fans ask for customs, the AI will alert the chatter and gather details.
+                    It will NOT quote prices automatically - you control the final quote based on the request.
+                  </p>
+                </div>
+              </div>
+            )}
           </div>
 
-          {config.does_customs && (
-            <div className="space-y-4 pl-6 border-l-2 border-indigo-200">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  What customs she does
-                </label>
-                <textarea
-                  value={config.custom_what_she_does || ''}
-                  onChange={(e) => setConfig({ ...config, custom_what_she_does: e.target.value })}
-                  rows={3}
-                  placeholder="e.g., Solo, B/G, roleplay, fetish-friendly, specific requests..."
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-vertical"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  What she DOESN'T do
-                </label>
-                <textarea
-                  value={config.custom_what_she_doesnt || ''}
-                  onChange={(e) => setConfig({ ...config, custom_what_she_doesnt: e.target.value })}
-                  rows={3}
-                  placeholder="e.g., No face, no extreme, no bodily fluids, no..."
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-vertical"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Price Range
-                  </label>
-                  <input
-                    type="text"
-                    value={config.custom_price_range || ''}
-                    onChange={(e) => setConfig({ ...config, custom_price_range: e.target.value })}
-                    placeholder="$50-200"
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Typical Delivery Time
-                  </label>
-                  <input
-                    type="text"
-                    value={config.custom_delivery || ''}
-                    onChange={(e) => setConfig({ ...config, custom_delivery: e.target.value })}
-                    placeholder="3-7 days"
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                  />
-                </div>
-              </div>
-
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-                <p className="text-xs text-blue-800">
-                  💡 <strong>Tip:</strong> When fans ask for customs, the AI will alert the chatter and gather details. 
-                  It will NOT quote prices automatically - you control the final quote based on the request.
-                </p>
-              </div>
+          {/* Additional Services & Pricing */}
+          <div className="border-t pt-6">
+            <div className="mb-4">
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                💰 Additional Services & Pricing
+              </h3>
+              <p className="text-sm text-gray-600">
+                List other services you offer beyond customs and catalog PPV. AI will ONLY offer services listed here.
+              </p>
             </div>
-          )}
-        </div>
-            {/*
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Services You Offer
+              </label>
+              <textarea
+                value={config.services_offered || ''}
+                onChange={(e) => setConfig({ ...config, services_offered: e.target.value })}
+                rows={10}
+                placeholder={`Example format:
+- Dick ratings (text): $30
+- Dick rating video: $60
+- SPH/Humiliation: $40 (NEVER give free)
+- Sexting sessions: $100/30min (ONLY when fan explicitly asks for dedicated sexting time - normal flirty chat is free)
+- Video calls: $200/15min
+- Voice messages: $25
+- JOI videos: $50
+- Roleplay customs: $60
+
+💡 Be specific about prices and conditions.
+⚠️ If it's not listed here, AI won't offer it.`}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-vertical font-mono text-sm"
+              />
+            </div>
+
+            <div className="mt-3 bg-blue-50 border border-blue-200 rounded-lg p-3">
+              <p className="text-xs text-blue-800">
+                💡 <strong>How it works:</strong> When a fan requests something (e.g., "rate my dick"),
+                the AI checks this list and offers it with the price you set. If it's not listed,
+                AI will politely say you don't offer that service.
+              </p>
+            </div>
+          </div>
+          {/*
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -392,11 +435,10 @@ export default function ConfigTab({ modelId }) {
           <button
             type="submit"
             disabled={saving}
-            className={`px-6 py-3 rounded-lg font-semibold text-white transition-colors ${
-              saving 
-                ? 'bg-gray-400 cursor-not-allowed' 
+            className={`px-6 py-3 rounded-lg font-semibold text-white transition-colors ${saving
+                ? 'bg-gray-400 cursor-not-allowed'
                 : 'bg-indigo-600 hover:bg-indigo-700'
-            }`}
+              }`}
           >
             {saving ? '💾 Saving...' : '💾 Save Configuration'}
           </button>

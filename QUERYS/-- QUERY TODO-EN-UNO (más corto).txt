@@ -1,0 +1,36 @@
+-- QUERY TODO-EN-UNO (más corto)
+SELECT 
+  table_name,
+  column_name,
+  data_type,
+  is_nullable
+FROM information_schema.columns
+WHERE table_schema = 'public'
+  AND table_name IN (
+    'models', 'fans', 'chat', 'catalog', 
+    'transactions', 'notifications', 
+    'usage_limits', 'model_configs', 'typing_status'
+  )
+ORDER BY table_name, ordinal_position;
+```
+
+Y dile a Claude:
+```
+"Mi BD tiene estas tablas con estos campos:
+[Resultado del query]
+
+Triggers principales:
+- calculate_fan_tier (en transactions insert)
+
+Funciones RPC:
+- increment_fan_spent
+- recalculateAllFanTiers
+
+Foreign keys:
+- fans.model_id → models.model_id
+- chat.fan_id → fans.id
+- chat.model_id → models.model_id
+- catalog.model_id → models.model_id
+- transactions.fan_id → fans.id
+- etc...
+"
