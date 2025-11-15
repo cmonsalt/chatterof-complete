@@ -59,7 +59,7 @@ export default function NotificationBell() {
         (payload) => {
           setNotifications(prev => [payload.new, ...prev].slice(0, 20))
           setUnreadCount(prev => prev + 1)
-          
+
           // Reproducir sonido (opcional)
           // new Audio('/notification.mp3').play()
         }
@@ -187,7 +187,8 @@ export default function NotificationBell() {
           border: '1px solid #e5e7eb',
           borderRadius: '0.75rem',
           boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1)',
-          width: '380px',
+          width: 'calc(100vw - 2rem)',
+          maxWidth: '380px',
           maxHeight: '500px',
           overflow: 'hidden',
           zIndex: 50
@@ -281,8 +282,10 @@ export default function NotificationBell() {
                         fontSize: '0.8125rem',
                         color: '#6b7280',
                         overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                        whiteSpace: 'nowrap'
+                        display: '-webkit-box',
+                        WebkitLineClamp: 2,
+                        WebkitBoxOrient: 'vertical',
+                        whiteSpace: 'normal'
                       }}>
                         {notif.message}
                       </div>
