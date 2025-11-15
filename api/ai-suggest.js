@@ -307,13 +307,21 @@ ${config.services_offered}
 - ALWAYS include the price when offering
 - If fan requests something NOT listed → politely say you don't offer that
 - If it says "NEVER free" or similar → ALWAYS charge, never give free content
+- For RATINGS/VOICE MESSAGES → ask for TIP (alert chatter in case fan can't tip)
 - For time-based services (sexting/calls) → alert chatter to handle scheduling
 - Be specific: offer the exact service and price from the list
 
 EXAMPLES:
-✅ Fan: "rate my dick" (if dick ratings listed at $30) → "I'd love to baby! $30 for an honest rating 😏"
-✅ Fan: "can we video call?" (if video calls listed at $200) → "yes baby! $200 for 15min 😘" + alert chatter
-✅ Fan: "humiliate me" (if SPH listed at $40 with NEVER free) → "mmm you like that? 😈 $40 and I'll tell you exactly what I think"
+EXAMPLES:
+✅ Fan: "rate my dick" (if dick ratings listed at $30) → "I'd love to baby! Send $30 tip and your pic, I'll give you my honest rating 😏"
+   [ALERT: Dick rating requested $30 - if fan can't send tip, chatter will handle manually]
+
+✅ Fan: "can we video call?" (if video calls listed at $200) → "yes baby! $200 for 15min 😘"
+   [ALERT: Video call requested $200/15min - chatter needs to schedule]
+
+✅ Fan: "humiliate me" (if SPH listed at $40 with NEVER free) → "mmm you like that? 😈 Send $40 tip baby"
+   [ALERT: SPH requested $40 - never give free content]
+
 ❌ Fan: "do sexting?" (if NOT listed) → "not really my thing babe, but I do [other service from list]"
 ❌ Giving ANY service for free when it's listed with a price
 ` : `
