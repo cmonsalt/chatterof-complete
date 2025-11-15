@@ -178,134 +178,140 @@ export default function NotificationBell() {
 
       {/* Dropdown */}
       {showDropdown && (
+        <div style={{
+          position: 'fixed',
+          top: '4rem',
+          right: '1rem',
+          '@media (min-width: 768px)': {
+            position: 'absolute',
+            top: '100%',
+            right: 0,
+            marginTop: '0.5rem'
+          },
+          background: 'white',
+          border: '1px solid #e5e7eb',
+          borderRadius: '0.75rem',
+          boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1)',
+          width: 'calc(100vw - 2rem)',
+          maxWidth: '380px',
+          maxHeight: '500px',
+          overflow: 'hidden',
+          zIndex: 9999
+        }}>
+          {/* Header */}
           <div style={{
-            position: 'fixed',
-            top: '4rem',
-            right: '1rem',
-            background: 'white',
-            border: '1px solid #e5e7eb',
-            borderRadius: '0.75rem',
-            boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1)',
-            width: 'calc(100vw - 2rem)',
-            maxWidth: '380px',
-            maxHeight: '500px',
-            overflow: 'hidden',
-            zIndex: 9999
+            padding: '1rem',
+            borderBottom: '1px solid #e5e7eb',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center'
           }}>
-            {/* Header */}
-            <div style={{
-              padding: '1rem',
-              borderBottom: '1px solid #e5e7eb',
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center'
-            }}>
-              <h3 style={{ fontSize: '1rem', fontWeight: 700 }}>
-                Notificaciones
-              </h3>
-              {unreadCount > 0 && (
-                <button
-                  onClick={markAllAsRead}
-                  disabled={loading}
-                  style={{
-                    fontSize: '0.75rem',
-                    color: '#3b82f6',
-                    fontWeight: 600,
-                    background: 'none',
-                    border: 'none',
-                    cursor: 'pointer'
-                  }}
-                >
-                  {loading ? 'Marcando...' : 'Marcar todas'}
-                </button>
-              )}
-            </div>
+            <h3 style={{ fontSize: '1rem', fontWeight: 700 }}>
+              Notificaciones
+            </h3>
+            {unreadCount > 0 && (
+              <button
+                onClick={markAllAsRead}
+                disabled={loading}
+                style={{
+                  fontSize: '0.75rem',
+                  color: '#3b82f6',
+                  fontWeight: 600,
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer'
+                }}
+              >
+                {loading ? 'Marcando...' : 'Marcar todas'}
+              </button>
+            )}
+          </div>
 
-            {/* List */}
-            <div style={{
-              maxHeight: '420px',
-              overflowY: 'auto'
-            }}>
-              {notifications.length === 0 ? (
-                <div style={{
-                  padding: '3rem 1rem',
-                  textAlign: 'center',
-                  color: '#9ca3af'
-                }}>
-                  <div style={{ fontSize: '3rem', marginBottom: '0.5rem' }}>🔔</div>
-                  <div style={{ fontSize: '0.875rem' }}>No hay notificaciones</div>
-                </div>
-              ) : (
-                notifications.map((notif) => (
-                  <div
-                    key={notif.id}
-                    onClick={() => handleNotificationClick(notif)}
-                    style={{
-                      padding: '1rem',
-                      borderBottom: '1px solid #f3f4f6',
-                      cursor: 'pointer',
-                      background: notif.is_read ? 'white' : '#eff6ff',
-                      transition: 'background 0.2s'
-                    }}
-                    onMouseEnter={(e) => e.target.style.background = notif.is_read ? '#f9fafb' : '#dbeafe'}
-                    onMouseLeave={(e) => e.target.style.background = notif.is_read ? 'white' : '#eff6ff'}
-                  >
-                    <div style={{ display: 'flex', gap: '0.75rem' }}>
-                      <div style={{ fontSize: '1.5rem', flexShrink: 0 }}>
-                        {getIcon(notif.type)}
-                      </div>
-                      <div style={{ flex: 1, minWidth: 0 }}>
+          {/* List */}
+          <div style={{
+            maxHeight: '420px',
+            overflowY: 'auto'
+          }}>
+            {notifications.length === 0 ? (
+              <div style={{
+                padding: '3rem 1rem',
+                textAlign: 'center',
+                color: '#9ca3af'
+              }}>
+                <div style={{ fontSize: '3rem', marginBottom: '0.5rem' }}>🔔</div>
+                <div style={{ fontSize: '0.875rem' }}>No hay notificaciones</div>
+              </div>
+            ) : (
+              notifications.map((notif) => (
+                <div
+                  key={notif.id}
+                  onClick={() => handleNotificationClick(notif)}
+                  style={{
+                    padding: '1rem',
+                    borderBottom: '1px solid #f3f4f6',
+                    cursor: 'pointer',
+                    background: notif.is_read ? 'white' : '#eff6ff',
+                    transition: 'background 0.2s'
+                  }}
+                  onMouseEnter={(e) => e.target.style.background = notif.is_read ? '#f9fafb' : '#dbeafe'}
+                  onMouseLeave={(e) => e.target.style.background = notif.is_read ? 'white' : '#eff6ff'}
+                >
+                  <div style={{ display: 'flex', gap: '0.75rem' }}>
+                    <div style={{ fontSize: '1.5rem', flexShrink: 0 }}>
+                      {getIcon(notif.type)}
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'start',
+                        marginBottom: '0.25rem'
+                      }}>
                         <div style={{
-                          display: 'flex',
-                          justifyContent: 'space-between',
-                          alignItems: 'start',
-                          marginBottom: '0.25rem'
+                          fontSize: '0.875rem',
+                          fontWeight: notif.is_read ? 400 : 700,
+                          color: '#111827'
                         }}>
-                          <div style={{
-                            fontSize: '0.875rem',
-                            fontWeight: notif.is_read ? 400 : 700,
-                            color: '#111827'
-                          }}>
-                            {notif.title}
-                          </div>
-                          <div style={{
-                            fontSize: '0.75rem',
-                            color: '#9ca3af',
-                            flexShrink: 0,
-                            marginLeft: '0.5rem'
-                          }}>
-                            {timeAgo(notif.created_at)}
-                          </div>
+                          {notif.title}
                         </div>
                         <div style={{
-                          fontSize: '0.8125rem',
-                          color: '#6b7280',
-                          overflow: 'hidden',
-                          display: '-webkit-box',
-                          WebkitLineClamp: 2,
-                          WebkitBoxOrient: 'vertical',
-                          whiteSpace: 'normal'
+                          fontSize: '0.75rem',
+                          color: '#9ca3af',
+                          flexShrink: 0,
+                          marginLeft: '0.5rem'
                         }}>
-                          {notif.message}
+                          {timeAgo(notif.created_at)}
                         </div>
-                        {notif.amount > 0 && (
-                          <div style={{
-                            marginTop: '0.25rem',
-                            fontSize: '0.875rem',
-                            fontWeight: 700,
-                            color: '#10b981'
-                          }}>
-                            ${notif.amount.toFixed(2)}
-                          </div>
-                        )}
                       </div>
+                      <div style={{
+                        fontSize: '0.8125rem',
+                        color: '#6b7280',
+                        overflow: 'hidden',
+                        display: '-webkit-box',
+                        WebkitLineClamp: 2,
+                        WebkitBoxOrient: 'vertical',
+                        whiteSpace: 'normal'
+                      }}>
+                        {notif.message}
+                      </div>
+                      {notif.amount > 0 && (
+                        <div style={{
+                          marginTop: '0.25rem',
+                          fontSize: '0.875rem',
+                          fontWeight: 700,
+                          color: '#10b981'
+                        }}>
+                          ${notif.amount.toFixed(2)}
+                        </div>
+                      )}
                     </div>
                   </div>
-                ))
-              )}
-            </div>
+                </div>
+              ))
+            )}
           </div>
-        )}
+        </div>
+      )}
     </div>
   )
 }
