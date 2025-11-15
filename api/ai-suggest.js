@@ -832,16 +832,29 @@ REMEMBER:
             .eq('parent_type', 'single')
         }
 
-        const { data: fullPPV } = await query.single()
+        const { data: fullPPV, error: ppvError } = await query.maybeSingle()
 
         if (fullPPV) {
+          // ✅ PPV existe - usarlo
           suggestion.recommended_ppv = fullPPV
+        } else {
+          // ❌ PPV NO existe - sugerir propina
+          console.warn('⚠️ AI suggested non-existent PPV:', suggestion.recommended_ppv)
+
+          const suggestedTitle = suggestion.recommended_ppv?.title || 'content'
+          suggestion.recommended_ppv = null
+          suggestion.alerts = suggestion.alerts || []
+          suggestion.alerts.push(
+            `💡 AI wanted to suggest "${suggestedTitle}" but it's not in your catalog. Consider asking for a tip ($20-50) for personalized service instead.`
+          )
+
+          suggestion.reasoning += `\n\n💰 Tip suggestion: Ask for $20-50 tip for personalized content/service`
         }
       } catch (ppvLookupError) {
-        console.warn('Could not find full PPV details:', ppvLookupError)
+        console.error('Error looking up PPV:', ppvLookupError)
+        suggestion.recommended_ppv = null
       }
     }
-
     // 18. Retornar sugerencia
     return res.json({
       success: true,
