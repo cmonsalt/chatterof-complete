@@ -9,12 +9,12 @@ export default function ChatterMode() {
   const { fanId } = useParams()
   const { user, modelId } = useAuth()
   const navigate = useNavigate()
-  
+
   const actualModelId = modelId || user?.user_metadata?.model_id
-  
+
   const [activeChats, setActiveChats] = useState([])
   const [searchQuery, setSearchQuery] = useState('')
-  
+
   // Metrics
   const [todayStats, setTodayStats] = useState({
     messagesSent: 0,
@@ -38,7 +38,7 @@ export default function ChatterMode() {
     if (actualModelId) {
       loadActiveChats()
       loadTodayStats()
-      
+
       const interval = setInterval(loadActiveChats, 30000)
       return () => clearInterval(interval)
     }
@@ -89,14 +89,14 @@ export default function ChatterMode() {
 
       for (const fan of fans) {
         const messages = allMessages?.filter(m => m.fan_id === fan.fan_id) || []
-        
+
         if (messages.length === 0) continue
 
         const lastMessage = messages[0] // Already sorted desc
         const lastFanMessage = messages.find(m => m.from === 'fan')
         const lastModelMessage = messages.find(m => m.from === 'model')
 
-        const needsResponse = lastFanMessage && 
+        const needsResponse = lastFanMessage &&
           (!lastModelMessage || new Date(lastFanMessage.ts) > new Date(lastModelMessage.ts))
 
         const minutesAgo = Math.floor((new Date() - new Date(lastMessage.ts)) / 60000)
@@ -180,41 +180,56 @@ export default function ChatterMode() {
     <>
       <Navbar />
       <div className="min-h-screen bg-gray-50">
-        <div className="max-w-7xl mx-auto p-6">
+        <div className="max-w-7xl mx-auto px-3 md:px-6 py-4 md:py-6">
           {/* Header */}
           <div className="mb-6">
-            <h1 className="text-3xl font-bold">💬 Chatter Mode</h1>
-            <p className="text-gray-600 mt-1">Manage multiple conversations efficiently</p>
+            <h1 className="text-2xl md:text-3xl font-bold">💬 Chatter Mode</h1>
+            <p className="text-sm md:text-base text-gray-600 mt-1">Manage multiple conversations efficiently</p>
           </div>
 
           {/* Stats */}
-          <div className="grid grid-cols-5 gap-4 mb-6">
-            <div className="bg-white rounded-xl shadow p-4">
-              <p className="text-sm text-gray-600">Messages Today</p>
-              <p className="text-2xl font-bold text-blue-600">{todayStats.messagesSent}</p>
-            </div>
-            <div className="bg-white rounded-xl shadow p-4">
-              <p className="text-sm text-gray-600">Sales Today</p>
-              <p className="text-2xl font-bold text-green-600">{todayStats.sales}</p>
-            </div>
-            <div className="bg-white rounded-xl shadow p-4">
-              <p className="text-sm text-gray-600">Revenue Today</p>
-              <p className="text-2xl font-bold text-green-600">${todayStats.revenue}</p>
-            </div>
-            <div className="bg-white rounded-xl shadow p-4">
-              <p className="text-sm text-gray-600">Active Chats</p>
-              <p className="text-2xl font-bold text-orange-600">{todayStats.activeFans}</p>
-            </div>
-            <div className="bg-white rounded-xl shadow p-4">
-              <p className="text-sm text-gray-600">Avg Response</p>
-              <p className="text-2xl font-bold text-purple-600">{todayStats.avgResponseTime}m</p>
-            </div>
+          {/* Card 1 - Messages Today */}
+          <div className="bg-white rounded-xl shadow p-3 md:p-4">
+            <p className="text-xs md:text-sm text-gray-600">Messages Today</p>
+            <p className="text-xl md:text-2xl font-bold text-blue-600">{todayStats.messagesSent}</p>
           </div>
 
-          <div className="grid grid-cols-12 gap-6">
+          {/* Card 2 - Sales Today */}
+          <div className="bg-white rounded-xl shadow p-3 md:p-4">
+            <p className="text-xs md:text-sm text-gray-600">Sales Today</p>
+            <p className="text-xl md:text-2xl font-bold text-green-600">{todayStats.sales}</p>
+          </div>
+
+          {/* Card 3 - Revenue Today */}
+          <div className="bg-white rounded-xl shadow p-3 md:p-4">
+            <p className="text-xs md:text-sm text-gray-600">Revenue Today</p>
+            <p className="text-xl md:text-2xl font-bold text-green-600">${todayStats.revenue}</p>
+          </div>
+
+          {/* Card 4 - Active Chats */}
+          <div className="bg-white rounded-xl shadow p-3 md:p-4">
+            <p className="text-xs md:text-sm text-gray-600">Active Chats</p>
+            <p className="text-xl md:text-2xl font-bold text-orange-600">{todayStats.activeFans}</p>
+          </div>
+
+          {/* Card 5 - Avg Response */}
+          <div className="bg-white rounded-xl shadow p-3 md:p-4">
+            <p className="text-xs md:text-sm text-gray-600">Avg Response</p>
+            <p className="text-xl md:text-2xl font-bold text-purple-600">{todayStats.avgResponseTime}m</p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-12 gap-4 md:gap-6">
             {/* Left: Fan List (3 columns) */}
-            <div className="col-span-3 bg-white rounded-xl shadow-lg p-6">
+            <div className={`${fanId ? 'hidden md:block' : 'block'} md:col-span-3 bg-white rounded-xl shadow-lg p-4 md:p-6`}>
               <div className="flex items-center justify-between mb-3 pb-3 border-b">
+                {fanId && (
+                  <button
+                    onClick={() => navigate('/chatter')}
+                    className="md:hidden text-blue-500 font-semibold text-sm"
+                  >
+                    ← Back
+                  </button>
+                )}
                 <h3 className="font-bold text-lg">Active Chats ({filteredChats.length})</h3>
               </div>
 
@@ -249,8 +264,8 @@ export default function ChatterMode() {
                     <div className="text-5xl mb-3">💬</div>
                     <p className="text-gray-500 font-semibold text-sm">No active chats</p>
                     <p className="text-gray-400 text-xs mt-2">
-                      {searchQuery 
-                        ? 'No fans match your search' 
+                      {searchQuery
+                        ? 'No fans match your search'
                         : 'Fans with recent messages will appear here'}
                     </p>
                   </div>
@@ -258,16 +273,15 @@ export default function ChatterMode() {
                   filteredChats.map((chat) => {
                     const tierBadge = getTierBadge(chat.tier || 0)
                     const isSelected = fanId === chat.fan_id
-                    
+
                     return (
                       <div
                         key={chat.fan_id}
                         onClick={() => navigate(`/chatter/${chat.fan_id}`)}
-                        className={`p-3 rounded-lg cursor-pointer transition-all ${
-                          isSelected
-                            ? 'bg-blue-50 border-2 border-blue-500 shadow-sm'
-                            : 'bg-gray-50 hover:bg-gray-100 border-2 border-transparent'
-                        }`}
+                        className={`p-3 rounded-lg cursor-pointer transition-all ${isSelected
+                          ? 'bg-blue-50 border-2 border-blue-500 shadow-sm'
+                          : 'bg-gray-50 hover:bg-gray-100 border-2 border-transparent'
+                          }`}
                       >
                         <div className="flex items-center justify-between mb-2">
                           <div className="flex items-center gap-2 flex-1 min-w-0">
@@ -276,7 +290,7 @@ export default function ChatterMode() {
                           </div>
                           <span className="text-xs text-gray-500 ml-2 flex-shrink-0">{getTimeText(chat)}</span>
                         </div>
-                        
+
                         <div className="flex items-center justify-between text-xs mb-2">
                           <span className={`px-2 py-0.5 rounded-full font-semibold text-xs ${tierBadge.color}`}>
                             {tierBadge.emoji} {tierBadge.label}
@@ -297,7 +311,7 @@ export default function ChatterMode() {
             </div>
 
             {/* Right: ChatView Component (9 columns - más espacio) */}
-            <div className="col-span-9">
+            <div className={`${fanId ? 'block' : 'hidden md:block'} md:col-span-9`}>
               {fanId ? (
                 <ChatView embedded={true} />
               ) : (
