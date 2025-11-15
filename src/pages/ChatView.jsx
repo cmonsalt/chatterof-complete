@@ -802,7 +802,7 @@ export default function ChatView({ embedded = false }) {
                       onKeyPress={(e) => e.key === 'Enter' && !sending && enviarMensaje()}
                       placeholder={replyingTo ? "Write your reply..." : "Type your message..."}
                       disabled={sending}
-                      className="flex-1 px-3 md:px-4 py-3 md:py-2 text-base md:text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
+                      className="flex-1 px-3 md:px-4 py-3 md:py-2 text-base border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
                     />
 
                     {/* 🤖 AI BUTTON */}
@@ -847,106 +847,95 @@ export default function ChatView({ embedded = false }) {
             </div>
 
             {/* Notes Sidebar */}
+            {/* Notes Sidebar */}
             {showNotesSidebar && (
-              <div className="hidden md:block bg-white rounded-xl shadow-lg p-6 max-h-[700px] overflow-y-auto md:w-[320px]">
-                <div className="flex items-center justify-between mb-4">
-                  <h2 className="text-xl font-bold text-gray-800">📝 Notes</h2>
-                  <button
-                    onClick={() => setShowNotesSidebar(false)}
-                    className="text-gray-400 hover:text-gray-600"
-                  >
-                    ✕
-                  </button>
-                </div>
+              <>
+                {/* Overlay oscuro - solo mobile */}
+                <div
+                  className="md:hidden fixed inset-0 bg-black bg-opacity-50 z-40"
+                  onClick={() => setShowNotesSidebar(false)}
+                />
 
-                {/* Nickname */}
-                <div className="mb-6">
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    Nickname
-                  </label>
-                  {editingNickname ? (
-                    <div className="space-y-2">
-                      <input
-                        type="text"
-                        value={nicknameValue}
-                        onChange={(e) => setNicknameValue(e.target.value)}
-                        className="w-full px-3 py-2 border rounded text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                        placeholder="Give this fan a nickname..."
-                      />
-                      <div className="flex gap-2">
-                        <button
-                          onClick={handleSaveNickname}
-                          disabled={savingNotes}
-                          className="flex-1 px-3 py-1 bg-blue-500 text-white rounded text-sm hover:bg-blue-600 disabled:opacity-50"
-                        >
-                          Save
-                        </button>
-                        <button
-                          onClick={() => {
-                            setEditingNickname(false);
-                            setNicknameValue(fan.display_name || '');
-                          }}
-                          className="flex-1 px-3 py-1 bg-gray-200 text-gray-700 rounded text-sm hover:bg-gray-300"
-                        >
-                          Cancel
-                        </button>
-                      </div>
-                    </div>
-                  ) : (
-                    <div
-                      onClick={() => {
-                        setEditingNickname(true);
-                        setNicknameValue(fan.display_name || '');
-                      }}
-                      className="px-3 py-2 bg-gray-50 border rounded text-sm cursor-pointer hover:bg-gray-100"
+                {/* Sidebar/Modal */}
+                <div className="fixed md:relative bottom-0 left-0 right-0 md:top-auto bg-white rounded-t-2xl md:rounded-xl shadow-lg p-6 max-h-[80vh] md:max-h-[700px] overflow-y-auto md:w-[320px] z-50">
+                  <div className="flex items-center justify-between mb-4">
+                    <h2 className="text-xl font-bold text-gray-800">📝 Notes</h2>
+                    <button
+                      onClick={() => setShowNotesSidebar(false)}
+                      className="text-gray-400 hover:text-gray-600"
                     >
-                      {fan.display_name || 'Click to add nickname...'}
-                    </div>
-                  )}
-                </div>
+                      ✕
+                    </button>
+                  </div>
 
-                {/* Personal Notes */}
-                <div className="mb-6">
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    💭 Personal Notes
-                  </label>
-                  <textarea
-                    value={notesValue}
-                    onChange={(e) => setNotesValue(e.target.value)}
-                    className="w-full px-3 py-2 border rounded text-sm resize-none focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                    rows="4"
-                    placeholder="What they like, preferences, personal info, etc."
-                  />
-                  <button
-                    onClick={handleSaveNotes}
-                    disabled={savingNotes}
-                    className="mt-2 w-full px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 text-sm disabled:opacity-50 font-semibold"
-                  >
-                    {savingNotes ? 'Saving...' : '💾 Save Notes'}
-                  </button>
-                </div>
+                  {/* Nickname */}
+                  <div className="mb-6">
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">
+                      Nickname
+                    </label>
+                    {editingNickname ? (
+                      <div className="space-y-2">
+                        <input
+                          type="text"
+                          value={nicknameValue}
+                          onChange={(e) => setNicknameValue(e.target.value)}
+                          className="w-full px-3 py-2 border rounded text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                          placeholder="Give this fan a nickname..."
+                        />
+                        <div className="flex gap-2">
+                          <button
+                            onClick={handleSaveNickname}
+                            disabled={savingNotes}
+                            className="flex-1 px-3 py-1 bg-blue-500 text-white rounded text-sm hover:bg-blue-600 disabled:opacity-50"
+                          >
+                            Save
+                          </button>
+                          <button
+                            onClick={() => {
+                              setEditingNickname(false);
+                              setNicknameValue(fan.display_name || '');
+                            }}
+                            className="flex-1 px-3 py-1 bg-gray-200 text-gray-700 rounded text-sm hover:bg-gray-300"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div
+                        onClick={() => {
+                          setEditingNickname(true);
+                          setNicknameValue(fan.display_name || '');
+                        }}
+                        className="px-3 py-2 bg-gray-50 border rounded text-sm cursor-pointer hover:bg-gray-100"
+                      >
+                        {fan.display_name || 'Click to add nickname...'}
+                      </div>
+                    )}
+                  </div>
 
-                {/* Chatter Tips */}
-                {/*<div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    💡 Chatter Tips
-                  </label>
-                  <textarea
-                    value={chatterNotesValue}
-                    onChange={(e) => setChatterNotesValue(e.target.value)}
-                    className="w-full px-3 py-2 border rounded text-sm resize-none focus:ring-2 focus:ring-purple-500 focus:outline-none"
-                    rows="4"
-                    placeholder="Best time to message, what they like to buy, conversation style, etc."
-                  />
-                  <button
-                    onClick={handleSaveChatterNotes}
-                    disabled={savingNotes}
-                    className="mt-2 w-full px-4 py-2 bg-purple-500 text-white rounded hover:bg-purple-600 text-sm disabled:opacity-50 font-semibold"
-                  >
-                    {savingNotes ? 'Saving...' : '💾 Save Tips'}
-                  </button>
-                </div>*/}
-              </div>
+                  {/* Personal Notes */}
+                  <div className="mb-6">
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">
+                      💭 Personal Notes
+                    </label>
+                    <textarea
+                      value={notesValue}
+                      onChange={(e) => setNotesValue(e.target.value)}
+                      className="w-full px-3 py-2 border rounded text-sm resize-none focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                      rows="4"
+                      placeholder="What they like, preferences, personal info, etc."
+                    />
+                    <button
+                      onClick={handleSaveNotes}
+                      disabled={savingNotes}
+                      className="mt-2 w-full px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 text-sm disabled:opacity-50 font-semibold"
+                    >
+                      {savingNotes ? 'Saving...' : '💾 Save Notes'}
+                    </button>
+                  </div>
+                </div>
+              </>
             )}
           </div>
 
