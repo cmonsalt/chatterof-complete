@@ -425,7 +425,7 @@ async function handlePPVUnlocked(payload, modelId) {
       purchase_metadata: {
         message_id: messageId,
         event_type: 'ppv_unlock',
-        subscriber_id: subscriberId
+       subscriber_id: fanId 
       }
     })
 
