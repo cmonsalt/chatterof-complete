@@ -328,7 +328,7 @@ export default function Dashboard() {
               {filteredFans.map(fan => (
                 <div
                   key={fan.fan_id}
-                  className="border rounded-lg p-3 md:p-4 hover:shadow-lg hover:border-blue-300 transition cursor-pointer bg-gray-50"
+                  className="border rounded-lg p-3 md:p-4 hover:shadow-lg hover:border-blue-300 transition cursor-pointer bg-gray-50 overflow-hidden"
                   onClick={() => navigate(`/chat/${fan.fan_id}`)}
                 >
                   <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-3">
