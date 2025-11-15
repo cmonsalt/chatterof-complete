@@ -792,32 +792,31 @@ export default function ChatView({ embedded = false }) {
                   </div>
                 )}
 
-                <div className="space-y-2">
-                  {/* Botones en línea */}
-                  <div className="flex gap-2 items-end">
-                    <input
-                      type="text"
-                      value={newMessage}
-                      onChange={(e) => setNewMessage(e.target.value)}
-                      onKeyPress={(e) => e.key === 'Enter' && !sending && enviarMensaje()}
-                      placeholder={replyingTo ? "Write your reply..." : "Type your message..."}
-                      disabled={sending}
-                      className="flex-1 px-3 md:px-4 py-3 md:py-2 text-base border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
-                    />
+                <div className="space-y-3">
+                  {/* Input arriba - full width */}
+                  <textarea
+                    value={newMessage}
+                    onChange={(e) => setNewMessage(e.target.value)}
+                    onKeyPress={(e) => e.key === 'Enter' && !e.shiftKey && !sending && (e.preventDefault(), enviarMensaje())}
+                    placeholder={replyingTo ? "Write your reply..." : "Type your message..."}
+                    disabled={sending}
+                    rows="3"
+                    className="w-full px-4 py-3 text-base border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 resize-none"
+                  />
 
-                    {/* 🤖 AI BUTTON */}
+                  {/* Botones abajo - grid */}
+                  <div className="grid grid-cols-3 gap-2">
                     <button
                       onClick={handleConsultarIA}
                       disabled={aiGenerating}
-                      className="px-3 md:px-4 py-3 md:py-2 text-sm md:text-base bg-purple-500 text-white rounded-lg hover:bg-purple-600 font-semibold transition-all disabled:opacity-50"
+                      className="px-4 py-3 bg-purple-500 text-white rounded-lg hover:bg-purple-600 font-semibold transition-all disabled:opacity-50 text-sm"
                     >
                       {aiGenerating ? '⏳' : '🤖 AI'}
                     </button>
 
-                    {/* 🔥 PPV BUTTON */}
                     <button
                       onClick={() => setShowPPVSelector(true)}
-                      className="px-3 md:px-4 py-3 md:py-2 text-sm md:text-base bg-gradient-to-r from-green-500 to-emerald-500 text-white rounded-lg hover:from-green-600 hover:to-emerald-600 font-semibold transition-all"
+                      className="px-4 py-3 bg-gradient-to-r from-green-500 to-emerald-500 text-white rounded-lg hover:from-green-600 hover:to-emerald-600 font-semibold transition-all text-sm"
                     >
                       💰 PPV
                     </button>
@@ -825,13 +824,13 @@ export default function ChatView({ embedded = false }) {
                     <button
                       onClick={enviarMensaje}
                       disabled={sending || !newMessage.trim()}
-                      className="px-3 md:px-4 py-3 md:py-2 text-sm md:text-base bg-blue-500 text-white rounded-lg hover:bg-blue-600 font-semibold transition-all disabled:opacity-50"
+                      className="px-4 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 font-semibold transition-all disabled:opacity-50 text-sm"
                     >
-                      {sending ? 'Enviando...' : 'Enviar'}
+                      {sending ? '⏳' : '📤'}
                     </button>
                   </div>
 
-                  {/* Typing indicator FUERA del flex */}
+                  {/* Typing indicator */}
                   {fanIsTyping && (
                     <div className="px-4 py-1 text-sm text-gray-500 italic flex items-center gap-2">
                       <div className="flex gap-1">
