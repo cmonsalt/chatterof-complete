@@ -214,6 +214,10 @@ export default function ChatView({ embedded = false }) {
         .order('ts', { ascending: true })  // ← DESC
         .limit(100);
 
+      console.log('🔍 QUERY PARAMS:', { fanId, currentModelId });
+      console.log('📨 MENSAJES TRAÍDOS:', messagesData?.length);
+      console.log('📋 ÚLTIMOS 3:', messagesData?.slice(-3));
+
       if (messagesError) {
         console.error('❌ Messages error:', messagesError);
       } else {
