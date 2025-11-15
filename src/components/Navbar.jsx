@@ -42,7 +42,7 @@ export default function Navbar() {
           onClick={() => navigate('/dashboard')}
           className="text-lg md:text-2xl font-bold cursor-pointer text-blue-500"
         >
-          ChatterOF 🔔
+          ChatterOF
         </h1>
 
         <div className="flex gap-1 md:gap-3 items-center">
