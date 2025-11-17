@@ -9,6 +9,7 @@ import PPVMessage from '../components/PPVMessage';
 
 
 
+
 export default function ChatView({ embedded = false }) {
   const { fanId } = useParams();
   const { user, modelId } = useAuth();
@@ -54,6 +55,7 @@ export default function ChatView({ embedded = false }) {
   const [translating, setTranslating] = useState(null)
   const [translatedInput, setTranslatedInput] = useState('')
   const [isTranslatingInput, setIsTranslatingInput] = useState(false)
+  const [outputLang, setOutputLang] = useState('en'); // 'es' o 'en'
 
 
 
@@ -317,51 +319,59 @@ export default function ChatView({ embedded = false }) {
   };
 
   // 🌐 Auto-translate input (español → inglés)
- const handleInputChange = (e) => {
-  const spanishText = e.target.value;
-  setNewMessage(spanishText);
-  
-  if (!spanishText.trim()) {
-    setTranslatedInput('');
-    return;
-  }
-  
-  // Cancelar traducción anterior si existe
-  if (window.translationTimeout) {
-    clearTimeout(window.translationTimeout);
-  }
-  
-  // Esperar 800ms después que el usuario deje de escribir
-  window.translationTimeout = setTimeout(async () => {
-    setIsTranslatingInput(true);
-    
-    try {
-      const response = await fetch('/api/translate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          text: spanishText,
-          direction: 'to_english'
-        })
-      });
-      
-      if (!response.ok) {
-        throw new Error('Translation failed');
-      }
-      
-      const data = await response.json();
-      
-      if (data.translated) {
-        setTranslatedInput(data.translated);
-      }
-    } catch (error) {
-      console.error('❌ Input translation error:', error);
-      // No mostrar error al usuario, solo log
-    } finally {
-      setIsTranslatingInput(false);
+  const handleInputChange = (e) => {
+    const text = e.target.value;
+    setNewMessage(text);
+
+    // ⚠️ SOLO traducir si dropdown está en "English"
+    if (outputLang !== 'en' || !text.trim()) {
+      setTranslatedInput('');
+      return;
     }
-  }, 800); // Espera 800ms (0.8 segundos)
-};
+
+    // Mínimo 3 palabras
+    const wordCount = text.trim().split(/\s+/).length;
+    if (wordCount < 3) {
+      setTranslatedInput('');
+      return;
+    }
+
+    // Cancelar traducción anterior
+    if (window.translationTimeout) {
+      clearTimeout(window.translationTimeout);
+    }
+
+    // ⏱️ Esperar 1.5 segundos
+    window.translationTimeout = setTimeout(async () => {
+      setIsTranslatingInput(true);
+
+      try {
+        const response = await fetch('/api/translate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            text: spanishText,
+            direction: 'to_english'
+          })
+        });
+
+        if (!response.ok) {
+          throw new Error('Translation failed');
+        }
+
+        const data = await response.json();
+
+        if (data.translated) {
+          setTranslatedInput(data.translated);
+        }
+      } catch (error) {
+        console.error('❌ Input translation error:', error);
+        // No mostrar error al usuario, solo log
+      } finally {
+        setIsTranslatingInput(false);
+      }
+    }, 800); // Espera 800ms (0.8 segundos)
+  };
 
   // 🔥 Handle PPV content selection
   function handlePPVContentSelected(content) {
@@ -458,7 +468,7 @@ export default function ChatView({ embedded = false }) {
           accountId: model.of_account_id,
           modelId: currentModelId,
           chatId: fanId,
-          text: translatedInput || newMessage, // 🌐 Usar traducción si existe
+          text: outputLang === 'en' && translatedInput ? translatedInput : newMessage,
           mediaFiles: [],
           price: 0,
           replyToMessageId: replyingTo?.id || null,
@@ -773,6 +783,22 @@ export default function ChatView({ embedded = false }) {
                 <div ref={messagesEndRef} />
               </div>
 
+              {/* 🆕 DROPDOWN IDIOMA */}
+              <div className="mb-3 flex items-center gap-2">
+                <span className="text-sm text-gray-600 font-medium">Send in:</span>
+                <select
+                  value={outputLang}
+                  onChange={(e) => {
+                    setOutputLang(e.target.value);
+                    setTranslatedInput(''); // Limpiar preview
+                  }}
+                  className="text-sm border border-gray-300 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="es">🇪🇸 Español</option>
+                  <option value="en">🇺🇸 English</option>
+                </select>
+              </div>
+
               {/* Input Area */}
               <div className="border-t border-gray-200 p-4">
                 {replyingTo && (
@@ -808,7 +834,13 @@ export default function ChatView({ embedded = false }) {
                     value={newMessage}
                     onChange={handleInputChange}
                     onKeyPress={(e) => e.key === 'Enter' && !e.shiftKey && !sending && (e.preventDefault(), enviarMensaje())}
-                    placeholder={replyingTo ? "Write your reply..." : "Escribe en español..."}
+                    placeholder={
+                      replyingTo
+                        ? "Write your reply..."
+                        : outputLang === 'en'
+                          ? "Escribe en español..."
+                          : "Escribe tu mensaje..."
+                    }
                     disabled={sending}
                     rows="3"
                     className="w-full px-4 py-3 text-base border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 resize-none"
