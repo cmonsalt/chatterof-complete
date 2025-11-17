@@ -18,6 +18,10 @@ export default function PPVSendModal({
   const [sending, setSending] = useState(false);
   const [customPrice, setCustomPrice] = useState(null);
   const [purchasedCatalogIds, setPurchasedCatalogIds] = useState(new Set());
+  const [translatedMessage, setTranslatedMessage] = useState('');
+  const [translatedLocked, setTranslatedLocked] = useState('');
+  const [translatingMessage, setTranslatingMessage] = useState(false);
+  const [translatingLocked, setTranslatingLocked] = useState(false);
 
   // ← NUEVO: Auto-rellenar cuando viene de IA
   useEffect(() => {
@@ -106,10 +110,10 @@ export default function PPVSendModal({
       const mediaFiles = selectedContent.map(item => item.of_media_id);
 
       const ppvData = {
-        text: message,
+        text: translatedMessage || message,  // ✅ Usar traducción si existe
         mediaFiles,
         price,
-        lockedText: lockedText.trim() || undefined,
+        lockedText: (translatedLocked || lockedText).trim() || undefined,
         previewMediaIds: previewMediaIds.length > 0 ? previewMediaIds : undefined,
         catalogIds: selectedContent.map(item => item.id)
       };
@@ -134,6 +138,34 @@ export default function PPVSendModal({
         return [...prev, mediaId];
       }
     });
+  }
+
+  async function translateText(text, setTranslated, setTranslating) {
+    if (!text.trim()) return;
+
+    setTranslating(true);
+    try {
+      const response = await fetch('/api/translate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          text: text,
+          direction: 'to_english'
+        })
+      });
+
+      if (!response.ok) throw new Error('Translation failed');
+
+      const data = await response.json();
+      if (data.translated) {
+        setTranslated(data.translated);
+      }
+    } catch (error) {
+      console.error('❌ Translation error:', error);
+      alert('Translation failed');
+    } finally {
+      setTranslating(false);
+    }
   }
 
   if (!isOpen || !selectedContent || selectedContent.length === 0) return null;
@@ -288,34 +320,40 @@ export default function PPVSendModal({
             </label>
             <textarea
               value={message}
-              onChange={(e) => setMessage(e.target.value)}
-              placeholder="Baby I have something special for you..."
+              onChange={(e) => {
+                setMessage(e.target.value);
+                setTranslatedMessage(''); // Limpiar traducción al editar
+              }}
+              placeholder="Escribe en español..."
               rows={3}
               className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent resize-none"
             />
-            {aiSuggestion && (
-              <p className="text-xs text-purple-600 mt-1">
-                ✨ Pre-filled by AI
-              </p>
-            )}
-          </div>
 
-          {/* Locked Text (Tease) */}
-          <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-2">
-              🔓 Locked Text (Optional Tease)
-            </label>
-            <input
-              type="text"
-              value={lockedText}
-              onChange={(e) => setLockedText(e.target.value)}
-              placeholder="e.g., Unlock to see me play 💦"
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-            />
-            <p className="text-xs text-gray-500 mt-1">
-              This text appears before fan unlocks the content
-            </p>
-            {aiSuggestion && aiSuggestion.teaseText && (
+            {/* Botón traducir */}
+            <button
+              onClick={() => translateText(message, setTranslatedMessage, setTranslatingMessage)}
+              disabled={translatingMessage || !message.trim()}
+              className="mt-2 text-sm text-blue-600 hover:text-blue-800 font-semibold disabled:opacity-50"
+            >
+              {translatingMessage ? '⏳ Traduciendo...' : '🌐 Translate to English'}
+            </button>
+
+            {/* Preview traducción */}
+            {translatedMessage && (
+              <div className="mt-3 bg-green-50 border border-green-200 rounded-lg p-3">
+                <label className="block text-xs text-green-700 font-semibold mb-1">
+                  🇺🇸 English Preview (editable):
+                </label>
+                <textarea
+                  value={translatedMessage}
+                  onChange={(e) => setTranslatedMessage(e.target.value)}
+                  rows={2}
+                  className="w-full px-3 py-2 text-sm border border-green-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 resize-none"
+                />
+              </div>
+            )}
+
+            {aiSuggestion && (
               <p className="text-xs text-purple-600 mt-1">
                 ✨ Pre-filled by AI
               </p>
