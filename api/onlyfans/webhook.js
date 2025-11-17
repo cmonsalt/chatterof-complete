@@ -425,7 +425,7 @@ async function handlePPVUnlocked(payload, modelId) {
       purchase_metadata: {
         message_id: messageId,
         event_type: 'ppv_unlock',
-        subscriber_id: fanId
+       subscriber_id: fanId 
       }
     })
 
@@ -439,7 +439,7 @@ async function handlePPVUnlocked(payload, modelId) {
   const { data: fanData } = await supabase
     .from('fans')
     .select('of_username, display_name, name')
-    .eq('fan_id', actualFanId)
+    .eq('fan_id', actualFanId) 
     .eq('model_id', modelId)
     .single()
 
@@ -605,34 +605,29 @@ async function handleAccountEvent(event, payload, modelId) {
 }
 
 export default async function handler(req, res) {
-  // ⚡ 1. RESPONDER INMEDIATAMENTE
-  res.status(200).json({ success: true });
+  if (req.method !== 'POST') {
+    return res.status(405).json({ error: 'Method not allowed' })
+  }
 
-  // ⚡ 2. VALIDACIONES Y PROCESAMIENTO EN BACKGROUND
   try {
-    if (req.method !== 'POST') {
-      console.log('❌ Method not POST');
-      return;
-    }
-
-    const { event, account_id, payload } = req.body;
+    const { event, account_id, payload } = req.body
 
     if (!event || !payload) {
-      console.log('❌ Invalid payload');
-      return;
+      console.log('❌ Invalid payload:', JSON.stringify(req.body))
+      return res.status(400).json({ error: 'Invalid webhook payload' })
     }
 
     // Ignorar eventos de test
     if (event === 'test-event') {
-      console.log('✅ Test event received');
-      return;
+      console.log('✅ Test event received')
+      return res.status(200).json({ success: true })
     }
 
-    console.log(`🔔 Webhook event: ${event}`);
+    console.log(`🔔 Webhook event: ${event}`)
 
     if (!account_id) {
-      console.log('❌ Missing account_id');
-      return;
+      console.log('❌ Missing account_id')
+      return res.status(400).json({ error: 'Missing account_id' })
     }
 
     // Buscar modelo por account_id
@@ -640,12 +635,13 @@ export default async function handler(req, res) {
       .from('models')
       .select('model_id')
       .eq('of_account_id', account_id)
-      .single();
+      .single()
 
     if (!model) {
-      console.log(`❌ Model not found for account: ${account_id}`);
-      return;
+      console.log(`❌ Model not found for account: ${account_id}`)
+      return res.status(404).json({ error: 'Model not found' })
     }
+
     const modelId = model.model_id
 
     // Rutear eventos
@@ -687,10 +683,10 @@ export default async function handler(req, res) {
         console.log(`⚠️ Unhandled event: ${event}`)
     }
 
-    console.log('✅ Webhook processed');
+    return res.status(200).json({ success: true })
 
   } catch (error) {
-    console.error('❌ Webhook error:', error);
-    // NO res.status - ya respondimos
+    console.error('❌ Webhook error:', error)
+    return res.status(500).json({ error: error.message })
   }
 }
