@@ -17,9 +17,12 @@ export default async function handler(req, res) {
       return res.status(500).json({ error: 'OpenAI API key not configured' });
     }
 
-    const targetLang = direction === 'to_spanish' ? 'Spanish' : 'English';
+    // 🎯 Idioma target natural
+    const targetLang = direction === 'to_spanish' 
+      ? 'natural Latin American Spanish' 
+      : 'natural American English';
     
-    console.log('🤖 Calling GPT-4o-mini...');
+    console.log(`🤖 Translating to ${targetLang}...`);
 
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
@@ -31,7 +34,7 @@ export default async function handler(req, res) {
         model: 'gpt-4o-mini',
         messages: [{
           role: 'user',
-          content: `Translate this to ${targetLang}. Only output the translation, nothing else:\n\n${text}`
+          content: `Translate to ${targetLang} as spoken in casual conversations. Keep the same tone and emotion. Only output the translation:\n\n${text}`
         }],
         temperature: 0.3,
         max_tokens: 500
