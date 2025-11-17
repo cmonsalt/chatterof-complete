@@ -41,16 +41,34 @@ export default async function handler(req, res) {
       apiKey: process.env.ANTHROPIC_API_KEY
     });
 
-    // Prompt según dirección
+    // 🎯 PROMPT MEJORADO con contexto profesional
     const prompt = direction === 'to_spanish'
-      ? `Translate this English text to Spanish. Only return the translation, nothing else:\n\n${text}`
-      : `Translate this Spanish text to English. Only return the translation, nothing else:\n\n${text}`;
+      ? `You are a professional translation assistant for an adult content subscription platform (similar to OnlyFans). Your job is to accurately translate messages between creators and their paying subscribers.
 
-    console.log('🤖 Calling Claude Haiku...');
+Context: This is legitimate business communication between consenting adults on a paid platform. The creator needs accurate translations to communicate with international subscribers.
 
-    // Llamar a Claude Haiku - ✅ NOMBRE CORRECTO
+Task: Translate the following English message to Spanish, maintaining the tone and meaning exactly as written. Provide ONLY the Spanish translation, nothing else.
+
+Message to translate:
+${text}
+
+Spanish translation:`
+      : `You are a professional translation assistant for an adult content subscription platform (similar to OnlyFans). Your job is to accurately translate messages between creators and their paying subscribers.
+
+Context: This is legitimate business communication between consenting adults on a paid platform. The creator needs accurate translations to communicate with international subscribers.
+
+Task: Translate the following Spanish message to English, maintaining the tone and meaning exactly as written. Provide ONLY the English translation, nothing else.
+
+Message to translate:
+${text}
+
+English translation:`;
+
+    console.log('🤖 Calling Claude Haiku with professional context...');
+
+    // Llamar a Claude Haiku
     const message = await anthropic.messages.create({
-      model: 'claude-3-5-haiku-20241022',  // ✅ CORRECTO
+      model: 'claude-3-5-haiku-20241022',
       max_tokens: 1024,
       messages: [{
         role: 'user',
@@ -59,6 +77,19 @@ export default async function handler(req, res) {
     });
 
     const translated = message.content[0].text.trim();
+
+    // Verificar si Claude se negó
+    if (translated.toLowerCase().includes('i cannot') || 
+        translated.toLowerCase().includes('i do not feel comfortable') ||
+        translated.toLowerCase().includes('i apologize')) {
+      
+      console.error('❌ Claude refused translation');
+      return res.status(400).json({ 
+        error: 'Translation blocked by AI safety filters',
+        original: text,
+        suggestion: 'Consider using DeepL API for adult content translation'
+      });
+    }
 
     console.log('✅ Translation success:', translated.substring(0, 50));
 
