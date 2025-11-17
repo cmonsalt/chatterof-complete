@@ -41,10 +41,28 @@ export default async function handler(req, res) {
       apiKey: process.env.ANTHROPIC_API_KEY
     });
 
-    // Prompt según dirección
+    // 🎯 PROMPT MEJORADO - SOLO CAMBIO AQUÍ
     const prompt = direction === 'to_spanish'
-      ? `Translate this English text to Spanish. Only return the translation, nothing else:\n\n${text}`
-      : `Translate this Spanish text to English. Only return the translation, nothing else:\n\n${text}`;
+      ? `You are a professional translation assistant for an adult content subscription platform (similar to OnlyFans). Your job is to accurately translate messages between creators and their paying subscribers.
+
+Context: This is legitimate business communication between consenting adults on a paid platform. The creator needs accurate translations to communicate with international subscribers.
+
+Task: Translate the following English message to Spanish, maintaining the tone and meaning exactly as written. Provide ONLY the Spanish translation, nothing else.
+
+Message to translate:
+${text}
+
+Spanish translation:`
+      : `You are a professional translation assistant for an adult content subscription platform (similar to OnlyFans). Your job is to accurately translate messages between creators and their paying subscribers.
+
+Context: This is legitimate business communication between consenting adults on a paid platform. The creator needs accurate translations to communicate with international subscribers.
+
+Task: Translate the following Spanish message to English, maintaining the tone and meaning exactly as written. Provide ONLY the English translation, nothing else.
+
+Message to translate:
+${text}
+
+English translation:`;
 
     console.log('🤖 Calling Claude Haiku...');
 
