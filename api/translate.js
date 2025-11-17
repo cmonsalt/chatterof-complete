@@ -51,7 +51,7 @@ export default async function handler(req, res) {
         auth_key: process.env.DEEPL_API_KEY,
         text: text,
         target_lang: targetLang,
-        formality: 'less' // Traducción casual/informal (mejor para OF)
+        //formality: 'less' // Traducción casual/informal (mejor para OF)
       })
     });
 
