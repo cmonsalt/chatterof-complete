@@ -47,7 +47,7 @@ export default function ChatView({ embedded = false }) {
   const justSentMessage = useRef(false);
   const messagesEndRef = useRef(null);
 
-  // 🌐 TRANSLATION STATES
+
   const [fanIsTyping, setFanIsTyping] = useState(false)
   const [floatingDate, setFloatingDate] = useState(null)
   const [expandedTranslations, setExpandedTranslations] = useState({})
@@ -106,7 +106,6 @@ export default function ChatView({ embedded = false }) {
       scrollToBottom();
     }
   }, [messages]);
-  
   const getTierBadge = (tier) => {
     const tiers = {
       0: { emoji: '🆓', label: 'New Fan', color: 'bg-gray-100 text-gray-700' },
@@ -205,11 +204,11 @@ export default function ChatView({ embedded = false }) {
   id, ts, fan_id, message, created_at, model_id, from, read, source,
   media_url, media_thumb, media_type, amount, is_ppv, ppv_price,
   is_locked, is_purchased, ppv_unlocked, of_message_id,
-  media_urls, ppv_metadata, translated_message
+  media_urls, ppv_metadata
 `)
         .eq('fan_id', fanId)
         .eq('model_id', currentModelId)
-        .order('ts', { ascending: false })
+        .order('ts', { ascending: false })  // ← DESC
         .limit(100);
 
 
@@ -218,15 +217,6 @@ export default function ChatView({ embedded = false }) {
       } else {
         const sortedMessages = (messagesData || []).reverse();
         setMessages(sortedMessages);
-        
-        // Cargar traducciones existentes
-        const existingTranslations = {};
-        sortedMessages.forEach(msg => {
-          if (msg.translated_message) {
-            existingTranslations[msg.id] = msg.translated_message;
-          }
-        });
-        setExpandedTranslations(existingTranslations);
       }
       calculateFanStats(messagesData || []);
       setLoading(false);
@@ -279,77 +269,127 @@ export default function ChatView({ embedded = false }) {
     });
   }
 
-  // 🌐 Translate incoming message (fan → español)
-  const translateMessage = async (messageId, text) => {
-    if (translating === messageId) return;
-    
-    setTranslating(messageId);
-    
+  // 🤖 NEW: AI Suggestion Handler
+  async function handleConsultarIA() {
+    const currentModelId = modelId;
+    if (!currentModelId || !fan) return;
+
+    setAiGenerating(true);
+
     try {
-      const response = await fetch('/api/translate', {
+      const response = await fetch('/api/ai-suggest', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          text,
-          direction: 'to_spanish'
+          fan_id: fan.fan_id,
+          model_id: currentModelId,
+          extra_instructions: aiExtraInstructions || ''
         })
       });
-      
-      const data = await response.json();
-      
-      if (data.translated) {
-        setExpandedTranslations(prev => ({
-          ...prev,
-          [messageId]: data.translated
-        }));
-        
-        // Guardar en DB
-        await supabase
-          .from('chat')
-          .update({ translated_message: data.translated })
-          .eq('id', messageId);
-      }
-    } catch (error) {
-      console.error('❌ Translation error:', error);
-    } finally {
-      setTranslating(null);
-    }
-  };
 
-  // 🌐 Auto-translate input (español → inglés)
-  const handleInputChange = async (e) => {
-    const spanishText = e.target.value;
-    setNewMessage(spanishText);
-    
-    if (!spanishText.trim()) {
-      setTranslatedInput('');
-      return;
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error);
+      }
+
+      const data = await response.json();
+      setAiSuggestion(data.suggestion);
+      setShowAISuggestion(true);
+
+    } catch (error) {
+      console.error('Error generating AI suggestion:', error);
+      alert('Error: ' + error.message);
+    } finally {
+      setAiGenerating(false);
     }
-    
-    setIsTranslatingInput(true);
-    
+  }
+
+  async function handleRegenerateAI() {
+    const currentModelId = modelId || user?.user_metadata?.model_id;
+    if (!currentModelId || !fan) return;
+
+    setAiGenerating(true);
+
     try {
-      const response = await fetch('/api/translate', {
+      const response = await fetch('/api/ai-suggest', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          text: spanishText,
-          direction: 'to_english'
+          fan_id: fan.fan_id,
+          model_id: currentModelId,
+          extra_instructions: aiExtraInstructions
         })
       });
-      
-      const data = await response.json();
-      
-      if (data.translated) {
-        setTranslatedInput(data.translated);
-      }
-    } catch (error) {
-      console.error('❌ Input translation error:', error);
-    } finally {
-      setIsTranslatingInput(false);
-    }
-  };
 
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error);
+      }
+
+      const data = await response.json();
+      setAiSuggestion(data.suggestion);
+      setAiGenerating(false);
+    } catch (error) {
+      console.error('AI Error:', error);
+      alert('Error: ' + error.message);
+      setAiGenerating(false);
+    }
+  }
+  // 🤖 Handle using AI suggestion
+  function handleUseAISuggestion() {
+    if (aiSuggestion?.message) {
+      setNewMessage(aiSuggestion.message);
+      setShowAISuggestion(false);
+    }
+  }
+
+  // 🤖 Handle sending AI suggestion with PPV
+  async function handleSendAIWithPPV() {
+    if (!aiSuggestion?.recommendedPPV) return;
+
+    const recommended = aiSuggestion.recommendedPPV;
+
+    if (recommended.session_name && recommended.step_number !== undefined) {
+      try {
+        // 1. Buscar el registro maestro de la parte
+        const { data: masterRecord, error: masterError } = await supabase
+          .from('catalog')
+          .select('of_media_ids')
+          .eq('model_id', modelId || user?.user_metadata?.model_id)
+          .eq('session_name', recommended.session_name)
+          .eq('step_number', recommended.step_number)
+          .single();
+
+        if (masterError) throw masterError;
+
+        // 2. Obtener TODOS los registros de esos media IDs
+        if (masterRecord?.of_media_ids && masterRecord.of_media_ids.length > 0) {
+          const { data: allMedias, error: mediasError } = await supabase
+            .from('catalog')
+            .select('*')
+            .eq('model_id', modelId || user?.user_metadata?.model_id)
+            .in('of_media_id', masterRecord.of_media_ids)
+            .order('created_at', { ascending: true });
+
+          if (mediasError) throw mediasError;
+
+          setSelectedPPVContent(allMedias || []);
+        } else {
+          setSelectedPPVContent([recommended]);
+        }
+      } catch (error) {
+        console.error('Error loading session part medias:', error);
+        setSelectedPPVContent([recommended]);
+      }
+    } else {
+      // Si es single, solo uno
+      setSelectedPPVContent([recommended]);
+    }
+
+    setAISuggestionForPPV(aiSuggestion);
+    setShowAISuggestion(false);
+    setShowPPVSend(true);
+  }
   // 🔥 Handle PPV content selection
   function handlePPVContentSelected(content) {
     setSelectedPPVContent(content);
@@ -445,7 +485,7 @@ export default function ChatView({ embedded = false }) {
           accountId: model.of_account_id,
           modelId: currentModelId,
           chatId: fanId,
-          text: translatedInput || newMessage, // 🌐 Usar traducción si existe
+          text: newMessage,
           mediaFiles: [],
           price: 0,
           replyToMessageId: replyingTo?.id || null,
@@ -459,7 +499,6 @@ export default function ChatView({ embedded = false }) {
       }
 
       setNewMessage('');
-      setTranslatedInput(''); // 🌐 Limpiar traducción
       setReplyingTo(null);
 
       await new Promise(resolve => setTimeout(resolve, 500));
@@ -682,6 +721,7 @@ export default function ChatView({ embedded = false }) {
 
                         <p className="text-sm">{msg.message}</p>
 
+
                         {msg.media_url && (
                           msg.is_ppv ? (
                             <PPVMessage message={msg} />
@@ -712,25 +752,6 @@ export default function ChatView({ embedded = false }) {
                           {new Date(msg.ts).toLocaleTimeString()}
                           {msg.from === 'model' && msg.read && ' • Read ✓'}
                         </div>
-
-                        {/* 🌐 Botón traducir para mensajes del fan */}
-                        {msg.from === 'fan' && (
-                          <div className="mt-2">
-                            {expandedTranslations[msg.id] ? (
-                              <div className="bg-blue-50 px-3 py-2 rounded-lg text-sm text-gray-700 border border-blue-200">
-                                🇪🇸 {expandedTranslations[msg.id]}
-                              </div>
-                            ) : (
-                              <button
-                                onClick={() => translateMessage(msg.id, msg.message)}
-                                disabled={translating === msg.id}
-                                className="text-xs text-blue-600 hover:text-blue-800 font-semibold"
-                              >
-                                {translating === msg.id ? '⏳ Traduciendo...' : '🌐 Traducir a español'}
-                              </button>
-                            )}
-                          </div>
-                        )}
 
                         {msg.from === 'fan' && (
                           <button
@@ -769,27 +790,27 @@ export default function ChatView({ embedded = false }) {
                 )}
 
                 <div className="space-y-3">
-                  {/* 🌐 Preview de traducción */}
-                  {translatedInput && (
-                    <div className="bg-green-50 px-4 py-2 rounded-lg border border-green-200">
-                      <span className="text-xs text-green-700 font-semibold">🇬🇧 English Preview:</span>
-                      <p className="text-sm text-gray-700 mt-1">{translatedInput}</p>
-                    </div>
-                  )}
-
                   {/* Input arriba - full width */}
                   <textarea
                     value={newMessage}
-                    onChange={handleInputChange}
+                    onChange={(e) => setNewMessage(e.target.value)}
                     onKeyPress={(e) => e.key === 'Enter' && !e.shiftKey && !sending && (e.preventDefault(), enviarMensaje())}
-                    placeholder={replyingTo ? "Write your reply..." : "Escribe en español..."}
+                    placeholder={replyingTo ? "Write your reply..." : "Type your message..."}
                     disabled={sending}
                     rows="3"
                     className="w-full px-4 py-3 text-base border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 resize-none"
                   />
 
-                  {/* Botones abajo - grid (sin botón AI) */}
-                  <div className="grid grid-cols-2 gap-2">
+                  {/* Botones abajo - grid */}
+                  <div className="grid grid-cols-3 gap-2">
+                    <button
+                      onClick={handleConsultarIA}
+                      disabled={aiGenerating}
+                      className="px-4 py-3 bg-purple-500 text-white rounded-lg hover:bg-purple-600 font-semibold transition-all disabled:opacity-50 text-sm"
+                    >
+                      {aiGenerating ? '⏳' : '🤖 AI'}
+                    </button>
+
                     <button
                       onClick={() => setShowPPVSelector(true)}
                       className="px-4 py-3 bg-gradient-to-r from-green-500 to-emerald-500 text-white rounded-lg hover:from-green-600 hover:to-emerald-600 font-semibold transition-all text-sm"
@@ -802,7 +823,7 @@ export default function ChatView({ embedded = false }) {
                       disabled={sending || !newMessage.trim()}
                       className="px-4 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 font-semibold transition-all disabled:opacity-50 text-sm"
                     >
-                      {sending ? '⏳' : '📤 Send'}
+                      {sending ? '⏳' : '📤'}
                     </button>
                   </div>
 
@@ -821,6 +842,7 @@ export default function ChatView({ embedded = false }) {
               </div>
             </div>
 
+            {/* Notes Sidebar */}
             {/* Notes Sidebar */}
             {showNotesSidebar && (
               <>
@@ -924,6 +946,135 @@ export default function ChatView({ embedded = false }) {
         </div>
       </div>
 
+      {/* 🤖 AI SUGGESTION MODAL */}
+      {showAISuggestion && aiSuggestion && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-6">
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-2xl font-bold text-gray-800">🤖 AI Suggestion</h2>
+                <button
+                  onClick={() => setShowAISuggestion(false)}
+                  className="text-gray-400 hover:text-gray-600 text-2xl"
+                >
+                  ✕
+                </button>
+              </div>
+
+              <div className="space-y-6">
+                {/* Suggested Message */}
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    💬 Suggested Message
+                  </label>
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                    <p className="text-gray-800">{aiSuggestion.message}</p>
+                  </div>
+                </div>
+
+                {/* Locked Text */}
+                {aiSuggestion.lockedText && (
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">
+                      🔒 Tease Text
+                    </label>
+                    <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
+                      <p className="text-gray-800">{aiSuggestion.lockedText}</p>
+                    </div>
+                  </div>
+                )}
+
+                {/* Recommended PPV */}
+                {aiSuggestion.recommendedPPV && (
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">
+                      📦 Recommended PPV
+                    </label>
+                    <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="font-semibold text-gray-800">
+                            {aiSuggestion.recommendedPPV.title}
+                          </p>
+                          <p className="text-sm text-gray-600">
+                            Level {aiSuggestion.recommendedPPV.nivel}/10
+                          </p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-2xl font-bold text-green-600">
+                            ${aiSuggestion.recommendedPPV.base_price}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Reasoning */}
+                {aiSuggestion.reasoning && (
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">
+                      💡 Why this suggestion?
+                    </label>
+                    <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                      <p className="text-sm text-gray-600">{aiSuggestion.reasoning}</p>
+                    </div>
+                  </div>
+                )}
+
+                {/* Additional Instructions */}
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    💬 Additional Instructions (optional)
+                  </label>
+                  <textarea
+                    value={aiExtraInstructions}
+                    onChange={(e) => setAiExtraInstructions(e.target.value)}
+                    className="w-full px-3 py-2 border rounded text-sm resize-none focus:ring-2 focus:ring-purple-500 focus:outline-none"
+                    rows="2"
+                    placeholder="e.g., Be more flirty, focus on her birthday, mention last purchase..."
+                  />
+                </div>
+
+                {/* Actions */}
+                <div className="flex gap-3 pt-4">
+                  <button
+                    onClick={handleRegenerateAI}
+                    disabled={aiGenerating}
+                    className="px-6 py-3 bg-purple-500 text-white rounded-lg hover:bg-purple-600 font-semibold transition-all disabled:opacity-50"
+                  >
+                    {aiGenerating ? '⏳ Regenerating...' : '🔄 Regenerate'}
+                  </button>
+
+                  <button
+                    onClick={handleUseAISuggestion}
+                    className="flex-1 px-6 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 font-semibold transition-all"
+                  >
+                    📝 Use Message
+                  </button>
+
+                  {aiSuggestion.recommendedPPV && (
+                    <button
+                      onClick={handleSendAIWithPPV}
+                      className="flex-1 px-6 py-3 bg-gradient-to-r from-green-500 to-emerald-500 text-white rounded-lg hover:from-green-600 hover:to-emerald-600 font-semibold transition-all"
+                    >
+                      💰 Send with PPV
+                    </button>
+                  )}
+
+                  <button
+                    onClick={() => setShowAISuggestion(false)}
+                    className="px-6 py-3 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 font-semibold transition-all"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* 🔥 PPV MODALS */}
       <PPVSelectorModal
         isOpen={showPPVSelector}
@@ -937,12 +1088,14 @@ export default function ChatView({ embedded = false }) {
         onClose={() => {
           setShowPPVSend(false);
           setSelectedPPVContent([]);
+          setAISuggestionForPPV(null);  // ← Limpiar también
         }}
         selectedContent={selectedPPVContent}
         fanTier={fan?.tier || 0}
         fanId={fanId}
         modelId={modelId || user?.user_metadata?.model_id}
         onSendPPV={handleSendPPV}
+        aiSuggestion={aiSuggestionForPPV}  // ← AGREGAR ESTE PROP
       />
     </>
   );
