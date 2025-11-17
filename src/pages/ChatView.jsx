@@ -106,7 +106,7 @@ export default function ChatView({ embedded = false }) {
       scrollToBottom();
     }
   }, [messages]);
-  
+
   const getTierBadge = (tier) => {
     const tiers = {
       0: { emoji: '🆓', label: 'New Fan', color: 'bg-gray-100 text-gray-700' },
@@ -218,7 +218,7 @@ export default function ChatView({ embedded = false }) {
       } else {
         const sortedMessages = (messagesData || []).reverse();
         setMessages(sortedMessages);
-        
+
         // Cargar traducciones existentes
         const existingTranslations = {};
         sortedMessages.forEach(msg => {
@@ -280,29 +280,29 @@ export default function ChatView({ embedded = false }) {
   }
 
   // 🌐 Translate incoming message (fan → español)
-  const translateMessage = async (messageId, text) => {
+  const translateMessage = async (messageId, text, direction = 'to_spanish') => {
     if (translating === messageId) return;
-    
+
     setTranslating(messageId);
-    
+
     try {
       const response = await fetch('/api/translate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           text,
-          direction: 'to_spanish'
+          direction  // ← Ahora es flexible
         })
       });
-      
+
       const data = await response.json();
-      
+
       if (data.translated) {
         setExpandedTranslations(prev => ({
           ...prev,
           [messageId]: data.translated
         }));
-        
+
         // Guardar en DB
         await supabase
           .from('chat')
@@ -317,15 +317,22 @@ export default function ChatView({ embedded = false }) {
   };
 
   // 🌐 Auto-translate input (español → inglés)
-  const handleInputChange = async (e) => {
-    const spanishText = e.target.value;
-    setNewMessage(spanishText);
-    
-    if (!spanishText.trim()) {
-      setTranslatedInput('');
-      return;
-    }
-    
+ const handleInputChange = (e) => {
+  const spanishText = e.target.value;
+  setNewMessage(spanishText);
+  
+  if (!spanishText.trim()) {
+    setTranslatedInput('');
+    return;
+  }
+  
+  // Cancelar traducción anterior si existe
+  if (window.translationTimeout) {
+    clearTimeout(window.translationTimeout);
+  }
+  
+  // Esperar 800ms después que el usuario deje de escribir
+  window.translationTimeout = setTimeout(async () => {
     setIsTranslatingInput(true);
     
     try {
@@ -338,6 +345,10 @@ export default function ChatView({ embedded = false }) {
         })
       });
       
+      if (!response.ok) {
+        throw new Error('Translation failed');
+      }
+      
       const data = await response.json();
       
       if (data.translated) {
@@ -345,10 +356,12 @@ export default function ChatView({ embedded = false }) {
       }
     } catch (error) {
       console.error('❌ Input translation error:', error);
+      // No mostrar error al usuario, solo log
     } finally {
       setIsTranslatingInput(false);
     }
-  };
+  }, 800); // Espera 800ms (0.8 segundos)
+};
 
   // 🔥 Handle PPV content selection
   function handlePPVContentSelected(content) {
@@ -713,23 +726,36 @@ export default function ChatView({ embedded = false }) {
                           {msg.from === 'model' && msg.read && ' • Read ✓'}
                         </div>
 
-                        {/* 🌐 Botón traducir para mensajes del fan */}
+                        {/* 🌐 Botón traducir PARA TODOS LOS MENSAJES */}
+                        <div className="mt-2">
+                          {expandedTranslations[msg.id] ? (
+                            <div className={`px-3 py-2 rounded-lg text-sm border ${msg.from === 'model'
+                              ? 'bg-white/20 border-white/30 text-white'
+                              : 'bg-blue-50 border-blue-200 text-gray-700'
+                              }`}>
+                              {msg.from === 'model' ? '🇪🇸' : '🇪🇸'} {expandedTranslations[msg.id]}
+                            </div>
+                          ) : (
+                            <button
+                              onClick={() => translateMessage(msg.id, msg.message, msg.from === 'model' ? 'to_spanish' : 'to_spanish')}
+                              disabled={translating === msg.id}
+                              className={`text-xs font-semibold ${msg.from === 'model'
+                                ? 'text-white/90 hover:text-white'
+                                : 'text-blue-600 hover:text-blue-800'
+                                }`}
+                            >
+                              {translating === msg.id ? '⏳ Traduciendo...' : '🌐 Traducir'}
+                            </button>
+                          )}
+                        </div>
+
                         {msg.from === 'fan' && (
-                          <div className="mt-2">
-                            {expandedTranslations[msg.id] ? (
-                              <div className="bg-blue-50 px-3 py-2 rounded-lg text-sm text-gray-700 border border-blue-200">
-                                🇪🇸 {expandedTranslations[msg.id]}
-                              </div>
-                            ) : (
-                              <button
-                                onClick={() => translateMessage(msg.id, msg.message)}
-                                disabled={translating === msg.id}
-                                className="text-xs text-blue-600 hover:text-blue-800 font-semibold"
-                              >
-                                {translating === msg.id ? '⏳ Traduciendo...' : '🌐 Traducir a español'}
-                              </button>
-                            )}
-                          </div>
+                          <button
+                            onClick={() => setReplyingTo(msg)}
+                            className="text-xs underline opacity-75 hover:opacity-100 mt-1"
+                          >
+                            Reply
+                          </button>
                         )}
 
                         {msg.from === 'fan' && (
