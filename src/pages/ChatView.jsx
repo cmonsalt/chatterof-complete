@@ -350,7 +350,7 @@ export default function ChatView({ embedded = false }) {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            text: spanishText,
+            text: text,
             direction: 'to_english'
           })
         });
@@ -370,7 +370,7 @@ export default function ChatView({ embedded = false }) {
       } finally {
         setIsTranslatingInput(false);
       }
-    }, 800); // Espera 800ms (0.8 segundos)
+    }, 1500); // Espera 800ms (0.8 segundos)
   };
 
   // 🔥 Handle PPV content selection
