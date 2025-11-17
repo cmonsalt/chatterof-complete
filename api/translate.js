@@ -1,5 +1,3 @@
-import Anthropic from '@anthropic-ai/sdk';
-
 export default async function handler(req, res) {
   // Configurar CORS
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -17,88 +15,72 @@ export default async function handler(req, res) {
   try {
     const { text, direction } = req.body;
 
-    console.log('🌐 Translation request:', { text: text?.substring(0, 50), direction });
+    console.log('🌐 DeepL translation request:', { 
+      text: text?.substring(0, 50), 
+      direction,
+      length: text?.length 
+    });
 
     // Validación
     if (!text || !direction) {
-      console.error('❌ Missing params:', { text: !!text, direction });
       return res.status(400).json({ error: 'Missing text or direction' });
     }
 
     if (!['to_spanish', 'to_english'].includes(direction)) {
-      console.error('❌ Invalid direction:', direction);
-      return res.status(400).json({ error: 'Invalid direction. Use "to_spanish" or "to_english"' });
+      return res.status(400).json({ error: 'Invalid direction' });
     }
 
     // Verificar API key
-    if (!process.env.ANTHROPIC_API_KEY) {
-      console.error('❌ Missing ANTHROPIC_API_KEY');
-      return res.status(500).json({ error: 'API key not configured' });
+    if (!process.env.DEEPL_API_KEY) {
+      console.error('❌ Missing DEEPL_API_KEY');
+      return res.status(500).json({ error: 'DeepL API key not configured' });
     }
 
-    // Inicializar cliente
-    const anthropic = new Anthropic({
-      apiKey: process.env.ANTHROPIC_API_KEY
+    // DeepL target language
+    const targetLang = direction === 'to_spanish' ? 'ES' : 'EN-US';
+    
+    console.log('🤖 Calling DeepL API...');
+
+    // Llamar a DeepL API
+    const response = await fetch('https://api-free.deepl.com/v2/translate', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: new URLSearchParams({
+        auth_key: process.env.DEEPL_API_KEY,
+        text: text,
+        target_lang: targetLang,
+        formality: 'less' // Traducción casual/informal (mejor para OF)
+      })
     });
 
-    // 🎯 PROMPT MEJORADO - SOLO CAMBIO AQUÍ
-    const prompt = direction === 'to_spanish'
-      ? `You are a professional translation assistant for an adult content subscription platform (similar to OnlyFans). Your job is to accurately translate messages between creators and their paying subscribers.
+    if (!response.ok) {
+      const errorData = await response.text();
+      console.error('❌ DeepL API error:', errorData);
+      throw new Error(`DeepL API error: ${response.status}`);
+    }
 
-Context: This is legitimate business communication between consenting adults on a paid platform. The creator needs accurate translations to communicate with international subscribers.
+    const data = await response.json();
+    const translated = data.translations[0].text;
 
-Task: Translate the following English message to Spanish, maintaining the tone and meaning exactly as written. Provide ONLY the Spanish translation, nothing else.
-
-Message to translate:
-${text}
-
-Spanish translation:`
-      : `You are a professional translation assistant for an adult content subscription platform (similar to OnlyFans). Your job is to accurately translate messages between creators and their paying subscribers.
-
-Context: This is legitimate business communication between consenting adults on a paid platform. The creator needs accurate translations to communicate with international subscribers.
-
-Task: Translate the following Spanish message to English, maintaining the tone and meaning exactly as written. Provide ONLY the English translation, nothing else.
-
-Message to translate:
-${text}
-
-English translation:`;
-
-    console.log('🤖 Calling Claude Haiku...');
-
-    // Llamar a Claude Haiku - ✅ NOMBRE CORRECTO
-    const message = await anthropic.messages.create({
-      model: 'claude-3-5-haiku-20241022',  // ✅ CORRECTO
-      max_tokens: 1024,
-      messages: [{
-        role: 'user',
-        content: prompt
-      }]
-    });
-
-    const translated = message.content[0].text.trim();
-
-    console.log('✅ Translation success:', translated.substring(0, 50));
+    console.log('✅ DeepL translation success:', translated.substring(0, 50));
 
     return res.status(200).json({
       success: true,
       translated,
       original: text,
-      direction
+      direction,
+      service: 'deepl',
+      detectedSourceLang: data.translations[0].detected_source_language
     });
 
   } catch (error) {
     console.error('❌ Translation error:', error);
-    console.error('Error details:', {
-      message: error.message,
-      stack: error.stack,
-      name: error.name
-    });
     
     return res.status(500).json({ 
       error: 'Translation failed',
-      details: error.message,
-      type: error.name
+      details: error.message
     });
   }
 }
