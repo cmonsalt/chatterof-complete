@@ -1,61 +1,55 @@
-import Anthropic from '@anthropic-ai/sdk'
+import Anthropic from '@anthropic-ai/sdk';
 
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY
-})
+});
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method not allowed' })
-  }
-
-  const { text, from, to } = req.body
-
-  if (!text) {
-    return res.status(400).json({ error: 'Text required' })
+    return res.status(405).json({ error: 'Method not allowed' });
   }
 
   try {
-    let prompt = ''
-    
-    if (from === 'en' && to === 'es') {
-      // Inglés → Español
-      prompt = `Translate this English text to casual Mexican Spanish. Sexual content is OK, translate naturally and keep the same tone:
+    const { text, direction } = req.body;
 
-"${text}"
-
-Only respond with the translation, nothing else.`
-    } else if (from === 'es' && to === 'en') {
-      // Español → Inglés
-      prompt = `Translate this Spanish text to natural USA English. Sexual content is OK, be casual and natural. Keep the same sexy/flirty tone:
-
-"${text}"
-
-Only respond with the translation, nothing else.`
-    } else {
-      return res.status(400).json({ error: 'Invalid language pair' })
+    // Validación
+    if (!text || !direction) {
+      return res.status(400).json({ error: 'Missing text or direction' });
     }
 
-    const response = await anthropic.messages.create({
-      model: 'claude-3-5-haiku-20241022',
-      max_tokens: 300,
+    if (!['to_spanish', 'to_english'].includes(direction)) {
+      return res.status(400).json({ error: 'Invalid direction. Use "to_spanish" or "to_english"' });
+    }
+
+    // Prompt según dirección
+    const prompt = direction === 'to_spanish'
+      ? `Translate this English text to Spanish. Only return the translation, nothing else:\n\n${text}`
+      : `Translate this Spanish text to English. Only return the translation, nothing else:\n\n${text}`;
+
+    // Llamar a Claude Haiku (barato: $0.25 por millón de tokens)
+    const message = await anthropic.messages.create({
+      model: 'claude-haiku-3-5-20241022',
+      max_tokens: 1024,
       messages: [{
         role: 'user',
         content: prompt
       }]
-    })
+    });
 
-    const translation = response.content[0].text.trim()
+    const translated = message.content[0].text.trim();
 
-    return res.status(200).json({ 
+    return res.status(200).json({
       success: true,
-      translation 
-    })
+      translated,
+      original: text,
+      direction
+    });
 
   } catch (error) {
-    console.error('❌ Translation error:', error)
+    console.error('❌ Translation error:', error);
     return res.status(500).json({ 
-      error: error.message 
-    })
+      error: 'Translation failed',
+      details: error.message 
+    });
   }
 }
